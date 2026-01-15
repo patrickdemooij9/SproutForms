@@ -1,0 +1,69 @@
+/* ===========================
+   Default Form Theme
+   =========================== */
+
+.form-root {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #222;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+    .form-group label {
+        font-weight: 600;
+        margin-bottom: 0.25rem;
+    }
+
+    .form-group .required {
+        color: #c62828;
+        margin-left: 0.25rem;
+    }
+
+.form-control {
+    padding: 0.5rem 0.6rem;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+    .form-control:focus {
+        outline: none;
+        border-color: #1976d2;
+        box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2);
+    }
+
+    .form-control[aria-invalid="true"] {
+        border-color: #c62828;
+    }
+
+.form-error {
+    color: #c62828;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+.form-actions {
+    margin-top: 1rem;
+}
+
+    .form-actions button {
+        background: #1976d2;
+        color: #fff;
+        border: none;
+        padding: 0.6rem 1.2rem;
+        font-size: 1rem;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .form-actions button:hover {
+            background: #155fa0;
+        }
+
+        .form-actions button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }

@@ -1,0 +1,14 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (FileFieldConfig)Model.Configuration;
+}
+
+<input type="file"
+    class="form-control"
+    id="@Model.Alias"
+    name="@Model.Alias"
+    value="@(Model.Value)"
+    aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
+    data-field-id="@Model.Id" />

@@ -1,0 +1,13 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (HiddenFieldConfig)Model.Configuration;
+}
+
+<input type="hidden"
+       id="@Model.Alias"
+       name="@Model.Alias"
+       value="@(Model.Value ?? config.DefaultValue)"
+       aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
+       data-field-id="@Model.Id" />

@@ -1,0 +1,31 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Product>SproutForms.Umbraco.Core</Product>
+    <PackageId>SproutForms.Umbraco.Core</PackageId>
+    <Title>SproutForms for Umbraco</Title>
+    <Description>An Umbraco plugin to easily add forms to your Umbraco CMS</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>1.0.0--alpha001</Version>
+
+    <ContentTargetFolders>.</ContentTargetFolders>
+    <RazorCompileToolset>RazorSdk</RazorCompileToolset>
+    <RazorCompileOnBuild>true</RazorCompileOnBuild>
+    <EmbedRazorGenerateSources>true</EmbedRazorGenerateSources>
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <StaticWebAssetBasePath>forms</StaticWebAssetBasePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Umbraco.Cms.Web.Website" Version="[17.0.0,17.999)" />
+    <PackageReference Include="Umbraco.Cms.Api.Management" Version="[17.0.0,17.999)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SproutForms.Core\SproutForms.Core.csproj" />
+  </ItemGroup>
+
+</Project>

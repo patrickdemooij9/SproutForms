@@ -1,0 +1,37 @@
+﻿@using SproutForms.Core.Builders
+@using SproutForms.Core.Fields
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Core.Models
+@using SproutForms.Core.Repositories
+@using SproutForms.Umbraco.Core.Services
+@using Umbraco.Cms.Web.Common.PublishedModels;
+@inject IFormRepository Form
+@inject IFormVersionRepository Forms
+@inject FormRenderingService Renderer
+@inherits Umbraco.Cms.Web.Common.Views.UmbracoViewPage
+@{
+	Layout = null;
+}
+
+@{
+    var form = Form.GetByAlias("dropdown");
+    if (form is null)
+    {
+        return;
+    }
+    var formVersion = Forms.GetPublished(form.Id);
+
+    var model = Renderer.Build(formVersion);
+}
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" href="/forms/forms-layout.css" />
+        <link rel="stylesheet" href="/forms/forms-default-theme.css" />
+        <script src="/forms/forms.js"></script>
+    </head>
+    <body>
+        @await Html.PartialAsync("~/Views/Forms/Form.cshtml", model)
+    </body>
+</html>

@@ -1,0 +1,23 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (RadioFieldConfig)Model.Configuration;
+}
+
+<div>
+    @foreach (var option in config.Options)
+    {
+        var id = $"{Model.Alias}_{option.Value}";
+
+        <label>
+            <input type="radio"
+                   name="@Model.Alias"
+                   id="@id"
+                   value="@option.Value"
+                   class="form-control"
+                   @(Equals(Model.Value, option.Value) ? "checked" : "") />
+            <span>@option.Label</span>
+        </label>
+    }
+</div>

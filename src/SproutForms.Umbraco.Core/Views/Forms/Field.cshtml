@@ -1,0 +1,36 @@
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+
+@{
+    var hasError = Model.Errors.Any();
+    var describedBy = hasError
+        ? $"{Model.Alias}-error"
+        : null;
+}
+
+<div class="form-group @(hasError ? "has-error" : "")">
+    @if (!Model.RendersOwnLabel)
+    {
+        <label for="@Model.Alias">
+            @Model.Label
+            @if (Model.Required)
+            {
+                <span class="required">*</span>
+            }
+            </label>
+    }
+
+    @await Html.PartialAsync($"~/Views/Forms/Fields/{Model.Type}.cshtml", Model)
+
+    @if (hasError)
+    {
+        <div id="@($"{Model.Alias}-error")"
+             class="form-error"
+             role="alert">
+            @foreach (var error in Model.Errors)
+            {
+                <div>@error</div>
+            }
+        </div>
+    }
+</div>

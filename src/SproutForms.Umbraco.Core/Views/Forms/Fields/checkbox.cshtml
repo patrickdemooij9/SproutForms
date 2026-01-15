@@ -1,0 +1,24 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var isChecked = Model.Value == "true";
+}
+
+<label class="checkbox">
+    <input type="checkbox"
+           id="@Model.Alias"
+           name="@Model.Alias"
+           value="true"
+           @(isChecked ? "checked" : "")
+           aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
+           data-field-id="@Model.Id" />
+    <span>
+        @Model.Label
+        @if (Model.Required)
+        {
+            <span class="required">*</span>
+        }
+    </span>
+</label>
+<input type="hidden" name="@Model.Alias" value="false" />

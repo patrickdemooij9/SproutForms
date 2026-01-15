@@ -1,0 +1,96 @@
+﻿using SproutForms.Umbraco.Core.Helpers;
+using SproutForms.Umbraco.Core.Models.ViewModels;
+using System.Linq.Expressions;
+using System.Reflection;
+using System.Text.Json;
+
+namespace SproutForms.Umbraco.Core.Descriptors.Fields
+{
+    public abstract class BaseFieldDescriptor<TConfig> : IFieldDescriptor where TConfig : class, new()
+    {
+        public abstract string FieldTypeAlias { get; }
+
+        public abstract string DisplayName { get; }
+
+        public abstract string Icon { get; }
+
+        private List<DescriptorMapping<TConfig>> _mappings = [];
+
+        protected void DefineMap(Expression<Func<TConfig, object?>> expression, string alias, string displayName, string propertyTypeAlias, Func<object, string>? overrideFromConfig = null, Func<string, object> overrideToConfig = null)
+        {
+            _mappings.Add(new DescriptorMapping<TConfig>
+            {
+                Expression = expression,
+                Alias = alias,
+                DisplayName = displayName,
+                PropertyTypeAlias = propertyTypeAlias,
+                OverrideFromConfig = overrideFromConfig,
+                OverrideToConfig = overrideToConfig
+            });
+        }
+
+        public FormPropertyBackofficeModel[] FromConfig(object configuration)
+        {
+            var items = new List<FormPropertyBackofficeModel>();
+            var config = (TConfig)configuration;
+            foreach (var mapping in _mappings)
+            {
+                var value = mapping.Expression.Compile().Invoke(config);
+
+                string frontendValue;
+                if (value != null && mapping.OverrideFromConfig != null)
+                {
+                    frontendValue = mapping.OverrideFromConfig(value);
+                }
+                else
+                {
+                    frontendValue = JsonSerializer.Serialize(value);
+                }
+                items.Add(new FormPropertyBackofficeModel
+                {
+                    Alias = mapping.Alias,
+                    DisplayName = mapping.DisplayName,
+                    PropertyEditor = mapping.PropertyTypeAlias,
+                    Value = frontendValue
+                });
+            }
+            return items.ToArray();
+        }
+
+        public object ToConfig(Dictionary<string, string> properties)
+        {
+            var config = new TConfig();
+            foreach (var property in properties)
+            {
+                if (property.Value is null) continue;
+
+                var mapping = _mappings.FirstOrDefault(it => it.Alias == property.Key);
+                if (mapping is null) continue;
+
+                var body = mapping.Expression.Body;
+
+                // Handle UnaryExpression (Convert) that wraps the actual MemberExpression
+                if (body is UnaryExpression unaryExpression)
+                {
+                    body = unaryExpression.Operand;
+                }
+
+                if (body is MemberExpression memberSelectorExpression)
+                {
+                    var configProperty = memberSelectorExpression.Member as PropertyInfo;
+                    object value;
+                    if (mapping.OverrideToConfig != null)
+                    {
+                        value = mapping.OverrideToConfig(property.Value);
+                    }
+                    else
+                    {
+                        value = ConvertHelper.Convert(property.Value, configProperty.PropertyType);
+                    }
+                    configProperty?.SetValue(config, value, null);
+                }
+            }
+            return config;
+        }
+    }
+}

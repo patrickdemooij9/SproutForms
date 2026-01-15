@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.SDK.Razor">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+
+    <ContentTargetFolders>.</ContentTargetFolders>
+    <StaticWebAssetBasePath>App_Plugins/SproutForms</StaticWebAssetBasePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SproutForms.Umbraco.Core\SproutForms.Umbraco.Core.csproj" />
+  </ItemGroup>
+
+</Project>

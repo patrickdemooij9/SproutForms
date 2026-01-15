@@ -1,0 +1,35 @@
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model RenderedFormViewModel
+
+<div class="form-root">
+    @if (TempData["FormSuccessMessage"] is string message)
+    {
+        <div class="form-success" role="status">
+            @message
+        </div>
+    }
+    else
+    {
+        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true">
+            @Html.AntiForgeryToken()
+            @foreach (var row in Model.Rows)
+            {
+                <div class="form-row">
+                    @foreach (var col in row.Columns)
+                    {
+                        <div class="form-col col-@col.Width">
+                            @await Html.PartialAsync(
+                            $"~/Views/Forms/Field.cshtml",
+                                col.Field
+                                )
+            </div>
+                        }
+                </div>
+            }
+
+            <div class="form-actions">
+                <button type="submit">Submit</button>
+            </div>
+        </form>
+    }
+</div>

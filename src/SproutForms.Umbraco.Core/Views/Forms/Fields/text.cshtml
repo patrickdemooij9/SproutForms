@@ -1,0 +1,15 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (TextFieldConfig)Model.Configuration;
+}
+
+<input type="text"
+       id="@Model.Alias"
+       name="@Model.Alias"
+       value="@Model.Value"
+       placeholder="@config.Placeholder"
+       class="form-control"
+       aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
+       data-field-id="@Model.Id" />

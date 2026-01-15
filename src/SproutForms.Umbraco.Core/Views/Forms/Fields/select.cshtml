@@ -1,0 +1,22 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (SelectFieldConfig)Model.Configuration;
+}
+
+<select id="@Model.Alias"
+        name="@Model.Alias"
+        class="form-control"
+        aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
+        data-field-id="@Model.Id">
+    <option value="">Select an option</option>
+
+    @foreach (var option in config.Options)
+    {
+        <option value="@option.Value"
+                @(Equals(Model.Value, option.Value) ? "selected" : "")>
+            @option.Label
+        </option>
+    }
+</select>
