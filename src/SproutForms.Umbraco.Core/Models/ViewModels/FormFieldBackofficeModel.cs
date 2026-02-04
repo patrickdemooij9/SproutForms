@@ -10,17 +10,17 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
     {
         public string Alias { get; set; }
         public string Label { get; set; }
-        public Guid FieldTypeId { get; set; }
+        public string FieldTypeAlias { get; set; }
         public bool Required { get; set; }
 
-        public Dictionary<string, string> Configuration { get; set; }
+        public Dictionary<string, object?> Configuration { get; set; }
         public FieldConditions? Conditions { get; set; }
 
         public FormFieldBackofficeModel(FormField field)
         {
             Alias = field.Alias;
             Label = field.Label;
-            FieldTypeId = field.FieldTypeId;
+            FieldTypeAlias = field.FieldTypeAlias;
             Required = field.Required;
             Conditions = field.Conditions;
 

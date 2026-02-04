@@ -8,11 +8,7 @@ namespace SproutForms.Core.Fields
 {
     public class HiddenFieldType : FormFieldBase<HiddenFieldConfig, string>
     {
-        public override Guid Id => Guid.Parse("8951c929-07a2-4dcc-9a1b-dc41f9921a1c");
-
         public override string Alias => "hidden";
-
-        public override string DisplayName => "Hidden";
 
         public override HiddenFieldConfig DefaultConfiguration => new();
 

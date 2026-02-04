@@ -28,7 +28,7 @@ export default class KeyValuePairProperty
   @property({ type: Object })
   public set field(value: FormPropertyBackofficeModel) {
     this._field = value;
-    this._items = JSON.parse(this._field.value || "[]");
+    this._items = Array.isArray(this.field.value) ? this.field.value : JSON.parse(this._field.value as string || "[]");
   }
   public get field() {
     return this._field;

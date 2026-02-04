@@ -9,12 +9,7 @@ import {
 
 import "./formCanvas.element";
 import "./formInspector.element";
-import {
-  FormColumnBackofficeModel,
-  FormFieldBackofficeModel,
-  FormRowBackofficeModel,
-} from "../api";
-import { SelectedState } from "../models";
+import { FormColumnDto, FormFieldDto, FormRowDto, SelectedState } from "../models";
 
 @customElement("form-editor")
 export class FormEditorElement extends UmbElementMixin(LitElement) {
@@ -41,14 +36,14 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
 
   private onSelectField(
     e: CustomEvent<{
-      row: FormRowBackofficeModel;
-      column: FormColumnBackofficeModel;
-      field: FormFieldBackofficeModel;
+      row: FormRowDto;
+      column: FormColumnDto;
+      field: FormFieldDto;
     }>
   ) {
     this.selectedState = {
       row: e.detail.row,
-      field: e.detail.field?.alias,
+      field: e.detail.field?.id,
       column: e.detail.column,
     };
   }

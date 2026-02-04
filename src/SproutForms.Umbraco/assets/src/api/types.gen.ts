@@ -65,16 +65,15 @@ export type FormDefinitionBackofficeModel = {
 export type FormFieldBackofficeModel = {
     alias: string;
     label: string;
-    fieldTypeId: string;
+    fieldTypeAlias: string;
     required: boolean;
     configuration: {
-        [key: string]: string;
+        [key: string]: unknown;
     };
     conditions?: FieldConditions | null;
 };
 
 export type FormFieldTypeBackofficeModel = {
-    id: string;
     alias: string;
     displayName: string;
     icon: string;
@@ -98,7 +97,7 @@ export type FormOutcomeBackofficeModel = {
     typeAlias: string;
     displayName: string;
     configuration: {
-        [key: string]: string;
+        [key: string]: unknown;
     };
 };
 
@@ -112,7 +111,7 @@ export type FormPropertyBackofficeModel = {
     alias: string;
     displayName: string;
     propertyEditor: string;
-    value?: string | null;
+    value?: unknown;
 };
 
 export type FormRowBackofficeModel = {
@@ -135,13 +134,19 @@ export type FormSubmissionValueBackofficeModel = {
     value: string;
 };
 
+export type FormTreeItemModel = {
+    hasChildren: boolean;
+    id: string;
+    name: string;
+};
+
 export type FormWorkflowBackofficeModel = {
     alias: string;
     typeAlias: string;
     displayName: string;
     order: number;
     configuration: {
-        [key: string]: string;
+        [key: string]: unknown;
     };
 };
 
@@ -160,6 +165,49 @@ export type PagedFormSubmissionListItemBackofficeModel = {
     total: number;
     items: Array<FormSubmissionListItemBackofficeModel>;
 };
+
+export type PagedFormTreeItemModel = {
+    total: number;
+    items: Array<FormTreeItemModel>;
+};
+
+export type GetUmbracoSproutFormsAncestorsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        descendantId?: string;
+    };
+    url: '/umbraco/sproutForms/ancestors';
+};
+
+export type GetUmbracoSproutFormsAncestorsResponses = {
+    /**
+     * OK
+     */
+    200: Array<FormTreeItemModel>;
+};
+
+export type GetUmbracoSproutFormsAncestorsResponse = GetUmbracoSproutFormsAncestorsResponses[keyof GetUmbracoSproutFormsAncestorsResponses];
+
+export type GetUmbracoSproutFormsChildrenData = {
+    body?: never;
+    path?: never;
+    query?: {
+        parentUnique?: string;
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/sproutForms/children';
+};
+
+export type GetUmbracoSproutFormsChildrenResponses = {
+    /**
+     * OK
+     */
+    200: PagedFormTreeItemModel;
+};
+
+export type GetUmbracoSproutFormsChildrenResponse = GetUmbracoSproutFormsChildrenResponses[keyof GetUmbracoSproutFormsChildrenResponses];
 
 export type GetUmbracoSproutFormsFieldTypesData = {
     body?: never;
@@ -278,6 +326,25 @@ export type GetUmbracoSproutFormsOutcomeTypesResponses = {
 };
 
 export type GetUmbracoSproutFormsOutcomeTypesResponse = GetUmbracoSproutFormsOutcomeTypesResponses[keyof GetUmbracoSproutFormsOutcomeTypesResponses];
+
+export type GetUmbracoSproutFormsRootData = {
+    body?: never;
+    path?: never;
+    query?: {
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/sproutForms/root';
+};
+
+export type GetUmbracoSproutFormsRootResponses = {
+    /**
+     * OK
+     */
+    200: PagedFormTreeItemModel;
+};
+
+export type GetUmbracoSproutFormsRootResponse = GetUmbracoSproutFormsRootResponses[keyof GetUmbracoSproutFormsRootResponses];
 
 export type GetUmbracoSproutFormsSubmissionData = {
     body?: never;

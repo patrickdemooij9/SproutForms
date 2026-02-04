@@ -5,7 +5,6 @@ import {
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 import { css, html, LitElement } from "lit";
-import { FormBackofficeModel, FormOutcomeTypeBackofficeModel } from "../api";
 import {
   UmbPropertyDatasetElement,
   UmbPropertyValueData,
@@ -16,19 +15,20 @@ import { UUIRadioElement } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
+import { FormDto, FormOutcomeTypeDto } from "../models";
 
 @customElement("form-settings")
 export class FormSettingsElement extends UmbElementMixin(LitElement) {
   private context?: SproutFormsWorkspaceContext;
 
   @state()
-  form?: FormBackofficeModel;
+  form?: FormDto;
 
   @state()
   _values: Array<UmbPropertyValueData> = [];
 
   @state()
-  outcomes: Array<FormOutcomeTypeBackofficeModel> = [];
+  outcomes: Array<FormOutcomeTypeDto> = [];
 
   constructor() {
     super();
@@ -65,7 +65,7 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
   #onPropertyDataChange(e: Event) {
     const value = (e.target as UmbPropertyDatasetElement).value;
 
-    const updateForm: Partial<FormBackofficeModel> = {};
+    const updateForm: Partial<FormDto> = {};
     updateForm.definition = structuredClone(this.form!.definition);
     value.forEach((item) => {
       if (item.alias == "alias") {
@@ -96,13 +96,14 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
     const clonedDefinition = structuredClone(this.form!.definition);
     const configuration: Record<string, string> = {};
     outcome.properties.forEach((prop) => {
-      configuration[prop.alias] = prop.value ?? "";
+      configuration[prop.alias] = prop.value as string ?? "";
     });
     clonedDefinition.outcome = {
       typeAlias: outcome.alias,
       displayName: outcome.displayName,
       configuration: configuration,
     };
+    console.log(clonedDefinition);
     this.context?.updateForm({
       definition: clonedDefinition,
     });

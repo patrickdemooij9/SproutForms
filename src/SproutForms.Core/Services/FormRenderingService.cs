@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.SubmissionGuard;
+using SproutForms.Core.Models.ViewModels;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using System;
 using System.Collections.Generic;
@@ -13,14 +15,19 @@ namespace SproutForms.Umbraco.Core.Services
     public class FormRenderingService
     {
         private readonly IFormFieldType[] _fieldTypes;
+        private readonly IFormSubmissionGuard _formSubmissionGuard;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ITempDataDictionaryFactory _tempDataDictionaryFactory;
         private Dictionary<string, List<string>> _errors = [];
         private Dictionary<string, string> _values = [];
 
-        public FormRenderingService(IEnumerable<IFormFieldType> fieldTypes, IHttpContextAccessor httpContextAccessor, ITempDataDictionaryFactory tempDataDictionaryFactory)
+        public FormRenderingService(IEnumerable<IFormFieldType> fieldTypes,
+            IFormSubmissionGuard formSubmissionGuard,
+            IHttpContextAccessor httpContextAccessor,
+            ITempDataDictionaryFactory tempDataDictionaryFactory)
         {
             _fieldTypes = [.. fieldTypes];
+            _formSubmissionGuard = formSubmissionGuard;
             _httpContextAccessor = httpContextAccessor;
             _tempDataDictionaryFactory = tempDataDictionaryFactory;
         }
@@ -28,10 +35,20 @@ namespace SproutForms.Umbraco.Core.Services
         public RenderedFormViewModel Build(FormVersion version)
         {
             ReadFromTempData(version.FormId);
+            var submissionGuards = new List<FormSubmissionGuardViewModel>();
+            if (_formSubmissionGuard is not null)
+            {
+                submissionGuards.Add(new FormSubmissionGuardViewModel
+                {
+                    Alias = _formSubmissionGuard.Alias,
+                    Settings = _formSubmissionGuard.GetFrontendSettings()
+                });
+            }
             return new RenderedFormViewModel
             {
                 Id = version.FormId,
                 Rows = version.Definition.Rows.Select(it => BuildRow(it, version.Definition.Fields.ToArray())).ToList(),
+                SubmissionGuards = submissionGuards,
                 HasErrors = _errors.Count > 0
             };
         }
@@ -55,7 +72,7 @@ namespace SproutForms.Umbraco.Core.Services
         private FormColumnViewModel BuildColumn(FormColumn column, FormField[] fields)
         {
             var field = fields.First(it => it.Alias == column.FieldAlias);
-            var fieldType = _fieldTypes.First(it => it.Id == field.FieldTypeId);
+            var fieldType = _fieldTypes.First(it => it.Alias == field.FieldTypeAlias);
 
             var fieldViewModel = new FormFieldViewModel
             {

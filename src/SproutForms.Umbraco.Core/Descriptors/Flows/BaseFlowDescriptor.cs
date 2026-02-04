@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 
 namespace SproutForms.Umbraco.Core.Descriptors.Flows
 {
@@ -36,21 +37,35 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
             var config = (TConfig)configuration;
             foreach (var mapping in _mappings)
             {
+                var value = mapping.Expression.Compile().Invoke(config);
+
+                object? frontendValue = null;
+                if (value != null)
+                {
+                    if (mapping.OverrideFromConfig != null)
+                    {
+                        frontendValue = mapping.OverrideFromConfig(value);
+                    }
+                    else
+                    {
+                        frontendValue = value;
+                    }
+                }
                 items.Add(new FormPropertyBackofficeModel
                 {
                     Alias = mapping.Alias,
                     DisplayName = mapping.DisplayName,
                     PropertyEditor = mapping.PropertyTypeAlias,
-                    Value = mapping.Expression.Compile().Invoke(config)?.ToString()
+                    Value = frontendValue
                 });
             }
             return items.ToArray();
         }
 
-        public object ToConfig(Dictionary<string, string> properties)
+        public object ToConfig(Dictionary<string, object?> properties)
         {
             var config = new TConfig();
-            foreach (var property in properties)
+            foreach (var property in properties.Where(it => it.Value != null))
             {
                 var mapping = _mappings.FirstOrDefault(it => it.Alias == property.Key);
                 if (mapping is null) continue;
@@ -69,11 +84,11 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
                     object value;
                     if (mapping.OverrideToConfig != null)
                     {
-                        value = mapping.OverrideToConfig(property.Value);
+                        value = mapping.OverrideToConfig(property.Value!);
                     }
                     else
                     {
-                        value = ConvertHelper.Convert(property.Value, configProperty.PropertyType);
+                        value = ConvertHelper.Convert(property.Value!, configProperty.PropertyType);
                     }
                     configProperty?.SetValue(config, value, null);
                 }

@@ -2,6 +2,7 @@
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text.Json;
 
 namespace SproutForms.Umbraco.Core.Descriptors.Outcomes
 {
@@ -15,14 +16,16 @@ namespace SproutForms.Umbraco.Core.Descriptors.Outcomes
 
         private List<DescriptorMapping<TConfig>> _mappings = [];
 
-        protected void DefineMap(Expression<Func<TConfig, object?>> expression, string alias, string displayName, string propertyTypeAlias)
+        protected void DefineMap(Expression<Func<TConfig, object?>> expression, string alias, string displayName, string propertyTypeAlias, Func<object, object>? overrideFromConfig = null, Func<object, object>? overrideToConfig = null)
         {
             _mappings.Add(new DescriptorMapping<TConfig>
             {
                 Expression = expression,
                 Alias = alias,
                 DisplayName = displayName,
-                PropertyTypeAlias = propertyTypeAlias
+                PropertyTypeAlias = propertyTypeAlias,
+                OverrideFromConfig = overrideFromConfig,
+                OverrideToConfig = overrideToConfig
             });
         }
 
@@ -32,21 +35,35 @@ namespace SproutForms.Umbraco.Core.Descriptors.Outcomes
             var config = (TConfig)configuration;
             foreach (var mapping in _mappings)
             {
+                var value = mapping.Expression.Compile().Invoke(config);
+
+                object? frontendValue = null;
+                if (value != null)
+                {
+                    if (mapping.OverrideFromConfig != null)
+                    {
+                        frontendValue = mapping.OverrideFromConfig(value);
+                    }
+                    else
+                    {
+                        frontendValue = value;
+                    }
+                }
                 items.Add(new FormPropertyBackofficeModel
                 {
                     Alias = mapping.Alias,
                     DisplayName = mapping.DisplayName,
                     PropertyEditor = mapping.PropertyTypeAlias,
-                    Value = mapping.Expression.Compile().Invoke(config)?.ToString()
+                    Value = frontendValue
                 });
             }
             return items.ToArray();
         }
 
-        public object ToConfig(Dictionary<string, string> properties)
+        public object ToConfig(Dictionary<string, object?> properties)
         {
             var config = new TConfig();
-            foreach (var property in properties)
+            foreach (var property in properties.Where(it => it.Value != null))
             {
                 var mapping = _mappings.FirstOrDefault(it => it.Alias == property.Key);
                 if (mapping is null) continue;
@@ -65,11 +82,11 @@ namespace SproutForms.Umbraco.Core.Descriptors.Outcomes
                     object value;
                     if (mapping.OverrideToConfig != null)
                     {
-                        value = mapping.OverrideToConfig(property.Value);
+                        value = mapping.OverrideToConfig(property.Value!);
                     }
                     else
                     {
-                        value = ConvertHelper.Convert(property.Value, configProperty.PropertyType);
+                        value = ConvertHelper.Convert(property.Value!, configProperty.PropertyType);
                     }
                     configProperty?.SetValue(config, value, null);
                 }

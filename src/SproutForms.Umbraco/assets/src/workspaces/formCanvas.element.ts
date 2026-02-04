@@ -8,13 +8,7 @@ import {
   state,
   when,
 } from "@umbraco-cms/backoffice/external/lit";
-import {
-  FormColumnBackofficeModel,
-  FormDefinitionBackofficeModel,
-  FormFieldBackofficeModel,
-  FormRowBackofficeModel,
-} from "../api";
-import { SelectedResizeState, SelectedState } from "../models";
+import { FormColumnDto, FormDefinitionDto, FormFieldDto, FormRowDto, SelectedResizeState, SelectedState } from "../models";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
@@ -27,7 +21,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   selectedState!: SelectedState;
 
   @state()
-  definition!: FormDefinitionBackofficeModel;
+  definition!: FormDefinitionDto;
 
   @state()
   resizeState?: SelectedResizeState;
@@ -83,11 +77,11 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   private renderColumn(
-    row: FormRowBackofficeModel,
-    column: FormColumnBackofficeModel
+    row: FormRowDto,
+    column: FormColumnDto
   ) {
     const field = this.definition.fields.find(
-      (f) => f.alias === column.fieldAlias
+      (f) => f.id === column.fieldId
     );
     if (!field) {
       return;
@@ -119,8 +113,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
 
   private startResize(
     event: MouseEvent,
-    row: FormRowBackofficeModel,
-    column: FormColumnBackofficeModel
+    row: FormRowDto,
+    column: FormColumnDto
   ) {
     const startX = event.clientX;
     const columnElemn = (event.target as HTMLElement)
@@ -157,9 +151,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   private selectField(
-    row: FormRowBackofficeModel | undefined,
-    column: FormColumnBackofficeModel | undefined,
-    field: FormFieldBackofficeModel | undefined
+    row: FormRowDto | undefined,
+    column: FormColumnDto | undefined,
+    field: FormFieldDto | undefined
   ) {
     this.dispatchEvent(
       new CustomEvent("select-field", {

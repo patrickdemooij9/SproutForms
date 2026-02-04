@@ -8,11 +8,7 @@ namespace SproutForms.Core.Fields
 {
     public class CheckboxFieldType : FormFieldBase<CheckboxFieldConfig, bool>, IFormTypeRequiredHandler
     {
-        public override Guid Id => Guid.Parse("6f60c369-f21d-4edf-9774-e15443427641");
-
         public override string Alias => "checkbox";
-
-        public override string DisplayName => "Checkbox";
 
         public override CheckboxFieldConfig DefaultConfiguration => new();
 

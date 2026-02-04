@@ -23,11 +23,11 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
                 }));
             }, (value) =>
             {
-                return JsonSerializer.Deserialize<KeyValuePairModel[]>(value)!.Select(kvp => new SelectFieldOption
+                return JsonSerializer.Deserialize<KeyValuePairModel[]>(value.ToString())?.Select(kvp => new SelectFieldOption
                 {
                     Label = kvp.Key,
                     Value = kvp.Value
-                }).ToList();
+                }).ToList() ?? [];
             });
         }
     }

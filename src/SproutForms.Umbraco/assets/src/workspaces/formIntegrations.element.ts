@@ -6,34 +6,27 @@ import {
   when,
 } from "@umbraco-cms/backoffice/external/lit";
 import { css, html, LitElement } from "lit";
-import { FormBackofficeModel, FormFlowTypeBackofficeModel } from "../api";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
-import {
-  UmbPropertyDatasetElement,
-  UmbPropertyValueData,
-} from "@umbraco-cms/backoffice/property";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
+import { FormDto, FormFlowTypeDto, FormWorkflowDto } from "../models";
+import { FlowChangeEvent } from "./formIntegrationTypeInspector.element";
+
+import "./formIntegrationTypeInspector.element";
 
 @customElement("form-integrations")
 export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   private context?: SproutFormsWorkspaceContext;
 
   @state()
-  private form!: FormBackofficeModel;
+  private form!: FormDto;
 
   @state()
-  private flowTypes: FormFlowTypeBackofficeModel[] = [];
+  private flowTypes: FormFlowTypeDto[] = [];
 
   @state()
-  values: { [key: string]: Array<UmbPropertyValueData> } = {};
-
-  @state()
-  private showAddContainer: boolean = false;
-
-  @state()
-  private openFlowType?: string = undefined;
+  private selectedFlow?: FormWorkflowDto = undefined;
 
   constructor() {
     super();
@@ -47,43 +40,41 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
 
       context?.form.subscribe((form) => {
         this.form = form;
-
-        this.values = {};
-        this.form.definition.workflows.forEach((flow) => {
-          this.values[flow.alias] = Object.entries(flow.configuration).map(
-            ([key, value]) => ({
-              alias: key,
-              value: value,
-            })
-          );
-        });
       });
     });
   }
 
-  addFlowType(type: FormFlowTypeBackofficeModel) {
+  addFlowType(type: FormFlowTypeDto) {
     let order = 0;
     if (this.form.definition.workflows.length > 0) {
       order = Math.max(
-        ...this.form.definition.workflows.map((item) => item.order)
+        ...this.form.definition.workflows.map((item) => item.order),
       );
     }
 
     const clonedDefinition = structuredClone(this.form.definition);
     const configuration: Record<string, string> = {};
     type.configuration.forEach((prop) => {
-      configuration[prop.alias] = prop.value ?? "";
+      configuration[prop.alias] = (prop.value as string) ?? "";
     });
-    clonedDefinition.workflows.push({
-      alias: "test",
+    const newFlow = {
+      id: crypto.randomUUID(),
+      alias: crypto.randomUUID(),
       typeAlias: type.alias,
       displayName: type.displayName,
       order: order + 1,
       configuration: configuration,
-    });
-    this.showAddContainer = false;
+    };
+    clonedDefinition.workflows.push(newFlow);
+    this.selectedFlow = newFlow;
     this.context?.updateForm({
       definition: clonedDefinition,
+    });
+  }
+
+  getOrderedFlow() {
+    return [...this.form.definition.workflows].sort((a, b) => {
+      return a.order - b.order;
     });
   }
 
@@ -91,25 +82,17 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     return this.flowTypes.find((item) => item.alias == alias);
   }
 
-  #onPropertyDataChange(e: Event, alias: string) {
-    const value = (e.target as UmbPropertyDatasetElement).value;
-
-    if (!this.values[alias]) {
-      return;
-    }
-
+  #handleFlowUpdated(e: FlowChangeEvent) {
+    const updatedWorkflow = e.flow;
     const clonedDefinition = structuredClone(this.form.definition);
     const workflow = clonedDefinition.workflows.find(
-      (item) => item.alias == alias
+      (item) => item.id == updatedWorkflow.id,
     );
     if (!workflow) {
       return;
     }
-    value.forEach((item) => {
-      if (Object.keys(workflow.configuration).includes(item.alias)) {
-        workflow.configuration[item.alias] = item.value as string;
-      }
-    });
+
+    Object.assign(workflow, updatedWorkflow);
     this.context?.updateForm({
       definition: clonedDefinition,
     });
@@ -118,73 +101,66 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   render() {
     return html`
       <div class="integrations">
-        <h3>What happens after the user submits their form:</h3>
-        ${repeat(
-          this.form.definition.workflows.sort((a, b) => a.order - b.order),
-          (item) => item.alias,
-          (item) => html`
-            <div class="add" @click=${() => (this.openFlowType = item.alias)}>
-              ${item.displayName}
+        <div class="editor-container">
+          <h3>Submission workflow</h3>
+          <p>
+            Define the steps that should happen in the background after the
+            forms has been submitted
+          </p>
+          <div class="editor">
+            <div class="block start">
+              Form has been submitted (visitor finishes)
             </div>
-            ${when(
-              this.openFlowType == item.alias,
-              () => html`
-                <div class="add-container">
-                  <umb-property-dataset
-                    .value=${this.values[item.alias]}
-                    @change=${(e: Event) =>
-                      this.#onPropertyDataChange(e, item.alias)}
-                  >
-                    ${repeat(
-                      this.getFlowType(item.typeAlias)?.configuration ?? [],
-                      (prop) => prop.alias,
-                      (prop) => html`
-                        <umb-property
-                          alias=${prop.alias}
-                          label=${prop.displayName}
-                          description=""
-                          property-editor-ui-alias=${prop.propertyEditor}
-                          .appearance=${{
-                            labelOnTop: true,
-                          }}
-                          val
-                        ></umb-property>
-                      `
-                    )}</umb-property-dataset
-                  >
+            <div class="arrow">
+              <uui-icon name="icon-arrow-down"></uui-icon>
+            </div>
+            ${repeat(
+              this.getOrderedFlow(),
+              (item) => item.alias,
+              (item) => html`
+                <div
+                  class="flow-type ${this.selectedFlow?.alias === item.alias
+                    ? "selected"
+                    : ""}"
+                  @click=${() => (this.selectedFlow = item)}
+                >
+                  ${item.displayName}
                 </div>
-              `
+              `,
             )}
-          `
-        )}
-        <div
-          class="add"
-          @click=${() => (this.showAddContainer = !this.showAddContainer)}
-        >
-          Add flow step
+            <div
+              class="flow-type add"
+              @click=${() => (this.selectedFlow = undefined)}
+            >
+              Add flow step
+            </div>
+          </div>
         </div>
-        ${when(
-          this.showAddContainer,
-          () => html`
-            <div class="add-container">
-              <h3>Choose an flow type to add to your flow</h3>
-              <div class="flow-types">
+        <div class="inspector">
+          ${when(
+            this.selectedFlow !== undefined,
+            () => html`
+              <sf-integration-type-inspector
+                .flow=${this.selectedFlow!}
+                .flowType=${this.getFlowType(this.selectedFlow!.typeAlias)!}
+                @flow-change=${this.#handleFlowUpdated}
+              ></sf-integration-type-inspector>
+            `,
+            () => html`
+              <div class="content">
+                <h3>Choose your flow to add</h3>
                 ${repeat(
                   this.flowTypes,
-                  (item) => item.alias,
-                  (item) => html`
-                    <div
-                      class="flow-type"
-                      @click=${() => this.addFlowType(item)}
-                    >
-                      <p>${item.displayName}</p>
-                    </div>
-                  `
+                  (flowType) => flowType.alias,
+                  (flowType) =>
+                    html` <button @click=${() => this.addFlowType(flowType)}>
+                      ${flowType.displayName}
+                    </button>`,
                 )}
               </div>
-            </div>
-          `
-        )}
+            `,
+          )}
+        </div>
       </div>
     `;
   }
@@ -193,45 +169,93 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     .integrations {
       padding: 0 16px;
       background-color: white;
+      height: 100%;
 
       position: relative;
+
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 24px;
+      height: 100%;
+    }
+
+    .editor-container {
+      padding-top: 12px;
 
       h3 {
         margin: 0;
         padding-top: 12px;
-        padding-bottom: 12px;
       }
     }
 
-    .add {
+    .editor {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      .block {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        padding: 12px;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+
+        &.start {
+          background-color: #7bf1a8;
+        }
+      }
+
+      .arrow {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+    }
+
+    .inspector {
+      border-left: 1px solid #ccc;
+
+      .content {
+        padding: 18px 12px;
+      }
+
+      button {
+        display: block;
+        width: 100%;
+        margin-bottom: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        background-color: transparent;
+        padding: 8px 12px;
+        cursor: pointer;
+
+        &:hover {
+          background-color: #e5e7eb;
+        }
+      }
+
+      umb-property-layout {
+        padding: 0;
+      }
+    }
+
+    .flow-type {
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 8px 12px;
-      border: 1px dashed #ccc;
-      cursor: pointer;
-    }
-
-    .add-container {
-      padding: 8px 12px;
-      background-color: #e5e7eb;
       border: 1px solid #ccc;
-    }
+      cursor: pointer;
 
-    .flow-types {
-      display: grid;
-      grid-template-columns: auto auto auto auto;
+      &.add {
+        border: 1px dashed #ccc;
+      }
 
-      .flow-type {
-        padding: 2px 4px;
-        border: 1px solid #ccc;
-        border-radius: 8px;
-        background-color: white;
-        cursor: pointer;
-
-        &:hover {
-          background-color: #ccc;
-        }
+      &:hover,
+      &.selected {
+        background-color: #e5e7eb;
       }
     }
   `;

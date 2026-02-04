@@ -34,7 +34,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             if (published != null && version.Status == FormStatus.Published)
             {
                 scope.Database.Execute("UPDATE SproutForms_FormVersions SET Status = @Status WHERE Id = @Id",
-                    new { Status = (int)published.Status, Id = published.Id });
+                    new { Status = (int)FormStatus.Draft, Id = published.Id });
             }
 
             var options = new JsonSerializerOptions();

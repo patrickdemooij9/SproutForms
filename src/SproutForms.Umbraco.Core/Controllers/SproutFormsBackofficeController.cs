@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Polly;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Files;
@@ -10,12 +9,9 @@ using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
-using SproutForms.Umbraco.Core.Models.Attributes;
 using SproutForms.Umbraco.Core.Models.ViewModels;
-using System.Text.Json;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
-using Umbraco.Cms.Core.Models;
 using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Cms.Web.Common.Routing;
@@ -100,8 +96,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Outcome = new FormOutcomeBackofficeModel
                     {
                         TypeAlias = outcomeType.Alias,
-                        DisplayName = outcomeType.DisplayName,
-                        Configuration = outcomeDescriptor.FromConfig(latestVersion.Definition.SubmitOutcome.Configuration).ToDictionary(it => it.Alias, it => it.Value ?? string.Empty)
+                        DisplayName = outcomeDescriptor.DisplayName,
+                        Configuration = outcomeDescriptor.FromConfig(latestVersion.Definition.SubmitOutcome.Configuration).ToDictionary(it => it.Alias, it => it.Value)
                     },
                     Rows = [.. latestVersion.Definition.Rows.Select(row => new FormRowBackofficeModel(row))],
                     Fields = [.. latestVersion.Definition.Fields.Select(field => Map(field))],
@@ -113,9 +109,9 @@ namespace SproutForms.Umbraco.Core.Controllers
                         {
                             Alias = flow.Alias,
                             TypeAlias = flow.WorkflowTypeAlias,
-                            DisplayName = flowType.DisplayName,
+                            DisplayName = flowDescriptor.DisplayName,
                             Order = flow.Order,
-                            Configuration = flowDescriptor.FromConfig(flow.Configuration).ToDictionary(it => it.Alias, it => it.Value ?? "")
+                            Configuration = flowDescriptor.FromConfig(flow.Configuration).ToDictionary(it => it.Alias, it => it.Value)
                         };
                     }).ToList()
                 }
@@ -140,6 +136,12 @@ namespace SproutForms.Umbraco.Core.Controllers
             {
                 alias = GenerateAlias(model.Id, model.Name);
             }
+            var duplicateFieldAliasses = GetDuplicateAliasses(model);
+            if (duplicateFieldAliasses.Count > 0)
+            {
+                throw new InvalidOperationException($"Duplicated field aliasses: {string.Join(',', duplicateFieldAliasses)}");
+            }
+
             var form = new Form
             {
                 Id = model.Id ?? Guid.Empty,
@@ -209,7 +211,6 @@ namespace SproutForms.Umbraco.Core.Controllers
 
                 formFieldTypes.Add(new FormFieldTypeBackofficeModel
                 {
-                    Id = formFieldType.Id,
                     Alias = formFieldType.Alias,
                     DisplayName = descriptor.DisplayName,
                     Properties = descriptor.FromConfig(formFieldType.DefaultConfiguration)
@@ -285,8 +286,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Values = submission.Values.Select(it =>
                 {
                     var field = formVersion.Definition.Fields.FirstOrDefault(f => f.Alias == it.Key);
-                    if (field is null) return null; //TODO: FIX!!
-                    var fieldType = _formFieldTypes.First(ft => ft.Id == field.FieldTypeId);
+                    if (field is null) return null; //TODO: Fallback in place!!
+                    var fieldType = _formFieldTypes.First(ft => ft.Alias == field.FieldTypeAlias);
                     return new FormSubmissionValueBackofficeModel
                     {
                         FieldTypeAlias = fieldType.Alias,
@@ -341,25 +342,43 @@ namespace SproutForms.Umbraco.Core.Controllers
             }
         }
 
+        private List<string> GetDuplicateAliasses(FormBackofficeModel model) 
+        {
+            var duplicateAliasses = new List<string>();
+            var aliasses = new List<string>();
+            foreach (var field in model.Definition.Fields)
+            {
+                if (aliasses.Contains(field.Alias.ToLower()))
+                {
+                    duplicateAliasses.Add(field.Alias);
+                }
+                else
+                {
+                    aliasses.Add(field.Alias);
+                }
+            }
+            return duplicateAliasses;
+        }
+
         private FormFieldBackofficeModel Map(FormField field)
         {
             var result = new FormFieldBackofficeModel(field);
-            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Id == field.FieldTypeId);
+            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Alias == field.FieldTypeAlias);
             var descriptor = _fieldDescriptors.First(ft => ft.FieldTypeAlias == fieldType.Alias);
-            result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value ?? string.Empty);
+            result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
             return result;
         }
 
         private FormField Map(FormFieldBackofficeModel model)
         {
-            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Id == model.FieldTypeId);
+            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Alias == model.FieldTypeAlias);
             var fieldDescritor = _fieldDescriptors.First(it => it.FieldTypeAlias == fieldType.Alias);
             var configuration = fieldDescritor.ToConfig(model.Configuration);
             var result = new FormField
             {
                 Alias = model.Alias,
                 Label = model.Label,
-                FieldTypeId = model.FieldTypeId,
+                FieldTypeAlias = model.FieldTypeAlias,
                 Required = model.Required,
                 Configuration = configuration
             };

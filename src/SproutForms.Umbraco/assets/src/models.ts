@@ -1,13 +1,19 @@
-import { FieldConditions, FormColumnBackofficeModel, FormRowBackofficeModel } from "./api";
+import { FieldConditions } from "./api";
+
+export interface FormDto {
+  id?: string | null;
+  name: string;
+  alias: string;
+  version: number;
+  source: number;
+  definition: FormDefinitionDto;
+}
 
 export interface FormDefinitionDto {
-  id?: string;
-  alias: string;
-  name: string;
-  version?: number;
-
-  layout: FormRowDto[];
-  //submitOutcome: FormOutcomeDto;
+  rows: Array<FormRowDto>;
+  fields: Array<FormFieldDto>;
+  outcome: FormOutcomeDto;
+  workflows: Array<FormWorkflowDto>;
 }
 
 export interface FormRowDto {
@@ -16,64 +22,102 @@ export interface FormRowDto {
 
 export interface FormColumnDto {
   width: number; // 1–12
-  fieldAlias: string | null;
+  fieldId: string | null;
 }
 
 export interface FormFieldDto {
+  id: string;
   alias: string;
   label: string;
   fieldTypeAlias: string;
   required: boolean;
-  configuration: Record<string, any>;
-  conditions?: any;
+  configuration: {
+    [key: string]: unknown;
+  };
+  conditions?: FieldConditions | null;
 }
 
+export interface FormWorkflowDto {
+  id: string;
+  alias: string;
+  typeAlias: string;
+  displayName: string;
+  order: number;
+  configuration: {
+    [key: string]: unknown;
+  };
+}
 
-export type EditableFormField = {
-    alias: string;
-    label: string;
-    fieldTypeId: string;
-    required: boolean;
-    configuration: any;
-    conditions?: FieldConditions | null;
+export type FormOutcomeDto = {
+  typeAlias: string;
+  displayName: string;
+  configuration: {
+    [key: string]: unknown;
+  };
 };
 
-export type SelectedState = {
-    field: string | null;
-    column: FormColumnBackofficeModel | null;
-    row: FormRowBackofficeModel | null;
+export type FormOutcomeTypeDto = {
+  alias: string;
+  displayName: string;
+  properties: Array<FormPropertyDto>;
+};
+
+export interface FormFieldTypeDto {
+  alias: string;
+  displayName: string;
+  icon: string;
+  properties: Array<FormPropertyDto>;
 }
+
+export interface FormFlowTypeDto {
+  alias: string;
+  displayName: string;
+  configuration: Array<FormPropertyDto>;
+}
+
+export interface FormPropertyDto {
+  alias: string;
+  displayName: string;
+  propertyEditor: string;
+  value?: unknown;
+}
+
+export type SelectedState = {
+  field: string | null;
+  column: FormColumnDto | null;
+  row: FormRowDto | null;
+};
 
 export type SelectedResizeState = {
-    column: FormColumnBackofficeModel | null;
-    size: number
-}
+  column: FormColumnDto | null;
+  size: number;
+};
 
 export type FormOverviewItem = {
-    unique: string;
-    entityType: string;
+  unique: string;
+  entityType: string;
 
-    id: string;
-    name: string;
-    source: number;
-    totalSubmissions: number;
-}
+  id: string;
+  name: string;
+  source: number;
+  totalSubmissions: number;
+};
 
 export type FormSubmissionOverviewItem = {
-    unique: string;
-    entityType: string;
+  unique: string;
+  entityType: string;
 
-    id: string;
-    name: string;
-}
+  id: string;
+  name: string;
+};
 
 export type FormSubmissionOverviewFilter = {
-    formId: string;
-}
+  formId: string;
+};
 
 export type FormSubmissionInfoModalItem = {
-    submissionId: string;
-}
+  submissionId: string;
+};
 
 export const SOURCE_UI = 0;
 export const SOURCE_CODE = 1;

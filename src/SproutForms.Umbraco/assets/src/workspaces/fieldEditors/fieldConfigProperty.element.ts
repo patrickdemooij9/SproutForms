@@ -12,7 +12,10 @@ import {
   UmbExtensionsManifestInitializer,
 } from "@umbraco-cms/backoffice/extension-api";
 import { FormPropertyBackofficeModel } from "../../api";
-import { FormFieldConfigManifest, IFormFieldConfigElement } from "../../manifests/formFieldConfigManifest";
+import {
+  FormFieldConfigManifest,
+  IFormFieldConfigElement,
+} from "../../manifests/formFieldConfigManifest";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
 
 @customElement("sf-field-config-property")
@@ -56,12 +59,12 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
           }
           this._gotEditorUI(manifest);
         });
-      }
+      },
     );
   }
 
   private async _gotEditorUI(
-    manifest?: FormFieldConfigManifest | null
+    manifest?: FormFieldConfigManifest | null,
   ): Promise<void> {
     if (!manifest) {
       return;
@@ -105,8 +108,11 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
           label=${this.field!.displayName}
           description=""
           property-editor-ui-alias=${this.field!.propertyEditor}
+          .appearance=${{
+            labelOnTop: true,
+          }}
         ></umb-property>
-      `
+      `,
     );
   }
 }

@@ -2,13 +2,13 @@ import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { css, html, LitElement } from "lit";
 import { customElement, repeat, state } from "@umbraco-cms/backoffice/external/lit";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
-import { FormFieldTypeBackofficeModel } from "../api";
+import { FormFieldTypeDto } from "../models";
 
 @customElement("form-field-selector")
 export class FormFieldSelector extends UmbElementMixin(LitElement) {
 
     @state()
-    private fieldTypes: FormFieldTypeBackofficeModel[] = [];
+    private fieldTypes: FormFieldTypeDto[] = [];
 
     constructor() {
         super();
@@ -28,7 +28,7 @@ export class FormFieldSelector extends UmbElementMixin(LitElement) {
         )}`
     }
 
-    onAddField(fieldType: FormFieldTypeBackofficeModel) {
+    onAddField(fieldType: FormFieldTypeDto) {
         this.dispatchEvent(new CustomEvent("add-field", {
             detail: fieldType,
             bubbles: true,

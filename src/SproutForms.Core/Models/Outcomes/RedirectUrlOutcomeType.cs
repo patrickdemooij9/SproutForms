@@ -7,13 +7,20 @@ namespace SproutForms.Core.Models.Outcomes
 
         string IFormSubmitOutcomeType.Alias => Alias;
 
-        public string DisplayName => "Redirect";
-
         public Type ConfigurationType => typeof(RedirectUrlOutcomeConfig);
 
         public object GetDefaultConfiguration()
         {
             return new RedirectUrlOutcomeConfig();
+        }
+
+        public OutcomeResult Handle(object configuration)
+        {
+            var config = (RedirectUrlOutcomeConfig) configuration;
+            return new OutcomeResult
+            {
+                RedirectUrl = config.RedirectUrl
+            };
         }
     }
 }

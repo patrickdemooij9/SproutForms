@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SproutForms.Core.Models.ViewModels;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -10,6 +11,7 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public bool HasErrors { get; init; }
 
         public IReadOnlyList<FormRowViewModel> Rows { get; init; } = [];
+        public IReadOnlyList<FormSubmissionGuardViewModel> SubmissionGuards { get; init; } = [];
     }
 
 }

@@ -15,8 +15,8 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
 
         public DateFieldDescriptor()
         {
-            DefineMap(it => it.Min, "min", "Minimum date", "Umb.PropertyEditorUi.Date");
-            DefineMap(it => it.Max, "max", "Maximum date", "Umb.PropertyEditorUi.Date");
+            DefineMap(it => it.Min, "min", "Minimum date", "Umb.PropertyEditorUi.DatePicker");
+            DefineMap(it => it.Max, "max", "Maximum date", "Umb.PropertyEditorUi.DatePicker");
             DefineMap(it => it.IncludeTime, "includeTime", "Include time", "Umb.PropertyEditorUi.Toggle");
         }
     }

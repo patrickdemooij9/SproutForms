@@ -14,7 +14,7 @@
 }
 
 @{
-    var form = Form.GetByAlias("dropdown");
+    var form = Form.GetById(Model.Value<Guid>("formPicker"));
     if (form is null)
     {
         return;

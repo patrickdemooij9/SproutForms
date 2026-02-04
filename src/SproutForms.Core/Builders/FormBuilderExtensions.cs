@@ -103,7 +103,7 @@ namespace SproutForms.Core.Builders
             {
                 Alias = alias,
                 Label = label,
-                FieldTypeId = fieldType.Id,
+                FieldTypeAlias = fieldType.Alias,
                 Configuration = config,
             };
 
