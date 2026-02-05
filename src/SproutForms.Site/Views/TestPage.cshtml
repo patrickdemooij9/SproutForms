@@ -32,6 +32,8 @@
         <script src="/forms/forms.js"></script>
     </head>
     <body>
+        <vc:render-form form-alias="testFileForm"></vc:render-form>
+
         @await Html.PartialAsync("~/Views/Forms/Form.cshtml", model)
     </body>
 </html>
