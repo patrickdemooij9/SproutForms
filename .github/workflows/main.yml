@@ -1,0 +1,45 @@
+name: Packages Release
+
+env:
+  OUTPUT: ./Output
+  CONFIG: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    steps:      
+    - uses: actions/checkout@v2  
+      
+    - name: Set up .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: '10.x.x'
+        include-prerelease: true
+      
+    - name: Restore dependencies
+      run: dotnet restore ./src/SproutForms.sln
+
+    - name: Build javascript
+      run: |
+        cd ./src/SproutForms.Umbraco/assets
+        npm install
+        npm run build
+    - name: Build
+      run: dotnet build ./src/SproutForms.sln --configuration ${{ env.CONFIG }} --no-restore
+
+    - name: Create NuGet packages
+      run: dotnet pack ./src/SproutForms.sln -c ${{ env.CONFIG }} --no-build -o ${{ env.OUTPUT }}
+
+#    - name: Push packages to NuGet
+#      run: dotnet nuget push "**/*.nupkg" -k ${{ secrets.NUGET_DEPLOY_KEY }} -s https://api.nuget.org/v3/index.json
+
+    - name: upload-artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Build-Results
+        path: ${{ env.OUTPUT }}/**/*
