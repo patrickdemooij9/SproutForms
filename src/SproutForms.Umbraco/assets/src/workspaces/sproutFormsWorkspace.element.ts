@@ -11,12 +11,11 @@ import "./formEditor.element";
 import "./formSettings.element";
 import "./formIntegrations.element";
 import "./formSubmissions.element";
-import { FormBackofficeModel } from "../api";
 import { UUIInputEvent } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
-import { SOURCE_CODE } from "../models";
+import { FormDto, SOURCE_CODE } from "../models";
 
 enum TabState {
   Editor,
@@ -30,7 +29,7 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
   private context?: SproutFormsWorkspaceContext;
 
   @state()
-  private form!: FormBackofficeModel;
+  private form!: FormDto;
 
   @state()
   private tabState: TabState = TabState.Editor;

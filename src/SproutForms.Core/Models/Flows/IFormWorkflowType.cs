@@ -7,7 +7,6 @@ namespace SproutForms.Core.Models.Flows
     public interface IFormWorkflowType
     {
         string Alias { get; }
-        string DisplayName { get; }
         Type ConfigurationType { get; }
 
         object GetDefaultConfiguration();

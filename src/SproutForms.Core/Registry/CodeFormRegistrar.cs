@@ -9,7 +9,8 @@ using System.Text;
 
 namespace SproutForms.Core.Registry
 {
-    public class CodeFormRegistrar : IHostedService
+    //TODO: Find a way to correctly do this in regards to migrations
+    /*public class CodeFormRegistrar : IHostedService
     {
         private readonly IServiceProvider _services;
         private readonly CodeFormRegistry _registry;
@@ -86,5 +87,5 @@ namespace SproutForms.Core.Registry
             latest.DefinitionHash = hash;
             versionsRepo.Add(latest);
         }
-    }
+    }*/
 }

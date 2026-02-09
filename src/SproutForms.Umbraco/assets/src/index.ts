@@ -2,6 +2,7 @@ import { UmbEntryPointOnInit } from '@umbraco-cms/backoffice/extension-api';
 import { UMB_AUTH_CONTEXT } from '@umbraco-cms/backoffice/auth';
 import { client } from './api';
 import { SproutFormManifests } from './manifests/sproutFormManifests';
+import { TreeManifests } from './trees/formTreeManifest';
 
 export const onInit: UmbEntryPointOnInit = (host, extensionRegistry) => {
     host.consumeContext(UMB_AUTH_CONTEXT,(auth)=> {
@@ -26,4 +27,5 @@ export const onInit: UmbEntryPointOnInit = (host, extensionRegistry) => {
     });
 
 	extensionRegistry.registerMany(SproutFormManifests);
+	extensionRegistry.registerMany(TreeManifests);
 };

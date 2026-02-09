@@ -10,7 +10,7 @@ namespace SproutForms.Umbraco.Core.Descriptors
         public required string DisplayName { get; set; }
         public required string PropertyTypeAlias { get; set; }
 
-        public Func<object, string>? OverrideFromConfig { get; set; }
-        public Func<string, object>? OverrideToConfig { get; set; }
+        public Func<object, object>? OverrideFromConfig { get; set; }
+        public Func<object, object>? OverrideToConfig { get; set; }
     }
 }

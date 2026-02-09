@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses } from './types.gen';
+import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -19,6 +19,20 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 };
 
 export class BackofficeSproutForms {
+    public static getUmbracoSproutFormsAncestors<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsAncestorsData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetUmbracoSproutFormsAncestorsResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/ancestors',
+            ...options
+        });
+    }
+    
+    public static getUmbracoSproutFormsChildren<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsChildrenData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetUmbracoSproutFormsChildrenResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/children',
+            ...options
+        });
+    }
+    
     public static getUmbracoSproutFormsFieldTypes<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsFieldTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetUmbracoSproutFormsFieldTypesResponses, unknown, ThrowOnError>({
             url: '/umbraco/sproutForms/fieldTypes',
@@ -72,6 +86,13 @@ export class BackofficeSproutForms {
     public static getUmbracoSproutFormsOutcomeTypes<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsOutcomeTypesData, ThrowOnError>) {
         return (options?.client ?? client).get<GetUmbracoSproutFormsOutcomeTypesResponses, unknown, ThrowOnError>({
             url: '/umbraco/sproutForms/outcomeTypes',
+            ...options
+        });
+    }
+    
+    public static getUmbracoSproutFormsRoot<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsRootData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetUmbracoSproutFormsRootResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/root',
             ...options
         });
     }

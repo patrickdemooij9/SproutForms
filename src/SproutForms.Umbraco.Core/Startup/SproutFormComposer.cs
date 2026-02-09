@@ -7,6 +7,7 @@ using SproutForms.Core.Models.Files;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.Flows.Email;
 using SproutForms.Core.Models.Outcomes;
+using SproutForms.Core.Models.SubmissionGuard;
 using SproutForms.Core.Registry;
 using SproutForms.Core.Repositories;
 using SproutForms.Core.Services;
@@ -14,6 +15,7 @@ using SproutForms.Core.Storage;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
+using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Umbraco.Core.Implementations;
 using SproutForms.Umbraco.Core.Repositories;
 using SproutForms.Umbraco.Core.Services;
@@ -84,8 +86,12 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IWorkflowRunner, WorkflowRunner>();
             builder.Services.AddSingleton<IEmailSender, UmbracoEmailSender>();
 
-            builder.Services.AddHostedService<CodeFormRegistrar>();
+            builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
+
+            builder.Services.AddSingleton<IFormSubmissionGuard, NoFormSubmissionGuard>();
+
+            //builder.EnableSproutFormsRecaptchaV3();
         }
     }
 }

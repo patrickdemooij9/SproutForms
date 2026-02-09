@@ -6,27 +6,21 @@ import {
   LitElement,
   property,
   PropertyValues,
-  repeat,
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 
 import "./formFieldSelector.element";
-import "./fieldEditors/fieldConfigProperty.element";
+import { FormDefinitionDto, FormFieldDto, FormFieldTypeDto, SelectedState } from "../models";
 import {
-  FormDefinitionBackofficeModel,
-  FormFieldBackofficeModel,
-  FormFieldTypeBackofficeModel,
-} from "../api";
-import { SelectedState } from "../models";
-import {
-  UmbPropertyDatasetElement,
   UmbPropertyValueData,
 } from "@umbraco-cms/backoffice/property";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
-import { FieldConfigPropertyElement } from "./fieldEditors/fieldConfigProperty.element";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
+import { FieldChangeEvent } from "./formInspectorFieldType.element";
+
+import "./formInspectorFieldType.element";
 
 @customElement("form-inspector")
 export class FormInspector extends UmbElementMixin(LitElement) {
@@ -36,16 +30,16 @@ export class FormInspector extends UmbElementMixin(LitElement) {
   selectedState!: SelectedState;
 
   @state()
-  definition!: FormDefinitionBackofficeModel;
+  definition!: FormDefinitionDto;
 
   @state()
-  selectedField?: FormFieldBackofficeModel;
+  selectedField?: FormFieldDto;
 
   @state()
   _values: Array<UmbPropertyValueData> = [];
 
   @state()
-  private fieldTypes: FormFieldTypeBackofficeModel[] = [];
+  private fieldTypes: FormFieldTypeDto[] = [];
 
   constructor() {
     super();
@@ -55,9 +49,8 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       context?.form.subscribe((form) => {
         this.definition = form.definition;
         this.selectedField = form.definition.fields.find(
-          (item) => item.alias === this.selectedState.field
+          (item) => item.id === this.selectedState.field,
         );
-        this.setValues();
       });
     });
 
@@ -74,160 +67,62 @@ export class FormInspector extends UmbElementMixin(LitElement) {
         return;
       }
       this.selectedField = this.definition.fields.find(
-        (item) => item.alias === selectedState.field
+        (item) => item.id === selectedState.field,
       );
-      this.setValues();
     }
   }
 
-  private setValues() {
-    if (!this.selectedField) {
-      this._values = [];
-      return;
-    }
-    this._values = [
-      {
-        alias: "label",
-        value: this.selectedField!.label,
-      },
-      {
-        alias: "required",
-        value: this.selectedField!.required,
-      },
-    ];
-    Object.entries(this.selectedField!.configuration).forEach(
-      ([key, value]) => {
-        this._values.push({
-          alias: key,
-          value: value,
-        });
-      }
-    );
+  #handleFieldUpdate(event: FieldChangeEvent) {
+    this.context?.updateField(event.field);
   }
 
-  #onPropertyDataChange(e: Event) {
-    if (!this.selectedState.field) {
-      return;
-    }
-
-    const value = (e.target as UmbPropertyDatasetElement).value;
-
-    const updatedField: Partial<FormFieldBackofficeModel> = {};
-    updatedField.configuration = structuredClone(
-      this.selectedField?.configuration
-    );
-    console.log("Update!");
-    value.forEach((item) => {
-      if (item.alias == "label") {
-        updatedField.label = item.value as string;
-      } else if (item.alias == "required") {
-        updatedField.required = item.value as boolean;
-      } else {
-        if (Object.keys(updatedField.configuration!).includes(item.alias)) {
-          updatedField.configuration![item.alias] =
-            item.value?.toString() ?? "";
-        }
-      }
-    });
-    this.context?.updateField({
-      ...updatedField,
-      alias: this.selectedState.field,
-    });
-  }
-
-  #test(event: Event) {
-    if (!this.selectedState.field) {
-      return;
-    }
-
-    const target = (event.target as FieldConfigPropertyElement).Element!;
-    const value = target.value;
-    const updatedField: Partial<FormFieldBackofficeModel> = {};
-    updatedField.configuration = structuredClone(
-      this.selectedField?.configuration
-    );
-    if (Object.keys(updatedField.configuration!).includes(target.field.alias)) {
-      updatedField.configuration![target.field.alias] = value?.toString() ?? "";
-    }
-
-    this.context?.updateField({
-      ...updatedField,
-      alias: this.selectedState.field,
-    });
-  }
-
-  getFieldType(fieldTypeId: string) {
-    return this.fieldTypes.find((item) => item.id === fieldTypeId);
+  getFieldType(fieldTypeAlias: string) {
+    return this.fieldTypes.find((item) => item.alias === fieldTypeAlias);
   }
 
   render() {
     return html`
       <div class="inspector">
-        ${this.selectedState.field
-          ? html`
-              <h3>Field settings</h3>
-              <div class="fields">
-                <umb-property-dataset
-                  .value=${this._values!}
-                  @change=${this.#onPropertyDataChange}
-                >
-                  <umb-property
-                    alias="label"
-                    label="Label"
-                    description="Label of the field"
-                    property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
-                    val
-                  ></umb-property>
+        ${
+          this.selectedState.field
+            ? html`
+                <div class="fields">
+                  <sf-inspector-field-type
+                    .field=${this.selectedField!}
+                    .fieldType=${this.getFieldType(this.selectedField!.fieldTypeAlias)!}
+                    @field-change=${this.#handleFieldUpdate}>
 
-                  <umb-property
-                    alias="required"
-                    label="Is required"
-                    description="Determines if the field is required"
-                    property-editor-ui-alias="Umb.PropertyEditorUi.Toggle"
-                    val
-                  ></umb-property>
-
-                  ${repeat(
-                    this.getFieldType(this.selectedField!.fieldTypeId)
-                      ?.properties ?? [],
-                    (item) => item.alias,
-                    (item) => html`
-                      <sf-field-config-property
-                        .field=${{
-                          ...item,
-                          value: this.selectedField!.configuration[item.alias],
-                        }}
-                        @change=${this.#test}
-                      >
-                      </sf-field-config-property>
-                    `
-                  )}
-                </umb-property-dataset>
-              </div>
-            `
-          : html` <h3>Fields</h3>
-              <form-field-selector
-                @add-field=${(e: any) => this.onAddField(e.detail)}
-              ></form-field-selector>`}
+                  </sf-inspector-field-type>
+                </div>
+              `
+            : html`<div class="inspector-content">
+                <h3>Fields</h3>
+                <form-field-selector
+                  @add-field=${(e: any) => this.onAddField(e.detail)}
+                ></form-field-selector>
+              </div>`
+        }
+          </div>
       </div>
     `;
   }
 
-  private onAddField(fieldType: FormFieldTypeBackofficeModel) {
+  private onAddField(fieldType: FormFieldTypeDto) {
     const newDefinition = { ...this.definition };
     const configuration: Record<string, any> = {};
     fieldType.properties.forEach((prop) => {
       configuration[prop.alias] = prop.value;
     });
-    const newField: FormFieldBackofficeModel = {
+    const newField: FormFieldDto = {
+      id: crypto.randomUUID(),
       label: fieldType.displayName,
       alias: crypto.randomUUID(),
-      fieldTypeId: fieldType.id,
+      fieldTypeAlias: fieldType.alias,
       required: false,
       configuration: configuration,
     };
     if (this.selectedState.column) {
-      this.selectedState.column!.fieldAlias = newField.alias;
+      this.selectedState.column!.fieldId = newField.id;
     } else {
       let row = this.selectedState.row;
       if (!row) {
@@ -237,25 +132,25 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       const rowSize = row.columns.reduce((a, b) => a + b.width, 0);
       const newColumn = {
         width: 12 - rowSize,
-        fieldAlias: newField.alias,
+        fieldId: newField.id,
       };
       row.columns.push(newColumn);
       this.selectedState.column = newColumn;
     }
-    this.selectedState.field = newField.alias;
+    this.selectedState.field = newField.id;
     newDefinition.fields = [...newDefinition.fields, newField];
     this.context?.updateForm({ definition: newDefinition });
   }
 
   static styles = css`
-    .inspector {
-      padding: 18px 12px;
-    }
-
     .fields {
       display: flex;
       gap: 8px;
       flex-direction: column;
+    }
+
+    .inspector-content {
+      padding: 18px 12px;
     }
   `;
 }

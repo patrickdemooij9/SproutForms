@@ -10,6 +10,6 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         string Description { get; }
 
         FormPropertyBackofficeModel[] FromConfig(object configuration);
-        object ToConfig(Dictionary<string, string> properties);
+        object ToConfig(Dictionary<string, object?> properties);
     }
 }

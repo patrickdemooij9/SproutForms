@@ -5,11 +5,7 @@ namespace SproutForms.Core.Fields
 {
     public class DateFieldType : FormFieldBase<DateFieldConfig, DateTime>
     {
-        public override Guid Id => Guid.Parse("105d693d-26fe-4935-b03f-adf7b1c74e6d");
-
         public override string Alias => "date";
-
-        public override string DisplayName => "Date";
 
         public override DateFieldConfig DefaultConfiguration => new();
 

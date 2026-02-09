@@ -13,7 +13,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
 
         public FileFieldDescriptor()
         {
-            DefineMap(it => it.MaxFileSizeBytes, "maxFileSizeBytes", "Max file size bytes", "Umb.PropertyEditorUi.Integer");
+            DefineMap(it => it.MaxFileSizeBytes, "maxFileSizeBytes", "Max file size bytes", "Umb.PropertyEditorUi.Integer", (value) => value.ToString(), (value) => long.Parse(value.ToString()));
             DefineMap(it => it.AllowedExtensions, "allowedExtensions", "Allowed extensions", "Umb.PropertyEditorUi.MultipleTextString");
             DefineMap(it => it.StorageProviderAlias, "storageProviderAlias", "Storage provider", "Umb.PropertyEditorUi.TextBox");
         }

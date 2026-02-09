@@ -10,11 +10,7 @@ namespace SproutForms.Core.Fields
 {
     public class TextFieldFormFieldType : FormFieldBase<TextFieldConfig, string>
     {
-        public override Guid Id => Guid.Parse("a1b2c3d4-e5f6-4789-9012-3456789abcde");
-
         public override string Alias => "text";
-
-        public override string DisplayName => "Text Field";
 
         public override TextFieldConfig DefaultConfiguration => new TextFieldConfig();
 

@@ -26,6 +26,8 @@ import { SubmissionFieldManifest } from "./submissionFieldManifest";
 import FileSubmissionFieldElement from "../workspaces/submissionEditors/fileSubmissionField.element";
 import { FormFieldConfigManifest } from "./formFieldConfigManifest";
 import KeyValuePairProperty from "../workspaces/fieldEditors/keyValuePairProperty.element";
+import { ManifestPropertyEditorUi } from "@umbraco-cms/backoffice/property-editor";
+import FormPickerElement from "../propertyEditors/formPickerElement";
 
 const SproutFormSection: ManifestSection = {
   type: "section",
@@ -197,6 +199,19 @@ const KeyValuePairFieldConfigProperty: FormFieldConfigManifest = {
   propertyTypeAlias: "SproutForms.KeyValuePair",
 };
 
+const FormsPickerPropertyEditor: ManifestPropertyEditorUi = {
+  type: 'propertyEditorUi',
+  alias: 'sproutForms.propertyEditors.formPicker',
+  name: 'SproutForms form picker',
+  element: FormPickerElement,
+  meta: {
+    label: 'SproutForms form picker',
+    icon: 'icon-list',
+    group: 'common',
+    propertyEditorSchemaAlias: "Umbraco.Plain.String"
+  }
+}
+
 export const SproutFormManifests = [
   SproutFormSection,
   SproutFormsDashboard,
@@ -211,5 +226,6 @@ export const SproutFormManifests = [
   FormSubmissionsCollectionViewManifest,
   FormSubmissionInfoModal,
   FileFieldSubmissionField,
-  KeyValuePairFieldConfigProperty
+  KeyValuePairFieldConfigProperty,
+  FormsPickerPropertyEditor
 ];

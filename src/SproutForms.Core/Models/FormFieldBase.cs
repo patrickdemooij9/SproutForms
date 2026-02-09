@@ -9,11 +9,7 @@ namespace SproutForms.Core.Models
 {
     public abstract class FormFieldBase<TConfig, TValue>: IFormFieldType where TConfig: class
     {
-        public abstract Guid Id { get; }
-
         public abstract string Alias { get; }
-
-        public abstract string DisplayName { get; }
 
         public Type ConfigurationType => typeof(TConfig);
 

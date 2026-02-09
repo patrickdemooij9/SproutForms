@@ -7,11 +7,11 @@ namespace SproutForms.Core.JsonConverters
 {
     public class FormFieldJsonConverter : JsonConverter<FormField>
     {
-        private readonly IReadOnlyDictionary<Guid, Type> _configTypes;
+        private readonly IReadOnlyDictionary<string, Type> _configTypes;
 
         public FormFieldJsonConverter(IEnumerable<IFormFieldType> fieldTypes)
         {
-            _configTypes = fieldTypes.ToDictionary(ft => ft.Id, ft => ft.ConfigurationType);
+            _configTypes = fieldTypes.ToDictionary(ft => ft.Alias, ft => ft.ConfigurationType);
         }
 
         public override FormField Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -21,7 +21,7 @@ namespace SproutForms.Core.JsonConverters
 
             var alias = root.GetProperty("Alias").GetString()!;
             var label = root.GetProperty("Label").GetString()!;
-            var fieldTypeId = Guid.Parse(root.GetProperty("FieldTypeId").GetString()!);
+            var fieldTypeAlias = root.GetProperty("FieldTypeAlias").GetString()!;
             var required = root.TryGetProperty("Required", out var req) && req.GetBoolean();
 
             FieldConditions? conditions = null;
@@ -33,7 +33,7 @@ namespace SproutForms.Core.JsonConverters
             object configuration = null!;
             if (root.TryGetProperty("Configuration", out var conf) && conf.ValueKind != JsonValueKind.Null)
             {
-                if (_configTypes.TryGetValue(fieldTypeId, out var configType))
+                if (_configTypes.TryGetValue(fieldTypeAlias, out var configType))
                 {
                     configuration = JsonSerializer.Deserialize(conf.GetRawText(), configType, options)!;
                 }
@@ -47,7 +47,7 @@ namespace SproutForms.Core.JsonConverters
             {
                 Alias = alias,
                 Label = label,
-                FieldTypeId = fieldTypeId,
+                FieldTypeAlias = fieldTypeAlias,
                 Required = required,
                 Configuration = configuration,
                 Conditions = conditions
@@ -60,7 +60,7 @@ namespace SproutForms.Core.JsonConverters
 
             writer.WriteString("Alias", value.Alias);
             writer.WriteString("Label", value.Label);
-            writer.WriteString("FieldTypeId", value.FieldTypeId.ToString());
+            writer.WriteString("FieldTypeAlias", value.FieldTypeAlias.ToString());
             writer.WriteBoolean("Required", value.Required);
 
             writer.WritePropertyName("Configuration");

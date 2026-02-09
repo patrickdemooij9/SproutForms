@@ -10,7 +10,7 @@
     }
     else
     {
-        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true">
+        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)'>
             @Html.AntiForgeryToken()
             @foreach (var row in Model.Rows)
             {

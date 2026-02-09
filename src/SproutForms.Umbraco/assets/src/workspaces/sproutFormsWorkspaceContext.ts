@@ -10,16 +10,11 @@ import {
   UmbWorkspaceRouteManager,
 } from "@umbraco-cms/backoffice/workspace";
 import { SproutFormsWorkspaceElement } from "./sproutFormsWorkspace.element";
-import {
-  FormBackofficeModel,
-  FormColumnBackofficeModel,
-  FormFieldBackofficeModel,
-  FormRowBackofficeModel
-} from "../api";
 import { UmbObjectState } from "@umbraco-cms/backoffice/observable-api";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
-import { SOURCE_UI } from "../models";
+import { FormColumnDto, FormDto, FormFieldDto, FormRowDto, SOURCE_UI } from "../models";
+import { mapToDto, mapToPost } from "../mappings";
 
 export default class SproutFormsWorkspaceContext
   extends UmbContextBase
@@ -32,7 +27,7 @@ export default class SproutFormsWorkspaceContext
 
   #updateAlias = true;
 
-  #form = new UmbObjectState<FormBackofficeModel>({
+  #form = new UmbObjectState<FormDto>({
     name: "",
     alias: "",
     version: 1,
@@ -72,7 +67,7 @@ export default class SproutFormsWorkspaceContext
         setup: (_component, _info) => {
           this.#updateAlias = false;
           this.source.getForm(_info.match.params.unique).then((resp) => {
-            this.#form.update(resp.data);
+            this.#form.update(mapToDto(resp.data));
           });
         },
       },
@@ -96,13 +91,13 @@ export default class SproutFormsWorkspaceContext
     this.#updateAlias = false;
   }
 
-  updateForm(form: Partial<FormBackofficeModel>) {
+  updateForm(form: Partial<FormDto>) {
     this.#form.update(form);
   }
 
-  updateField(updatedField: Partial<FormFieldBackofficeModel>) {
+  updateField(updatedField: Partial<FormFieldDto>) {
     const clonedFields = structuredClone(this.#form.value.definition.fields);
-    const field = clonedFields.find((f) => f.alias === updatedField.alias);
+    const field = clonedFields.find((f) => f.id === updatedField.id);
     if (field) {
       Object.assign(field, updatedField);
       this.#form.update({
@@ -115,8 +110,8 @@ export default class SproutFormsWorkspaceContext
   }
 
   setColumnSize(
-    row: FormRowBackofficeModel,
-    column: FormColumnBackofficeModel,
+    row: FormRowDto,
+    column: FormColumnDto,
     newSize: number
   ) {
     const rowIndex = this.#form.value.definition.rows.findIndex(
@@ -141,8 +136,8 @@ export default class SproutFormsWorkspaceContext
   }
 
   async save() {
-    const returnValue = await this.source.saveForm(this.#form.value);
-    this.#form.update(returnValue.data);
+    const returnValue = await this.source.saveForm(mapToPost(this.#form.value));
+    this.#form.update(mapToDto(returnValue.data));
 
     history.replaceState(
       {},

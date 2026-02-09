@@ -7,8 +7,6 @@ namespace SproutForms.Core.Models.Outcomes
 
         string IFormSubmitOutcomeType.Alias => Alias;
 
-        public string DisplayName => "Show message";
-
         public Type ConfigurationType => typeof(ShowMessageOutcomeConfig);
 
         public object GetDefaultConfiguration()
@@ -16,6 +14,15 @@ namespace SproutForms.Core.Models.Outcomes
             return new ShowMessageOutcomeConfig
             {
                 Message = "Thank you for your submission!"
+            };
+        }
+
+        public OutcomeResult Handle(object configuration)
+        {
+            var config = (ShowMessageOutcomeConfig) configuration;
+            return new OutcomeResult
+            {
+                Message = config.Message,
             };
         }
     }

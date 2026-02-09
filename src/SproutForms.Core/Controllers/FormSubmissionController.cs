@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Outcomes;
+using SproutForms.Core.Models.SubmissionGuard;
 using SproutForms.Core.Models.ViewModels;
 using SproutForms.Core.Repositories;
 using SproutForms.Core.Services;
@@ -22,15 +23,21 @@ namespace SproutForms.Core.Controllers
         private readonly IFormVersionRepository _formVersions;
         private readonly IFormSubmissionService _submissionService;
         private readonly FormRenderingService _formRenderingService;
+        private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
+        private readonly IFormSubmissionGuard? _formSubmissionGuard;
 
         public FormSubmissionController(
             IFormVersionRepository formVersions,
             IFormSubmissionService submissionService,
-            FormRenderingService formRenderingService)
+            FormRenderingService formRenderingService,
+            IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
+            IFormSubmissionGuard? formSubmissionGuard)
         {
             _formVersions = formVersions;
             _submissionService = submissionService;
             _formRenderingService = formRenderingService;
+            _outcomeTypes = outcomeTypes;
+            _formSubmissionGuard = formSubmissionGuard;
         }
 
         [HttpPost("{id}")]
@@ -42,6 +49,30 @@ namespace SproutForms.Core.Controllers
             var formVersion = _formVersions.GetPublished(id);
             if (formVersion is null)
                 return NotFound();
+
+            if (_formSubmissionGuard != null)
+            {
+                var submissionGuardResult = await _formSubmissionGuard.EvaluateAsync(values);
+                if (!submissionGuardResult.Allowed)
+                {
+                    var errors = new Dictionary<string, List<string>>
+                {
+                    { "submissionGuard", new List<string> { submissionGuardResult.ErrorMessage! } }
+                };
+                    if (IsAjaxRequest(Request))
+                    {
+                        return BadRequest(new AjaxFormResponse
+                        {
+                            Success = false,
+                            Errors = errors,
+                            Values = values
+                        });
+                    }
+                    TempData[$"{formVersion.FormId}:FormErrors"] = JsonSerializer.Serialize(errors);
+                    TempData[$"{formVersion.FormId}:FormValues"] = JsonSerializer.Serialize(values);
+                    return Redirect(Request.Headers["Referer"].ToString());
+                }
+            }
 
             if (Request.Form.Files.Any())
             {
@@ -69,7 +100,7 @@ namespace SproutForms.Core.Controllers
 
             var request = new FormSubmissionRequest
             {
-                Values = values.ToDictionary(
+                Values = values.Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key)).ToDictionary(
                          kvp => kvp.Key,
                          kvp => JsonSerializer.SerializeToElement(kvp.Value))
             };
@@ -78,24 +109,22 @@ namespace SproutForms.Core.Controllers
             if (result is null)
                 return NotFound();
 
+            var outcomeType = _outcomeTypes.First(it => it.Alias == formVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
+            var outcomeResult = outcomeType.Handle(formVersion.Definition.SubmitOutcome.Configuration);
+
             if (IsAjaxRequest(Request))
             {
                 if (result.IsValid)
                 {
                     var responseModel = new AjaxFormResponse { Success = true };
-                    if (formVersion.Definition.SubmitOutcome.OutcomeTypeAlias == RedirectUrlOutcomeType.Alias)
-                    {
-                        var config = (RedirectUrlOutcomeConfig)formVersion.Definition.SubmitOutcome.Configuration;
-                        responseModel.RedirectUrl = config.RedirectUrl;
-                    }
-                    else if (formVersion.Definition.SubmitOutcome.OutcomeTypeAlias == ShowMessageOutcome.Alias)
-                    {
-                        var config = (ShowMessageOutcomeConfig)formVersion.Definition.SubmitOutcome.Configuration;
-                        responseModel.SuccessMessage = config.Message;
-                    }
+                    if (!string.IsNullOrWhiteSpace(outcomeResult.RedirectUrl))
+                        responseModel.RedirectUrl = outcomeResult.RedirectUrl;
+                    else if (!string.IsNullOrWhiteSpace(outcomeResult.Message))
+                        responseModel.SuccessMessage = outcomeResult.Message;
+
                     return Ok(responseModel);
                 }
-                    
+
 
                 return BadRequest(new AjaxFormResponse
                 {
@@ -107,16 +136,11 @@ namespace SproutForms.Core.Controllers
 
             if (result.IsValid)
             {
-                if (formVersion.Definition.SubmitOutcome.OutcomeTypeAlias == RedirectUrlOutcomeType.Alias)
-                {
-                    var config = (RedirectUrlOutcomeConfig)formVersion.Definition.SubmitOutcome.Configuration;
-                    return Redirect(config.RedirectUrl);
-                }
-                else if (formVersion.Definition.SubmitOutcome.OutcomeTypeAlias == ShowMessageOutcome.Alias)
-                {
-                    var config = (ShowMessageOutcomeConfig)formVersion.Definition.SubmitOutcome.Configuration;
-                    TempData[$"{formVersion.FormId}:SuccessMessage"] = config.Message;
-                }
+                if (!string.IsNullOrWhiteSpace(outcomeResult.RedirectUrl))
+                    return Redirect(outcomeResult.RedirectUrl);
+                else if (!string.IsNullOrWhiteSpace(outcomeResult.Message))
+                    TempData[$"{formVersion.FormId}:SuccessMessage"] = outcomeResult.Message;
+
                 return Redirect(Request.Headers["Referer"].ToString());
             }
 

@@ -8,11 +8,7 @@ namespace SproutForms.Core.Fields
 {
     public class RepeaterField : FormFieldBase<RepeaterFieldConfig, RepeaterItemValue[]>
     {
-        public override Guid Id => Guid.Parse("667db65c-9285-4109-9306-476aa41f71ea");
-
         public override string Alias => "repeater";
-
-        public override string DisplayName => "Repeater";
 
         public override RepeaterFieldConfig DefaultConfiguration => new()
         {

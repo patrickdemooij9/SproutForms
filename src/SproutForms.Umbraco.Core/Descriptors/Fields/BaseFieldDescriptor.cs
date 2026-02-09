@@ -16,7 +16,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
 
         private List<DescriptorMapping<TConfig>> _mappings = [];
 
-        protected void DefineMap(Expression<Func<TConfig, object?>> expression, string alias, string displayName, string propertyTypeAlias, Func<object, string>? overrideFromConfig = null, Func<string, object> overrideToConfig = null)
+        protected void DefineMap(Expression<Func<TConfig, object?>> expression, string alias, string displayName, string propertyTypeAlias, Func<object, object>? overrideFromConfig = null, Func<object, object>? overrideToConfig = null)
         {
             _mappings.Add(new DescriptorMapping<TConfig>
             {
@@ -37,14 +37,17 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
             {
                 var value = mapping.Expression.Compile().Invoke(config);
 
-                string frontendValue;
-                if (value != null && mapping.OverrideFromConfig != null)
+                object? frontendValue = null;
+                if (value != null)
                 {
-                    frontendValue = mapping.OverrideFromConfig(value);
-                }
-                else
-                {
-                    frontendValue = JsonSerializer.Serialize(value);
+                    if (mapping.OverrideFromConfig != null)
+                    {
+                        frontendValue = mapping.OverrideFromConfig(value);
+                    }
+                    else
+                    {
+                        frontendValue = value;
+                    }
                 }
                 items.Add(new FormPropertyBackofficeModel
                 {
@@ -57,13 +60,11 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
             return items.ToArray();
         }
 
-        public object ToConfig(Dictionary<string, string> properties)
+        public object ToConfig(Dictionary<string, object?> properties)
         {
             var config = new TConfig();
-            foreach (var property in properties)
+            foreach (var property in properties.Where(it => it.Value != null))
             {
-                if (property.Value is null) continue;
-
                 var mapping = _mappings.FirstOrDefault(it => it.Alias == property.Key);
                 if (mapping is null) continue;
 
@@ -81,11 +82,11 @@ namespace SproutForms.Umbraco.Core.Descriptors.Fields
                     object value;
                     if (mapping.OverrideToConfig != null)
                     {
-                        value = mapping.OverrideToConfig(property.Value);
+                        value = mapping.OverrideToConfig(property.Value!);
                     }
                     else
                     {
-                        value = ConvertHelper.Convert(property.Value, configProperty.PropertyType);
+                        value = ConvertHelper.Convert(property.Value!, configProperty.PropertyType);
                     }
                     configProperty?.SetValue(config, value, null);
                 }

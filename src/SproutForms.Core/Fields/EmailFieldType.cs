@@ -9,11 +9,7 @@ namespace SproutForms.Core.Fields
 {
     public class EmailFieldType : FormFieldBase<EmailFieldConfig, string>
     {
-        public override Guid Id => Guid.Parse("3e07b933-349c-408c-b337-2f983cd2938f");
-
         public override string Alias => "email";
-
-        public override string DisplayName => "Email";
 
         public override EmailFieldConfig DefaultConfiguration => new();
 

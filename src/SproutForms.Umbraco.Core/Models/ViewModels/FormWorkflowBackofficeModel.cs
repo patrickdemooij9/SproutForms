@@ -6,6 +6,6 @@
         public string TypeAlias { get; set; }
         public string DisplayName { get; set; }
         public int Order { get; set; }
-        public Dictionary<string, string> Configuration { get; set; }
+        public Dictionary<string, object?> Configuration { get; set; }
     }
 }

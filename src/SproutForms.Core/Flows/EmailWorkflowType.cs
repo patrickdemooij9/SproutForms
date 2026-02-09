@@ -13,8 +13,6 @@ namespace SproutForms.Core.Flows
 
         public string Alias => "email";
 
-        public string DisplayName => "Send email";
-
         public Type ConfigurationType => typeof(EmailWorkflowConfig);
 
         public EmailWorkflowType(IEmailSender emailSender)

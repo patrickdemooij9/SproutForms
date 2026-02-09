@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Product>SproutForms.Umbraco</Product>
+    <PackageId>SproutForms.Umbraco</PackageId>
+    <Title>SproutForms for Umbraco</Title>
+    <Description>An Umbraco plugin to easily add forms to your Umbraco CMS</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>1.0.0-beta001</Version>
 
     <ContentTargetFolders>.</ContentTargetFolders>
     <StaticWebAssetBasePath>App_Plugins/SproutForms</StaticWebAssetBasePath>

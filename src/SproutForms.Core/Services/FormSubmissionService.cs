@@ -59,7 +59,7 @@ namespace SproutForms.Core.Services
                     continue;
                 }
 
-                var fieldType = _fieldTypes.First(it => it.Id == field.FieldTypeId);
+                var fieldType = _fieldTypes.First(it => it.Alias == field.FieldTypeAlias);
 
                 if (fieldType is IFormTypeRequiredHandler requiredHandler) // Additional required logic for checkboxes
                 {
@@ -135,7 +135,7 @@ namespace SproutForms.Core.Services
                     .FirstOrDefault(f => f.Alias == file.Name);
                 if (field is null) continue;
 
-                var fieldType = _fieldTypes.First(it => it.Id == field.FieldTypeId);
+                var fieldType = _fieldTypes.First(it => it.Alias == field.FieldTypeAlias);
                 if (fieldType is null) continue;
 
                 var config = field.Configuration as FileFieldConfig;

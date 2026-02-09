@@ -8,11 +8,7 @@ namespace SproutForms.Core.Fields
 {
     public class RadioFieldType : FormFieldBase<RadioFieldConfig, string>
     {
-        public override Guid Id => Guid.Parse("e2ed7feb-8d39-4e5e-a47a-4456f278c8c6");
-
         public override string Alias => "radio";
-
-        public override string DisplayName => "Radio field";
 
         public override RadioFieldConfig DefaultConfiguration => new()
         {
