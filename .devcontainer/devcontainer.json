@@ -10,7 +10,8 @@
             "dotnetRuntimeVersions": "10.0",
             "aspNetCoreRuntimeVersions": "10.0"
         },
-		"ghcr.io/devcontainers-contrib/features/jshint:2": {}
+		"ghcr.io/devcontainers-contrib/features/jshint:2": {},
+		"ghcr.io/devcontainers/features/git-lfs:1": {}
 	},
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
