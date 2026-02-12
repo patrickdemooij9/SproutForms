@@ -135,6 +135,97 @@ export default class SproutFormsWorkspaceContext
     });
   }
 
+  moveField(
+    fieldId: string,
+    targetRow: FormRowDto,
+    targetCol: FormColumnDto
+  ) {
+    const sourceRowIndex = this.#form.value.definition.rows.findIndex(row => 
+      row.columns.some(col => col.fieldId === fieldId)
+    );
+    if (sourceRowIndex === -1) return;
+
+    const sourceRow = this.#form.value.definition.rows[sourceRowIndex];
+    const sourceColumnIndex = sourceRow.columns.findIndex(col => col.fieldId === fieldId);
+    if (sourceColumnIndex === -1) return;
+
+    const targetRowIndex = this.#form.value.definition.rows.findIndex(r => r === targetRow);
+    if (targetRowIndex === -1) return;
+
+    const targetColumnIndex = this.#form.value.definition.rows[targetRowIndex].columns.findIndex(c => c === targetCol);
+    if (targetColumnIndex === -1) return;
+
+    const updatedRows = structuredClone(this.#form.value.definition.rows);
+    
+    const sourceColumn = updatedRows[sourceRowIndex].columns[sourceColumnIndex];
+    const targetColumn = updatedRows[targetRowIndex].columns[targetColumnIndex];
+
+    const tempFieldId = sourceColumn.fieldId;
+    sourceColumn.fieldId = targetColumn.fieldId;
+    targetColumn.fieldId = tempFieldId;
+
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        rows: updatedRows,
+      },
+    });
+  }
+
+  moveFieldToEmpty(
+    fieldId: string,
+    targetRow: FormRowDto | undefined
+  ) {
+    const sourceRowIndex = this.#form.value.definition.rows.findIndex(row => 
+      row.columns.some(col => col.fieldId === fieldId)
+    );
+    if (sourceRowIndex === -1) return;
+
+    const sourceRow = this.#form.value.definition.rows[sourceRowIndex];
+    const sourceColumnIndex = sourceRow.columns.findIndex(col => col.fieldId === fieldId);
+    if (sourceColumnIndex === -1) return;
+
+    const updatedRows = structuredClone(this.#form.value.definition.rows);
+    
+    if (targetRow) {
+      const targetRowIndex = updatedRows.findIndex(r => r.id === targetRow.id);
+      if (targetRowIndex !== -1) {
+        const spaceLeft = 12 - updatedRows[targetRowIndex].columns.reduce((prev, cur) => prev + cur.width, 0);
+        const newColumn: FormColumnDto = {
+          id: crypto.randomUUID(),
+          width: spaceLeft,
+          fieldId: fieldId
+        }
+        updatedRows[targetRowIndex].columns.push(newColumn);
+      }
+    } else {
+      const newRow: FormRowDto = {
+        id: crypto.randomUUID(),
+        columns: [
+          {
+            id: crypto.randomUUID(),
+            fieldId: fieldId,
+            width: 12,
+          },
+        ],
+      };
+      updatedRows.push(newRow);
+    }
+
+    updatedRows[sourceRowIndex].columns.splice(sourceColumnIndex, 1);
+
+    if (updatedRows[sourceRowIndex].columns.length === 0) {
+      updatedRows.splice(sourceRowIndex, 1);
+    }
+
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        rows: updatedRows,
+      },
+    });
+  }
+
   async save() {
     const returnValue = await this.source.saveForm(mapToPost(this.#form.value));
     this.#form.update(mapToDto(returnValue.data));

@@ -17,10 +17,12 @@ export interface FormDefinitionDto {
 }
 
 export interface FormRowDto {
+  id: string;
   columns: FormColumnDto[];
 }
 
 export interface FormColumnDto {
+  id?: string;
   width: number; // 1–12
   fieldId: string | null;
 }

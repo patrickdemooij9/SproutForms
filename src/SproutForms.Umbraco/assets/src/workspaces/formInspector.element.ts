@@ -126,7 +126,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
     } else {
       let row = this.selectedState.row;
       if (!row) {
-        row = { columns: [] };
+        row = { id: crypto.randomUUID(), columns: [] };
         newDefinition.rows = [...newDefinition.rows, row];
       }
       const rowSize = row.columns.reduce((a, b) => a + b.width, 0);

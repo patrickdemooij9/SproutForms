@@ -41,12 +41,15 @@ namespace SproutForms.Core.Flows
             var sb = new StringBuilder();
 
             sb.AppendLine("New form submission:");
-            sb.AppendLine();
+            sb.AppendLine("<br/>");
 
             foreach (var field in submission.Values)
             {
                 sb.AppendLine($"{field.Key}: {field.Value}");
+                sb.AppendLine("<br/>");
             }
+
+            sb.AppendLine("<small>Mail provided by Sprout Forms</small>");
 
             return sb.ToString();
         }

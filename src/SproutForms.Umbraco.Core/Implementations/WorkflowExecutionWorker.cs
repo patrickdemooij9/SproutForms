@@ -15,6 +15,7 @@ namespace SproutForms.Umbraco.Core.Implementations
         private readonly IWorkflowRunner _workflowRunner;
 
         public TimeSpan Period => TimeSpan.FromSeconds(10);
+        public TimeSpan Delay => TimeSpan.FromSeconds(1);
 
         public event EventHandler PeriodChanged { add { } remove { } }
 

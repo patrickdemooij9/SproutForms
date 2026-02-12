@@ -24,7 +24,10 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   definition!: FormDefinitionDto;
 
   @state()
-  resizeState?: SelectedResizeState;
+  private resizeState?: SelectedResizeState;
+
+  @state()
+  private draggedFieldId?: string;
 
   constructor() {
     super();
@@ -56,6 +59,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
                   class="column empty"
                   style="flex:${12 - rowSize}"
                   @click=${() => this.selectField(row, undefined, undefined)}
+                  @dragover=${this.onDragOver}
+                  @drop=${(event: DragEvent) => this.onDropOnEmpty(event, row)}
                 >
                   (Empty)
                 </div> `
@@ -68,6 +73,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
             class="column empty"
             style="flex:12"
             @click=${() => this.selectField(undefined, undefined, undefined)}
+            @dragover=${this.onDragOver}
+            @drop=${(event: DragEvent) => this.onDropOnEmpty(event, undefined)}
           >
             (Empty)
           </div>
@@ -97,7 +104,11 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         <div
           class="column ${this.selectedState.column == column
             ? "selected"
-            : ""}"
+            : ""} ${this.draggedFieldId && this.draggedFieldId !== field.id ? 'drag-over' : ''}"
+          draggable="true"
+          @dragstart=${(event: DragEvent) => this.onDragStart(event, field.id!)}
+          @dragover=${this.onDragOver}
+          @drop=${(event: DragEvent) => this.onDrop(event, row, column)}
           @click=${() => this.selectField(row, column, field)}
         >
           ${field.label}
@@ -164,6 +175,38 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     );
   }
 
+  private onDragStart(event: DragEvent, fieldId: string) {
+    this.draggedFieldId = fieldId;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', fieldId);
+    }
+  }
+
+  private onDragOver(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  private onDrop(event: DragEvent, targetRow: FormRowDto, targetColumn: FormColumnDto) {
+    event.preventDefault();
+    if (!this.draggedFieldId) return;
+
+    this.context?.moveField(this.draggedFieldId, targetRow, targetColumn);
+    this.draggedFieldId = undefined;
+  }
+
+  private onDropOnEmpty(event: DragEvent, targetRow: FormRowDto | undefined) {
+    event.preventDefault();
+    console.log("Hello world");
+    if (!this.draggedFieldId) return;
+
+    this.context?.moveFieldToEmpty(this.draggedFieldId, targetRow);
+    this.draggedFieldId = undefined;
+  }
+
   static styles = css`
     .canvas {
       padding: 16px;
@@ -182,6 +225,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       border-radius: 4px;
       padding: 12px;
       cursor: pointer;
+      user-select: none;
 
       &:hover {
         background-color: #e5e7eb;
@@ -192,6 +236,11 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         display: flex;
         justify-content: center;
         color: #ccc;
+      }
+
+      &.drag-over {
+        border: 2px dashed #0078d4;
+        background-color: #e6f2fa;
       }
     }
     .selected {

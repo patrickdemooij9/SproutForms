@@ -31,7 +31,13 @@ namespace SproutForms.Site.Code
                         .Set(c => c.AllowedExtensions = [".png"])
                         .Done()
                     )
-                ).Build();
+                )
+                .OnSubmit(s => s
+                    .SendEmail("email", email => email
+                        .To("test@email.com")
+                        .From("from@email.com")
+                        .Subject("New contact form")))
+                .Build();
         }
     }
 }
