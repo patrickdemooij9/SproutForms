@@ -200,10 +200,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
 
   private onDropOnEmpty(event: DragEvent, targetRow: FormRowDto | undefined) {
     event.preventDefault();
-    console.log("Hello world");
     if (!this.draggedFieldId) return;
 
-    this.context?.moveFieldToEmpty(this.draggedFieldId, targetRow);
+    this.context?.moveField(this.draggedFieldId, targetRow);
     this.draggedFieldId = undefined;
   }
 

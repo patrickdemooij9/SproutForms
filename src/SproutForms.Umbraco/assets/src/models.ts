@@ -22,7 +22,7 @@ export interface FormRowDto {
 }
 
 export interface FormColumnDto {
-  id?: string;
+  id: string;
   width: number; // 1–12
   fieldId: string | null;
 }

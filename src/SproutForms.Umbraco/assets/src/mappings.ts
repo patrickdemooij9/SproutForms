@@ -17,6 +17,7 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
       rows: model.definition.rows.map((row) => ({
         id: crypto.randomUUID(),
         columns: row.columns.map((col) => ({
+          id: crypto.randomUUID(),
           width: col.width,
           fieldId: fields.find((f) => f.alias == col.fieldAlias)?.id!,
         })),

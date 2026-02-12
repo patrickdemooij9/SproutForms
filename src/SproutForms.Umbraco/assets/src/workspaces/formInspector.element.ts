@@ -131,6 +131,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       }
       const rowSize = row.columns.reduce((a, b) => a + b.width, 0);
       const newColumn = {
+        id: crypto.randomUUID(),
         width: 12 - rowSize,
         fieldId: newField.id,
       };
