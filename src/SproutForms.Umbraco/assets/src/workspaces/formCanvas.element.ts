@@ -29,6 +29,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   @state()
   private draggedFieldId?: string;
 
+  @state()
+  private isResizing = false;
+
   constructor() {
     super();
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
@@ -105,7 +108,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
           class="column ${this.selectedState.column == column
             ? "selected"
             : ""} ${this.draggedFieldId && this.draggedFieldId !== field.id ? 'drag-over' : ''}"
-          draggable="true"
+          draggable="${this.isResizing ? 'false' : 'true'}"
           @dragstart=${(event: DragEvent) => this.onDragStart(event, field.id!)}
           @dragover=${this.onDragOver}
           @drop=${(event: DragEvent) => this.onDrop(event, row, column)}
@@ -115,6 +118,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         </div>
         <div
           class="field-resizer"
+          draggable="false"
           @mousedown=${(event: MouseEvent) =>
             this.startResize(event, row, column)}
         ></div>
@@ -127,6 +131,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     row: FormRowDto,
     column: FormColumnDto
   ) {
+    event.preventDefault();
+    event.stopPropagation();
+    
     const startX = event.clientX;
     const columnElemn = (event.target as HTMLElement)
       .previousElementSibling as HTMLElement;
@@ -137,6 +144,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       column: column,
       size: column.width,
     };
+
+    this.isResizing = true;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const newColumnElemSize = columnElemSize - (startX - moveEvent.clientX);
@@ -155,6 +164,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       document.removeEventListener("mouseup", onMouseUp);
 
       this.context?.setColumnSize(row, column, this.resizeState!.size);
+      this.isResizing = false;
     };
 
     document.addEventListener("mousemove", onMouseMove);
