@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using SproutForms.Core.Fields;
 using SproutForms.Core.Flows;
 using SproutForms.Core.Models;
@@ -47,6 +47,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormSubmissionRepository, FormSubmissionRepository>();
             builder.Services.AddSingleton<IFormVersionRepository, FormVersionRepository>();
             builder.Services.AddSingleton<IFormRepository, FormRepository>();
+            builder.Services.AddSingleton<IFolderRepository, FolderRepository>();
             builder.Services.AddSingleton<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();

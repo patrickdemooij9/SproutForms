@@ -1,4 +1,4 @@
-﻿using Umbraco.Cms.Core.Packaging;
+using Umbraco.Cms.Core.Packaging;
 
 namespace SproutForms.Umbraco.Core.Startup.Migrations
 {
@@ -11,6 +11,7 @@ namespace SproutForms.Umbraco.Core.Startup.Migrations
         protected override void DefinePlan()
         {
             To<FormsInitialMigration>("v1");
+            To<AddFoldersMigration>("v2");
         }
     }
 }

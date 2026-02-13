@@ -1,4 +1,4 @@
-﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.Database;
 using System;
@@ -37,7 +37,37 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Id = it.Id,
                 Name = it.Name,
                 Alias = it.Alias,
-                Source = (FormSource)it.Source
+                Source = (FormSource)it.Source,
+                FolderId = it.FolderId
+            }).ToArray();
+        }
+
+        public Form[] GetByFolder(Guid? folderId, int skip, int take, out int total)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            var sql = scope.SqlContext.Sql()
+                .SelectAll()
+                .From<FormEntity>();
+
+            if (folderId.HasValue)
+            {
+                sql = sql.Where<FormEntity>(it => it.FolderId == folderId.Value);
+            }
+            else
+            {
+                sql = sql.Where<FormEntity>(it => it.FolderId == null);
+            }
+
+            var entities = scope.Database.Fetch<FormEntity>(sql);
+            total = entities.Count;
+
+            return entities.Skip(skip).Take(take).Select(it => new Form
+            {
+                Id = it.Id,
+                Name = it.Name,
+                Alias = it.Alias,
+                Source = (FormSource)it.Source,
+                FolderId = it.FolderId
             }).ToArray();
         }
 
@@ -54,7 +84,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Id = entity.Id,
                 Name = entity.Name,
                 Alias = entity.Alias,
-                Source = (FormSource)entity.Source
+                Source = (FormSource)entity.Source,
+                FolderId = entity.FolderId
             };
         }
 
@@ -71,7 +102,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Id = entity.Id,
                 Name = entity.Name,
                 Alias = entity.Alias,
-                Source = (FormSource)entity.Source
+                Source = (FormSource)entity.Source,
+                FolderId = entity.FolderId
             };
         }
 
@@ -88,7 +120,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Id = form.Id,
                 Name = form.Name,
                 Alias = form.Alias,
-                Source = (int)form.Source
+                Source = (int)form.Source,
+                FolderId = form.FolderId
             });
             return form.Id;
         }

@@ -1,14 +1,13 @@
 namespace SproutForms.Core.Models
 {
-    public class Form
+    public class Folder
     {
         public Guid Id { get; set; }
         public required string Name { get; set; }
-        public required string Alias { get; set; }
-        public FormSource Source { get; set; }
-        public Guid? FolderId { get; set; }
+        public Guid? ParentId { get; set; }
+        public int SortOrder { get; set; }
 
-        public Form()
+        public Folder()
         {
             Id = Guid.Empty;
         }
