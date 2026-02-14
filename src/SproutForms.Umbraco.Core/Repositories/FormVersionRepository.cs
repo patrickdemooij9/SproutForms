@@ -9,6 +9,8 @@ using SproutForms.Core.JsonConverters;
 using System.Linq;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Models.Flows;
+using Umbraco.Cms.Core.Cache;
+using SproutForms.Umbraco.Core.Caching;
 
 namespace SproutForms.Umbraco.Core.Repositories
 {
@@ -19,15 +21,28 @@ namespace SproutForms.Umbraco.Core.Repositories
         private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
         private readonly IEnumerable<IFormWorkflowType> _workflowTypes;
 
-        public FormVersionRepository(IScopeProvider scopeProvider, IEnumerable<IFormFieldType> fieldTypes, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFormWorkflowType> workflowTypes)
+        private readonly Caching.IRepositoryCachePolicy<FormVersion, Guid> _cachePolicy;
+
+        public FormVersionRepository(IScopeProvider scopeProvider,
+            IEnumerable<IFormFieldType> fieldTypes,
+            IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
+            IEnumerable<IFormWorkflowType> workflowTypes,
+            IAppPolicyCache cache)
         {
             _scopeProvider = scopeProvider;
             _fieldTypes = fieldTypes;
             _outcomeTypes = outcomeTypes;
             _workflowTypes = workflowTypes;
+
+            _cachePolicy = new Caching.DefaultRepositoryCachePolicy<FormVersion, Guid>(cache, new RepositoryPolicyOptions<FormVersion, Guid>(it => it.Id));
         }
 
         public void Add(FormVersion version)
+        {
+            _cachePolicy.Create(version, DoAdd);
+        }
+
+        private void DoAdd(FormVersion version)
         {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             var published = GetPublished(version.FormId);
@@ -57,60 +72,47 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         public void DeleteAllByForm(Guid formId)
         {
-            using var scope = _scopeProvider.CreateScope(autoComplete: true);
-            var versions = scope.Database.Fetch<FormVersionEntity>(scope.SqlContext.Sql().SelectAll().From<FormVersionEntity>().Where<FormVersionEntity>(it => it.FormId == formId));
+            var versions = _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId));
 
-            foreach(var version in versions)
+            foreach (var version in versions)
             {
-                scope.Database.Delete(version);
+                _cachePolicy.Delete(version, DoDelete);
             }
+        }
+
+        private void DoDelete(FormVersion version)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            scope.Database.Delete<FormVersionEntity>(version);
         }
 
         public FormVersion? GetLatest(Guid formId)
         {
-            using var scope = _scopeProvider.CreateScope(autoComplete: true);
-            var entity = scope.Database.FirstOrDefault<FormVersionEntity>(scope.SqlContext.Sql()
-                .SelectAll()
-                .From<FormVersionEntity>()
-                .Where<FormVersionEntity>(it => it.FormId == formId)
-                .OrderByDescending<FormVersionEntity>(it => it.CreatedAt));
-            if (entity is null)
-                return null;
-
-            var options = new JsonSerializerOptions();
-            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes));
-            options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
-            options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
-
-            return new FormVersion
-            {
-                Id = entity.Id,
-                FormId = entity.FormId,
-                Version = entity.Version,
-                Status = (FormStatus)entity.Status,
-                Definition = JsonSerializer.Deserialize<FormDefinition>(entity.DefinitionJson, options)!,
-                DefinitionHash = entity.DefinitionHash,
-                CreatedBy = entity.CreatedBy,
-                CreatedAt = entity.CreatedAt
-            };
+            return _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId)).OrderByDescending(it => it.CreatedAt).FirstOrDefault();
         }
 
         public FormVersion? GetPublished(Guid formId)
         {
+            return _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId)).FirstOrDefault(it => it.Status == FormStatus.Published);
+        }
+
+        private FormVersion[] DoGetByFormId(Guid formId)
+        {
+            Console.WriteLine("Cache fail!");
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
-            var entity = scope.Database.FirstOrDefault<FormVersionEntity>(scope.SqlContext.Sql()
+            var entities = scope.Database.Fetch<FormVersionEntity>(scope.SqlContext.Sql()
                 .SelectAll()
                 .From<FormVersionEntity>()
-                .Where<FormVersionEntity>(it => it.FormId == formId && it.Status == (int)FormStatus.Published));
-            if (entity is null)
-                return null;
+                .Where<FormVersionEntity>(it => it.FormId == formId));
+            if (entities.Count == 0)
+                return [];
 
             var options = new JsonSerializerOptions();
             options.Converters.Add(new FormFieldJsonConverter(_fieldTypes));
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
 
-            return new FormVersion
+            return [.. entities.Select(entity => new FormVersion
             {
                 Id = entity.Id,
                 FormId = entity.FormId,
@@ -120,16 +122,22 @@ namespace SproutForms.Umbraco.Core.Repositories
                 DefinitionHash = entity.DefinitionHash,
                 CreatedBy = entity.CreatedBy,
                 CreatedAt = entity.CreatedAt
-            };
+            })];
         }
 
         public FormVersion? Get(Guid formVersionId)
         {
+            return _cachePolicy.Get(formVersionId, DoGetById);
+        }
+
+        private FormVersion? DoGetById(Guid id)
+        {
+            Console.WriteLine("Cache fail!");
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             var entity = scope.Database.FirstOrDefault<FormVersionEntity>(scope.SqlContext.Sql()
                 .SelectAll()
                 .From<FormVersionEntity>()
-                .Where<FormVersionEntity>(it => it.Id == formVersionId));
+                .Where<FormVersionEntity>(it => it.Id == id));
             if (entity is null)
                 return null;
 

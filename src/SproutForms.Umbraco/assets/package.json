@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc && vite build && npm run minify:forms",
     "preview": "vite preview",
     "generate": "openapi-ts",
-    "deploy": "npm install && tsc && vite build"
+    "deploy": "npm install && tsc && vite build && npm run minify:forms",
+    "minify:forms": "node scripts/minify-forms.js",
+    "watch:forms": "node scripts/minify-forms.js --watch"
   },
   "dependencies": {
     "@lit/context": "^1.1.2",
@@ -21,7 +23,10 @@
     "@hey-api/client-fetch": "^0.10.0",
     "@hey-api/openapi-ts": "^0.85.0",
     "@umbraco-cms/backoffice": "17.0.0",
+    "cssnano": "^6.0.0",
     "eslint-plugin-lit": "^1.15.0",
+    "postcss": "^8.4.0",
+    "terser": "^5.31.0",
     "typescript": "^5.5.3",
     "vite": "^5.4.1"
   }

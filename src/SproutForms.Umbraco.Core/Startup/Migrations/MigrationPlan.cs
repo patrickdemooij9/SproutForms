@@ -12,6 +12,7 @@ namespace SproutForms.Umbraco.Core.Startup.Migrations
         {
             To<FormsInitialMigration>("v1");
             To<AddFoldersMigration>("v2");
+            To<FormsUserGroupMigration>("v3");
         }
     }
 }
