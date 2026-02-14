@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses } from './types.gen';
+import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFolderData, PostUmbracoSproutFormsFolderResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -37,6 +37,17 @@ export class BackofficeSproutForms {
         return (options?.client ?? client).get<GetUmbracoSproutFormsFieldTypesResponses, unknown, ThrowOnError>({
             url: '/umbraco/sproutForms/fieldTypes',
             ...options
+        });
+    }
+    
+    public static postUmbracoSproutFormsFolder<ThrowOnError extends boolean = true>(options?: Options<PostUmbracoSproutFormsFolderData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostUmbracoSproutFormsFolderResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/folder',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
         });
     }
     

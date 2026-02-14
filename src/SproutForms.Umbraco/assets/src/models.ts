@@ -2,6 +2,7 @@ import { FieldConditions } from "./api";
 
 export interface FormDto {
   id?: string | null;
+  folderId?: string | null;
   name: string;
   alias: string;
   version: number;

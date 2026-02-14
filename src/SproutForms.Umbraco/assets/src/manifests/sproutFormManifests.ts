@@ -28,6 +28,8 @@ import { FormFieldConfigManifest } from "./formFieldConfigManifest";
 import KeyValuePairProperty from "../workspaces/fieldEditors/keyValuePairProperty.element";
 import { ManifestPropertyEditorUi } from "@umbraco-cms/backoffice/property-editor";
 import FormPickerElement from "../propertyEditors/formPickerElement";
+import CreateFolderAction from "../actions/CreateFolderAction";
+import FolderWorkspaceContext from "../workspaces/folderWorkspaceContext";
 
 const SproutFormSection: ManifestSection = {
   type: "section",
@@ -68,6 +70,17 @@ const SproutFormsWorkspace: ManifestWorkspace = {
     entityType: "sprout-form",
   },
 };
+
+const SproutFolderWorkspace: ManifestWorkspace = {
+  type: "workspace",
+  kind: "routable",
+  alias: "sproutForms.folder.detail",
+  name: "Sprout Folder Workspace",
+  api: FolderWorkspaceContext,
+  meta: {
+    entityType: "sprout-folder"
+  }
+}
 
 const FormsCollection: ManifestCollection = {
   type: "collection",
@@ -113,6 +126,23 @@ const FormCollectionCreateAction: ManifestCollectionAction = {
   api: CreateFormAction,
   meta: {
     label: "#general_create",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: "sproutForms.collections.forms",
+    },
+  ],
+};
+
+const FolderCollectionCreateAction: ManifestCollectionAction = {
+  type: "collectionAction",
+  kind: "button",
+  name: "Form Collection Overview Create Folder",
+  alias: "sproutForms.collections.forms.createAction.folder",
+  api: CreateFolderAction,
+  meta: {
+    label: "Create folder",
   },
   conditions: [
     {
@@ -216,10 +246,12 @@ export const SproutFormManifests = [
   SproutFormSection,
   SproutFormsDashboard,
   SproutFormsWorkspace,
+  SproutFolderWorkspace,
   FormsCollection,
   FormsCollectionView,
   FormRepository,
   FormCollectionCreateAction,
+  FolderCollectionCreateAction,
   FormCollectionTrashBulkAction,
   FormSubmissionsRepositoryManifest,
   FormSubmissionsCollectionManifest,

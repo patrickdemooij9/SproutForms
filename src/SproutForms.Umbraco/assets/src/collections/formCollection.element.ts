@@ -74,13 +74,14 @@ export default class FormCollectionElement extends UmbLitElement {
         this._tableItems = items.map<UmbTableItem>((item) => {
           return {
             id: item.unique,
-            icon: "icon-trafic",
+            icon: item.entityType == "sf-form" ? "icon-trafic" : "icon-folder",
             data: [
               {
                 columnAlias: "name",
                 value: {
                     name: item.name,
-                    unique: item.unique
+                    unique: item.unique,
+                    entityType: item.entityType
                 },
               },
               {

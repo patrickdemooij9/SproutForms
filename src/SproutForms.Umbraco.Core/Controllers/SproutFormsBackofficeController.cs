@@ -145,6 +145,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             var form = new Form
             {
                 Id = model.Id ?? Guid.Empty,
+                FolderId = model.FolderId,
                 Name = model.Name,
                 Alias = alias,
                 Source = FormSource.UI

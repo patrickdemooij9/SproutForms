@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Umbraco.Cms.Api.Management.ViewModels.Tree;
 
 namespace SproutForms.Umbraco.Core.Models.ViewModels
@@ -7,11 +8,14 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public string Id { get; set; }
         public string Name { get; set; }
         public TreeItemType ItemType { get; set; }
+        public int? Source { get; set; }
+        public int? TotalSubmissions { get; set; }
     }
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum TreeItemType
     {
-        Folder,
-        Form
+        Folder = 0,
+        Form = 1
     }
 }

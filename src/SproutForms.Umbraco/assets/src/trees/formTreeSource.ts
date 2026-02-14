@@ -65,17 +65,18 @@ const getAncestorsOf = async (args: UmbTreeAncestorsOfRequestArgs) => {
 };
 
 const mapper = (item: FormTreeItemModel): FormTreeItem => {
-  return {
-    unique: item.id,
-    parent: {
-      unique: null,
-      entityType: 'sf-root',
-    },
-    name: item.name,
-    entityType: 'sf-form',
-    hasChildren: item.hasChildren,
-    isFolder: false,
-    icon: 'icon-list',
-    isDraft: false,
-  };
+	const isFolder = item.itemType === 'Folder';
+	return {
+		unique: item.id,
+		parent: {
+			unique: null,
+			entityType: 'sf-root',
+		},
+		name: item.name,
+		entityType: isFolder ? 'sf-folder' : 'sf-form',
+		hasChildren: item.hasChildren,
+		isFolder: isFolder,
+		icon: isFolder ? 'icon-folder' : 'icon-list',
+		isDraft: false,
+	};
 };

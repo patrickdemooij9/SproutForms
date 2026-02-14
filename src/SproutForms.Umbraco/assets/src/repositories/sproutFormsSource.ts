@@ -1,6 +1,6 @@
 import { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { BackofficeSproutForms, FormBackofficeModel } from "../api";
+import { BackofficeSproutForms, CreateFolderRequest, FormBackofficeModel } from "../api";
 
 export class SproutFormsSource {
      #host: UmbControllerHost;
@@ -9,13 +9,17 @@ export class SproutFormsSource {
     this.#host = host;
   }
 
-  async getForms(take: number, skip: number){
-    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsForms({
-      query: {
-        skip,
-        take
-      }
-    }))
+  async getForms(take: number, skip: number, parentId?: string | null){
+    // Use tree endpoints which include both folders and forms
+    const treeData = parentId 
+      ? await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsChildren({
+          query: { parentUnique: parentId, skip, take }
+        }))
+      : await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsRoot({
+          query: { skip, take }
+        }));
+    
+    return treeData;
   }
 
   async getSubmissions(take: number, skip: number, formId: string) {
@@ -66,6 +70,12 @@ export class SproutFormsSource {
         id: formId,
         name: name
       }
+    }))
+  }
+
+  async saveFolder(model: CreateFolderRequest){
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsFolder({
+      body: model
     }))
   }
 }

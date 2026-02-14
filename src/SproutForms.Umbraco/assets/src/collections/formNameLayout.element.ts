@@ -4,12 +4,14 @@ import { UmbLitElement } from "@umbraco-cms/backoffice/lit-element";
 @customElement("sf-form-name-column-layout")
 export class FormNameLayout extends UmbLitElement {
 	@property({ attribute: false })
-	value?: { unique: string; name: string, callback: (event: Event, unique: string) => void };
+	value?: { unique: string; name: string, entityType: string };
 
 	override render() {
 		if (!this.value) return nothing;
 
-		return html`<a href="/umbraco/section/sproutForms/workspace/sprout-form/edit/${this.value.unique}">${this.value.name}</a>`;
+		const entity = this.value.entityType === "sf-form" ? "sprout-form" : "sprout-folder";
+
+		return html`<a href="/umbraco/section/sproutForms/workspace/${entity}/edit/${this.value.unique}">${this.value.name}</a>`;
 	}
 
 	static override styles = [

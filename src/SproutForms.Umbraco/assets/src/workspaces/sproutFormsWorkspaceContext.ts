@@ -54,6 +54,16 @@ export default class SproutFormsWorkspaceContext
 
     this.routes.setRoutes([
       {
+        path: "create/:parent",
+        component: SproutFormsWorkspaceElement,
+        setup: (_component, info) => {
+          console.log("Create with parent");
+          this.updateForm({
+            folderId: info.match.params.parent
+          })
+        }
+      },
+      {
         path: "create",
         component: SproutFormsWorkspaceElement,
         setup: async () => {

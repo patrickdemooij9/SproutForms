@@ -2,8 +2,10 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.ViewModels;
+using SproutForms.Umbraco.Core.Repositories;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -14,6 +16,12 @@ using Umbraco.Cms.Web.Common.Routing;
 
 namespace SproutForms.Umbraco.Core.Controllers
 {
+    public class CreateFolderRequest
+    {
+        public string Name { get; set; } = string.Empty;
+        public Guid? ParentId { get; set; }
+    }
+
     [ApiExplorerSettings(GroupName = "Backoffice SproutForms")]
     [ApiController]
     [BackOfficeRoute("sproutForms")]
@@ -23,11 +31,15 @@ namespace SproutForms.Umbraco.Core.Controllers
     {
         private readonly IFormRepository _formRepository;
         private readonly IFolderRepository _folderRepository;
+        private readonly IFormSubmissionRepository _formSubmissionRepository;
 
-        public SproutFormsTreeController(IFormRepository formRepository, IFolderRepository folderRepository)
+        public SproutFormsTreeController(IFormRepository formRepository,
+            IFolderRepository folderRepository,
+            IFormSubmissionRepository formSubmissionRepository)
         {
             _formRepository = formRepository;
             _folderRepository = folderRepository;
+            _formSubmissionRepository = formSubmissionRepository;
         }
 
         [HttpGet("root")]
@@ -55,7 +67,9 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     Id = form.Id.ToString(),
                     Name = form.Name,
-                    ItemType = TreeItemType.Form
+                    ItemType = TreeItemType.Form,
+                    Source = (int)form.Source,
+                    TotalSubmissions = _formSubmissionRepository.Count(form.Id)
                 });
             }
 
@@ -102,7 +116,9 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     Id = form.Id.ToString(),
                     Name = form.Name,
-                    ItemType = TreeItemType.Form
+                    ItemType = TreeItemType.Form,
+                    Source = (int)form.Source,
+                    TotalSubmissions = _formSubmissionRepository.Count(form.Id)
                 });
             }
 
@@ -146,6 +162,28 @@ namespace SproutForms.Umbraco.Core.Controllers
             }
 
             return Ok(ancestors);
+        }
+
+        [HttpPost("folder")]
+        [ProducesResponseType(typeof(FormTreeItemModel), StatusCodes.Status200OK)]
+        public ActionResult<FormTreeItemModel> CreateFolder([FromBody] CreateFolderRequest request)
+        {
+            var folder = new Folder
+            {
+                Id = Guid.NewGuid(),
+                Name = request.Name,
+                ParentId = request.ParentId.HasValue && request.ParentId.Value != Guid.Empty ? request.ParentId : null,
+                SortOrder = 0
+            };
+
+            _folderRepository.Save(folder);
+
+            return Ok(new FormTreeItemModel
+            {
+                Id = folder.Id.ToString(),
+                Name = folder.Name,
+                ItemType = TreeItemType.Folder
+            });
         }
     }
 }

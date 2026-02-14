@@ -9,6 +9,7 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
 
   return {
     id: model.id,
+    folderId: model.folderId,
     name: model.name,
     alias: model.alias,
     version: model.version,
@@ -37,6 +38,7 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
 export function mapToPost(model: FormDto): FormBackofficeModel {
   return {
     id: model.id,
+    folderId: model.folderId,
     name: model.name,
     alias: model.alias,
     version: model.version,

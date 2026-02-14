@@ -23,7 +23,7 @@ export const treeItem: ManifestTreeItem = {
   type: "treeItem",
   alias: "SeoToolkitTreeItem",
   name: "SeoToolkit Tree Item",
-  forEntityTypes: ["sf-form"],
+  forEntityTypes: ["sf-form", "sf-folder"],
 };
 
 export const rootTreeItem: ManifestTreeItem = {
@@ -31,7 +31,12 @@ export const rootTreeItem: ManifestTreeItem = {
   kind: "default",
   alias: "SeoToolkitTreeItem.Root",
   name: "SeoToolkit Root Tree Item",
-  forEntityTypes: ["sf-root"],
+  forEntityTypes: ["sf-root", "sf-folder"],
 };
 
-export const TreeManifests = [treeRepository, tree, treeItem, rootTreeItem];
+export const TreeManifests = [
+  treeRepository,
+  tree,
+  treeItem,
+  rootTreeItem,
+];

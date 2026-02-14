@@ -27,6 +27,11 @@ export type ConditionRule = {
     value?: unknown;
 };
 
+export type CreateFolderRequest = {
+    name: string;
+    parentId?: string | null;
+};
+
 export enum EventMessageTypeModel {
     DEFAULT = 'Default',
     INFO = 'Info',
@@ -43,6 +48,7 @@ export type FieldConditions = {
 
 export type FormBackofficeModel = {
     id?: string | null;
+    folderId?: string | null;
     name: string;
     alias: string;
     version: number;
@@ -138,6 +144,9 @@ export type FormTreeItemModel = {
     hasChildren: boolean;
     id: string;
     name: string;
+    itemType: TreeItemType;
+    source?: number | null;
+    totalSubmissions?: number | null;
 };
 
 export type FormWorkflowBackofficeModel = {
@@ -170,6 +179,11 @@ export type PagedFormTreeItemModel = {
     total: number;
     items: Array<FormTreeItemModel>;
 };
+
+export enum TreeItemType {
+    FOLDER = 'Folder',
+    FORM = 'Form'
+}
 
 export type GetUmbracoSproutFormsAncestorsData = {
     body?: never;
@@ -224,6 +238,22 @@ export type GetUmbracoSproutFormsFieldTypesResponses = {
 };
 
 export type GetUmbracoSproutFormsFieldTypesResponse = GetUmbracoSproutFormsFieldTypesResponses[keyof GetUmbracoSproutFormsFieldTypesResponses];
+
+export type PostUmbracoSproutFormsFolderData = {
+    body?: CreateFolderRequest;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/folder';
+};
+
+export type PostUmbracoSproutFormsFolderResponses = {
+    /**
+     * OK
+     */
+    200: FormTreeItemModel;
+};
+
+export type PostUmbracoSproutFormsFolderResponse = PostUmbracoSproutFormsFolderResponses[keyof PostUmbracoSproutFormsFolderResponses];
 
 export type DeleteUmbracoSproutFormsFormData = {
     body?: Array<string>;
