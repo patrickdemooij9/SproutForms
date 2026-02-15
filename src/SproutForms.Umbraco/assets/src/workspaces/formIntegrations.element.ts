@@ -26,7 +26,13 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   private flowTypes: FormFlowTypeDto[] = [];
 
   @state()
+  private selectedFlowId?: string = undefined;
+
+  @state()
   private selectedFlow?: FormWorkflowDto = undefined;
+
+  @state()
+  private draggedWorkflowId?: string = undefined;
 
   constructor() {
     super();
@@ -40,6 +46,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
 
       context?.form.subscribe((form) => {
         this.form = form;
+        this.selectedFlow = this.selectedFlowId ? this.form.definition.workflows.find((item) => item.id === this.selectedFlowId) : undefined;
       });
     });
   }
@@ -66,7 +73,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       configuration: configuration,
     };
     clonedDefinition.workflows.push(newFlow);
-    this.selectedFlow = newFlow;
+    this.selectedFlowId = newFlow.id;
     this.context?.updateForm({
       definition: clonedDefinition,
     });
@@ -98,6 +105,60 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     });
   }
 
+  private deleteWorkflow(event: MouseEvent, workflowId: string) {
+    event.stopPropagation();
+    if (this.selectedFlowId === workflowId) {
+      this.selectedFlowId = undefined;
+      this.selectedFlow = undefined;
+    }
+    this.context?.removeWorkflow(workflowId);
+  }
+
+  private onDragStartWorkflow(event: DragEvent, workflowId: string) {
+    this.draggedWorkflowId = workflowId;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', workflowId);
+    }
+  }
+
+  private onDragOverWorkflow(event: DragEvent) {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+  }
+
+  private onDropWorkflow(event: DragEvent, targetWorkflowId: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    if (!this.draggedWorkflowId || this.draggedWorkflowId === targetWorkflowId) {
+      this.draggedWorkflowId = undefined;
+      return;
+    }
+
+    const orderedFlow = this.getOrderedFlow();
+    const draggedIndex = orderedFlow.findIndex(w => w.id === this.draggedWorkflowId);
+    const targetIndex = orderedFlow.findIndex(w => w.id === targetWorkflowId);
+
+    if (draggedIndex === -1 || targetIndex === -1) {
+      this.draggedWorkflowId = undefined;
+      return;
+    }
+
+    const newOrder = [...orderedFlow];
+    const [draggedItem] = newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedItem);
+
+    this.context?.reorderWorkflows(newOrder.map(w => w.id));
+    this.draggedWorkflowId = undefined;
+  }
+
+  private onDragEnd() {
+    this.draggedWorkflowId = undefined;
+  }
+
   render() {
     return html`
       <div class="integrations">
@@ -119,18 +180,36 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
               (item) => item.alias,
               (item) => html`
                 <div
-                  class="flow-type ${this.selectedFlow?.alias === item.alias
+                  class="flow-type ${this.selectedFlow?.id === item.id
                     ? "selected"
-                    : ""}"
-                  @click=${() => (this.selectedFlow = item)}
+                    : ""} ${this.draggedWorkflowId && this.draggedWorkflowId !== item.id ? 'drag-over' : ''}"
+                  draggable="true"
+                  @dragstart=${(event: DragEvent) => this.onDragStartWorkflow(event, item.id)}
+                  @dragover=${this.onDragOverWorkflow}
+                  @drop=${(event: DragEvent) => this.onDropWorkflow(event, item.id)}
+                  @dragend=${this.onDragEnd}
+                  @click=${() => {
+                    this.selectedFlowId = item.id;
+                    this.selectedFlow = this.form.definition.workflows.find((item) => item.id === this.selectedFlowId);
+                  }}
                 >
-                  ${item.displayName}
+                  <span class="workflow-name">${item.displayName}</span>
+                  <button
+                    class="delete-btn"
+                    @click=${(event: MouseEvent) => this.deleteWorkflow(event, item.id)}
+                    title="Delete workflow"
+                  >
+                    <uui-icon name="icon-delete"></uui-icon>
+                  </button>
                 </div>
               `,
             )}
             <div
               class="flow-type add"
-              @click=${() => (this.selectedFlow = undefined)}
+              @click=${() => {
+                this.selectedFlowId = undefined;
+                this.selectedFlow = undefined;
+              }}
             >
               Add flow step
             </div>
@@ -247,6 +326,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       align-items: center;
       padding: 8px 12px;
       border: 1px solid #ccc;
+      border-radius: 4px;
       cursor: pointer;
 
       &.add {
@@ -256,6 +336,36 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       &:hover,
       &.selected {
         background-color: #e5e7eb;
+      }
+
+      &.drag-over {
+        border: 2px dashed #0078d4;
+        background-color: #e6f2fa;
+      }
+
+      .workflow-name {
+        flex: 1;
+      }
+
+      .delete-btn {
+        opacity: 0;
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 4px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #666;
+        transition: opacity 0.2s, color 0.2s;
+
+        &:hover {
+          color: #d32f2f;
+        }
+      }
+
+      &:hover .delete-btn {
+        opacity: 1;
       }
     }
   `;

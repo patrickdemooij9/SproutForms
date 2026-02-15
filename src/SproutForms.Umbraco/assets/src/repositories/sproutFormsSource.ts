@@ -36,6 +36,24 @@ export class SproutFormsSource {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsSubmission({ query: { submissionId } }));
   }
 
+  async retryWorkflow(submissionId: string, workflowAlias: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsSubmissionWorkflowRetry({
+      query: { submissionId, workflowAlias }
+    }));
+  }
+
+  async approveWorkflow(submissionId: string, workflowAlias: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsSubmissionWorkflowApprove({
+      query: { submissionId, workflowAlias }
+    }));
+  }
+
+  async declineWorkflow(submissionId: string, workflowAlias: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsSubmissionWorkflowDecline({
+      query: { submissionId, workflowAlias }
+    }));
+  }
+
   async getFieldTypes() {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFieldTypes())
   }

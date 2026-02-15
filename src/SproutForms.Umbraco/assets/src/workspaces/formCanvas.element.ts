@@ -114,7 +114,14 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
           @drop=${(event: DragEvent) => this.onDrop(event, row, column)}
           @click=${() => this.selectField(row, column, field)}
         >
-          ${field.label}
+          <span class="field-label">${field.label}</span>
+          <button
+            class="delete-btn"
+            @click=${(event: MouseEvent) => this.deleteField(event, field.id!)}
+            title="Delete field"
+          >
+            <uui-icon name="icon-delete"></uui-icon>
+          </button>
         </div>
         <div
           class="field-resizer"
@@ -124,6 +131,11 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         ></div>
       </div>
     `;
+  }
+
+  private deleteField(event: MouseEvent, fieldId: string) {
+    event.stopPropagation();
+    this.context?.removeField(fieldId);
   }
 
   private startResize(
@@ -219,7 +231,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   static styles = css`
     .canvas {
       padding: 16px;
-      background: var(--uui-color-surface);
+      background: #f3f4f6;
     }
     .row {
       display: flex;
@@ -230,7 +242,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       position: relative;
     }
     .column {
+      display: flex;
       border: 1px solid #ccc;
+      background: var(--uui-color-surface);
       border-radius: 4px;
       padding: 12px;
       cursor: pointer;
@@ -255,6 +269,28 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     .selected {
       border: 1px solid #ccc;
       background-color: #e5e7eb;
+    }
+    .field-label {
+      flex: 1;
+    }
+    .delete-btn {
+      opacity: 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #666;
+      transition: opacity 0.2s, color 0.2s;
+
+      &:hover {
+        color: #d32f2f;
+      }
+    }
+    .column:hover .delete-btn {
+      opacity: 1;
     }
     .field-resizer {
       width: 10px;

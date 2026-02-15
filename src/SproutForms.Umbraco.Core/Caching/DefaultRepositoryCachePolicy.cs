@@ -13,6 +13,8 @@ public class DefaultRepositoryCachePolicy<TEntity, TId> : IRepositoryCachePolicy
 
     protected readonly string _entityTypeCacheKey;
 
+    private string _entityPropertyTypeCacheKey => _entityTypeCacheKey + "properties";
+
     public DefaultRepositoryCachePolicy(IAppPolicyCache cache, RepositoryPolicyOptions<TEntity, TId> options)
     {
         _cache = cache;
@@ -297,18 +299,10 @@ public class DefaultRepositoryCachePolicy<TEntity, TId> : IRepositoryCachePolicy
         _cache.Clear(key);
     }
 
-    /// <summary>
-    /// Clears all secondary indexes for a specific property name.
-    /// </summary>
-    /// <param name="propertyName">The name of the property to clear all indexes for</param>
-    public void ClearPropertyCache(string propertyName)
-    {
-        _cache.ClearByKey($"{_entityTypeCacheKey}_{propertyName}_");
-    }
-
     protected virtual void ClearBaseCache()
     {
         _cache.Clear(_entityTypeCacheKey);
+        _cache.ClearByKey(_entityPropertyTypeCacheKey);
     }
 
     protected string GetEntityCacheKey(TEntity entity) => _entityTypeCacheKey + _options.GetEntityId(entity);
@@ -337,7 +331,7 @@ public class DefaultRepositoryCachePolicy<TEntity, TId> : IRepositoryCachePolicy
             return string.Empty;
 
         var propValueStr = propertyValue.ToString()?.ToUpperInvariant() ?? "null";
-        return $"{_entityTypeCacheKey}_{propertyName}_{propValueStr}";
+        return $"{_entityPropertyTypeCacheKey}_{propertyName}_{propValueStr}";
     }
 
     protected virtual void InsertEntity(string cacheKey, TEntity entity)

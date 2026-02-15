@@ -112,6 +112,12 @@ export type FormSubmissionOverviewItem = {
 
   id: string;
   name: string;
+  workflowStages?: Array<{
+    workflowAlias: string;
+    displayName: string;
+    order: number;
+    status: string;
+  }>;
 };
 
 export type FormSubmissionOverviewFilter = {

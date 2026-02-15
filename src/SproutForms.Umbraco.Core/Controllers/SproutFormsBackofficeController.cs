@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
@@ -36,9 +36,11 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IFormRepository _formRepository;
         private readonly IFormVersionRepository _formVersionRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
+        private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
 
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
+        //TODO: Move each section (forms, submissions, flows) to their own controllers...
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository)
         {
             _formFieldTypes = formFieldTypes.ToArray();
             _outcomeTypes = outcomeTypes.ToArray();
@@ -52,6 +54,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             _flowDescriptors = flowDescriptors;
             _fileStorageProvider = fileStorageProvider;
             _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
+            _workflowExecutionRepository = workflowExecutionRepository;
         }
 
         [HttpGet("forms")]
@@ -263,13 +266,42 @@ namespace SproutForms.Umbraco.Core.Controllers
         public IActionResult GetSubmissions(Guid formId, int skip, int take)
         {
             var submissions = _formSubmissionRepository.GetByForm(formId, skip, take, out var totalCount);
-            return Ok(new PagedViewModel<FormSubmissionListItemBackofficeModel>
+
+            var submissionItems = submissions.Select(it =>
             {
-                Items = submissions.Select(it => new FormSubmissionListItemBackofficeModel
+                var workflowStages = new List<WorkflowStageStatusModel>();
+                var formVersion = _formVersionRepository.Get(it.FormVersionId);
+
+                if (formVersion != null)
+                {
+                    var workflowExecutions = _workflowExecutionRepository.GetBySubmissionId(it.Id).GetAwaiter().GetResult(); //TODO: Combine this together and do one database call for performance reasons...
+
+                    foreach (var workflow in formVersion.Definition.Workflows)
+                    {
+                        var execution = workflowExecutions.FirstOrDefault(e => e.WorkflowAlias == workflow.Alias);
+                        var flowDescriptor = _flowDescriptors.FirstOrDefault(f => f.FlowTypeAlias == workflow.WorkflowTypeAlias);
+
+                        workflowStages.Add(new WorkflowStageStatusModel
+                        {
+                            WorkflowAlias = workflow.Alias,
+                            DisplayName = flowDescriptor?.DisplayName ?? workflow.WorkflowTypeAlias,
+                            Order = workflow.Order,
+                            Status = execution?.Status ?? WorkflowExecutionStatus.Pending
+                        });
+                    }
+                }
+
+                return new FormSubmissionListItemBackofficeModel
                 {
                     Id = it.Id,
-                    Name = "Submission at " + it.SubmittedAt.ToString("G")
-                }).ToArray(),
+                    Name = "Submission at " + it.SubmittedAt.ToString("G"),
+                    WorkflowStages = workflowStages
+                };
+            }).ToArray();
+
+            return Ok(new PagedViewModel<FormSubmissionListItemBackofficeModel>
+            {
+                Items = submissionItems,
                 Total = totalCount
             });
         }
@@ -281,6 +313,24 @@ namespace SproutForms.Umbraco.Core.Controllers
             var submission = await _formSubmissionRepository.Get(submissionId);
             var formVersion = _formVersionRepository.Get(submission.FormVersionId);
             if (formVersion is null) return NotFound();
+
+            var workflowStages = new List<WorkflowStageStatusModel>();
+            var workflowExecutions = await _workflowExecutionRepository.GetBySubmissionId(submissionId);
+
+            foreach (var workflow in formVersion.Definition.Workflows)
+            {
+                var execution = workflowExecutions.FirstOrDefault(e => e.WorkflowAlias == workflow.Alias);
+                var flowDescriptor = _flowDescriptors.FirstOrDefault(f => f.FlowTypeAlias == workflow.WorkflowTypeAlias);
+
+                workflowStages.Add(new WorkflowStageStatusModel
+                {
+                    WorkflowAlias = workflow.Alias,
+                    DisplayName = flowDescriptor?.DisplayName ?? workflow.WorkflowTypeAlias,
+                    Order = workflow.Order,
+                    Status = execution?.Status ?? WorkflowExecutionStatus.Pending
+                });
+            }
+
             return Ok(new FormSubmissionBackofficeModel
             {
                 Id = submission.Id,
@@ -295,8 +345,41 @@ namespace SproutForms.Umbraco.Core.Controllers
                         Name = field.Label,
                         Value = it.Value.ToString()
                     };
-                }).WhereNotNull().ToArray()
+                }).WhereNotNull().ToArray(),
+                WorkflowStages = workflowStages
             });
+        }
+
+        [HttpPost("submission/workflow/retry")]
+        [ProducesResponseType(typeof(bool), 200)]
+        public IActionResult RetryWorkflow(Guid submissionId, string workflowAlias)
+        {
+            // TODO: Regenerate SDK after implementing retry logic
+            // This would involve:
+            // 1. Getting the workflow execution for the given submission and workflow alias
+            // 2. Resetting its status to Pending
+            // 3. The workflow worker will pick it up again
+            return Ok(true);
+        }
+
+        [HttpPost("submission/workflow/approve")]
+        [ProducesResponseType(typeof(bool), 200)]
+        public IActionResult ApproveWorkflow(Guid submissionId, string workflowAlias)
+        {
+            // TODO: Regenerate SDK after implementing manual approval logic
+            // This would check if the workflow type supports manual approval
+            // and then either skip the workflow execution or mark it as approved
+            return Ok(true);
+        }
+
+        [HttpPost("submission/workflow/decline")]
+        [ProducesResponseType(typeof(bool), 200)]
+        public IActionResult DeclineWorkflow(Guid submissionId, string workflowAlias)
+        {
+            // TODO: Regenerate SDK after implementing manual decline logic
+            // This would check if the workflow type supports manual approval
+            // and then mark the workflow as failed with a decline message
+            return Ok(true);
         }
 
         [HttpDelete("form")]

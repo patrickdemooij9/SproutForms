@@ -126,11 +126,13 @@ export type FormRowBackofficeModel = {
 export type FormSubmissionBackofficeModel = {
     id: string;
     values: Array<FormSubmissionValueBackofficeModel>;
+    workflowStages: Array<WorkflowStageStatusModel>;
 };
 
 export type FormSubmissionListItemBackofficeModel = {
     id: string;
     name: string;
+    workflowStages: Array<WorkflowStageStatusModel>;
 };
 
 export type FormSubmissionValueBackofficeModel = {
@@ -183,6 +185,21 @@ export enum TreeItemType {
     FOLDER = 'Folder',
     FORM = 'Form'
 }
+
+export enum WorkflowExecutionStatus {
+    PENDING = 'Pending',
+    RUNNING = 'Running',
+    SUCCEEDED = 'Succeeded',
+    FAILED = 'Failed',
+    RETRYING = 'Retrying'
+}
+
+export type WorkflowStageStatusModel = {
+    workflowAlias: string;
+    displayName: string;
+    order: number;
+    status: WorkflowExecutionStatus;
+};
 
 export type GetUmbracoSproutFormsAncestorsData = {
     body?: never;
@@ -392,6 +409,63 @@ export type GetUmbracoSproutFormsSubmissionResponses = {
 };
 
 export type GetUmbracoSproutFormsSubmissionResponse = GetUmbracoSproutFormsSubmissionResponses[keyof GetUmbracoSproutFormsSubmissionResponses];
+
+export type PostUmbracoSproutFormsSubmissionWorkflowApproveData = {
+    body?: never;
+    path?: never;
+    query?: {
+        submissionId?: string;
+        workflowAlias?: string;
+    };
+    url: '/umbraco/sproutForms/submission/workflow/approve';
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowApproveResponses = {
+    /**
+     * OK
+     */
+    200: boolean;
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowApproveResponse = PostUmbracoSproutFormsSubmissionWorkflowApproveResponses[keyof PostUmbracoSproutFormsSubmissionWorkflowApproveResponses];
+
+export type PostUmbracoSproutFormsSubmissionWorkflowDeclineData = {
+    body?: never;
+    path?: never;
+    query?: {
+        submissionId?: string;
+        workflowAlias?: string;
+    };
+    url: '/umbraco/sproutForms/submission/workflow/decline';
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses = {
+    /**
+     * OK
+     */
+    200: boolean;
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowDeclineResponse = PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses[keyof PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses];
+
+export type PostUmbracoSproutFormsSubmissionWorkflowRetryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        submissionId?: string;
+        workflowAlias?: string;
+    };
+    url: '/umbraco/sproutForms/submission/workflow/retry';
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowRetryResponses = {
+    /**
+     * OK
+     */
+    200: boolean;
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowRetryResponse = PostUmbracoSproutFormsSubmissionWorkflowRetryResponses[keyof PostUmbracoSproutFormsSubmissionWorkflowRetryResponses];
 
 export type GetUmbracoSproutFormsSubmissionsData = {
     body?: never;

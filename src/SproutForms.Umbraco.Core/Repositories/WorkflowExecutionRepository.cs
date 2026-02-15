@@ -1,4 +1,5 @@
-﻿using SproutForms.Core.Models;
+using NPoco;
+using SproutForms.Core.Models;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.Database;
@@ -95,6 +96,36 @@ namespace SproutForms.Umbraco.Core.Repositories
         {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             await scope.Database.SaveAsync(ToEntity(execution));
+        }
+
+        public async Task<WorkflowExecution[]> GetBySubmissionId(Guid submissionId)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+
+            var entities = await scope.Database.FetchAsync<WorkflowExecutionEntity>(scope.SqlContext.Sql()
+                .SelectAll()
+                .From<WorkflowExecutionEntity>()
+                .Where<WorkflowExecutionEntity>(it => it.SubmissionId == submissionId)
+                .OrderBy<WorkflowExecutionEntity>(it => it.Order));
+
+            return entities
+                .Select(e => new WorkflowExecution
+                {
+                    Id = e.Id,
+                    SubmissionId = e.SubmissionId,
+                    WorkflowAlias = e.WorkflowAlias,
+                    WorkflowTypeAlias = e.WorkflowTypeAlias,
+                    ConfigurationJson = e.ConfigurationJson,
+                    Order = e.Order,
+                    Status = (WorkflowExecutionStatus)e.Status,
+                    AttemptCount = e.AttemptCount,
+                    LastError = e.LastError,
+                    CreatedUtc = e.CreatedUtc,
+                    NextAttemptUtc = e.NextAttemptUtc,
+                    StartedUtc = e.StartedUtc,
+                    CompletedUtc = e.CompletedUtc
+                })
+                .ToArray();
         }
 
         private WorkflowExecutionEntity ToEntity(WorkflowExecution execution)

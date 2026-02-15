@@ -36,6 +36,10 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
       alias: "name",
       elementName: "sf-form-submission-name-column-layout",
     },
+    {
+      name: "Workflow Status",
+      alias: "workflowStatus",
+    },
   ];
 
   @state()
@@ -48,6 +52,16 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
     super();
 
     this.loadItems();
+  }
+
+  #getStatusDot(status: string) {
+    if (status === "Succeeded") {
+      return html`<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #4CAF50; margin-right: 4px;"></span>`;
+    } else if (status === "Failed") {
+      return html`<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #F44336; margin-right: 4px;"></span>`;
+    } else {
+      return html`<span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: #9E9E9E; margin-right: 4px;"></span>`;
+    }
   }
 
   async loadItems() {
@@ -76,6 +90,12 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
                     unique: item.unique,
                     name: item.name,
                   },
+                },
+                {
+                  columnAlias: "workflowStatus",
+                  value: item.workflowStages?.map((stage) =>
+                    this.#getStatusDot(stage.status)
+                  ) ?? [],
                 },
               ],
             };

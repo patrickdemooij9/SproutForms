@@ -218,6 +218,51 @@ export default class SproutFormsWorkspaceContext
     });
   }
 
+  removeField(fieldId: string) {
+    const updatedRows = this.#form.value.definition.rows.map(row => ({
+      ...row,
+      columns: row.columns.filter(col => col.fieldId !== fieldId)
+    })).filter(row => row.columns.length > 0);
+
+    const updatedFields = this.#form.value.definition.fields.filter(f => f.id !== fieldId);
+
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        rows: updatedRows,
+        fields: updatedFields,
+      },
+    });
+  }
+
+  removeWorkflow(workflowId: string) {
+    const updatedWorkflows = this.#form.value.definition.workflows.filter(w => w.id !== workflowId);
+
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        workflows: updatedWorkflows,
+      },
+    });
+  }
+
+  reorderWorkflows(workflowIds: string[]) {
+    const updatedWorkflows = workflowIds.map((id, index) => {
+      const workflow = this.#form.value.definition.workflows.find(w => w.id === id);
+      if (workflow) {
+        return { ...workflow, order: index + 1 };
+      }
+      return null;
+    }).filter((w): w is NonNullable<typeof w> => w !== null);
+
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        workflows: updatedWorkflows,
+      },
+    });
+  }
+
   async save() {
     const returnValue = await this.source.saveForm(mapToPost(this.#form.value));
     this.#form.update(mapToDto(returnValue.data));

@@ -14,10 +14,11 @@ export class FormSubmissionNameLayout extends UmbLitElement {
   value?: {
     unique: string;
     name: string;
-    callback: (event: Event, unique: string) => void;
   };
 
-  #handleClick() {
+  #handleClick(event: Event) {
+    event.preventDefault();
+
     this.consumeContext(UMB_MODAL_MANAGER_CONTEXT, async (instance) => {
       const modal = instance!.open(this, "sproutForms.modal.submission.info", {
         modal: { type: "sidebar", size: "medium" },
