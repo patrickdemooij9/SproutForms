@@ -1,14 +1,16 @@
 @using SproutForms.Umbraco.Core.Models.ViewModels
 @model FormFieldViewModel
+@using System.Text.Json
 
 @{
     var hasError = Model.Errors.Any();
     var describedBy = hasError
         ? $"{Model.Alias}-error"
         : null;
+    var conditionsJson = Model.Conditions != null ? Json.Serialize(Model.Conditions) : null;
 }
 
-<div class="form-group @(hasError ? "has-error" : "")">
+<div class="form-group @(hasError ? "has-error" : "")" data-field-id="@Model.Alias" @if (conditionsJson != null) { <text> data-field-conditions='@conditionsJson'</text> }>
     @if (!Model.RendersOwnLabel)
     {
         <label for="@Model.Alias">

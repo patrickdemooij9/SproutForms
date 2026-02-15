@@ -4,6 +4,70 @@ window.sproutForms = {
         register(alias, guard) {
             this.registry[alias] = guard;
         }
+    },
+    conditions: {
+        registry: null,
+        init(form) {
+            const raw = form.getAttribute("data-field-conditions");
+            if (!raw) {
+                this.registry = [];
+                return;
+            }
+            try {
+                this.registry = JSON.parse(raw);
+            } catch {
+                this.registry = [];
+            }
+        },
+        evaluate(fieldConditions, formValues) {
+            if (!fieldConditions || !fieldConditions.rules || fieldConditions.rules.length === 0) {
+                return true;
+            }
+            const rules = fieldConditions.rules;
+            const operator = fieldConditions.operator || "All";
+            
+            const results = rules.map(rule => {
+                const fieldValue = formValues[rule.fieldAlias];
+                const targetValue = rule.value;
+                
+                switch (rule.comparison) {
+                    case "Equals":
+                        return String(fieldValue || "").toLowerCase() === String(targetValue || "").toLowerCase();
+                    case "NotEquals":
+                        return String(fieldValue || "").toLowerCase() !== String(targetValue || "").toLowerCase();
+                    case "Contains":
+                        return String(fieldValue || "").toLowerCase().includes(String(targetValue || "").toLowerCase());
+                    case "GreaterThan":
+                        return parseFloat(fieldValue) > parseFloat(targetValue);
+                    case "LessThan":
+                        return parseFloat(fieldValue) < parseFloat(targetValue);
+                    case "IsEmpty":
+                        return !fieldValue || String(fieldValue).trim() === "";
+                    case "IsNotEmpty":
+                        return fieldValue && String(fieldValue).trim() !== "";
+                    case "MatchesRegex":
+                        try {
+                            return new RegExp(targetValue).test(String(fieldValue || ""));
+                        } catch {
+                            return false;
+                        }
+                    case "DoesNotMatchRegex":
+                        try {
+                            return !new RegExp(targetValue).test(String(fieldValue || ""));
+                        } catch {
+                            return false;
+                        }
+                    default:
+                        return true;
+                }
+            });
+
+            if (operator === "All") {
+                return results.every(r => r === true);
+            } else {
+                return results.some(r => r === true);
+            }
+        }
     }
 };
 
@@ -60,8 +124,104 @@ document.addEventListener("submit", async function (e) {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("form[data-form-ajax]").forEach(initFormGuards);
+    document.querySelectorAll("form[data-form-ajax]").forEach(initForm);
 });
+
+function initForm(form) {
+    initFormGuards(form);
+    initConditionalFields(form);
+}
+
+function initConditionalFields(form) {
+    const formFields = form.querySelectorAll("[data-field-conditions]");
+    
+    formFields.forEach(wrapper => {
+        const fieldAlias = wrapper.getAttribute("data-field-id");
+        const conditionsRaw = wrapper.getAttribute("data-field-conditions");
+        
+        if (!conditionsRaw || !fieldAlias) return;
+        
+        try {
+            const conditions = JSON.parse(conditionsRaw);
+            wrapper.setAttribute("data-condition-field", fieldAlias);
+            wrapper.conditions = conditions;
+        } catch (e) {
+            console.error("Failed to parse field conditions:", e);
+        }
+    });
+    
+    const allInputs = form.querySelectorAll("input, select, textarea");
+    allInputs.forEach(input => {
+        input.addEventListener("input", () => evaluateAllConditions(form));
+        input.addEventListener("change", () => evaluateAllConditions(form));
+    });
+
+    evaluateAllConditions(form);
+}
+
+function getFormValues(form) {
+    const values = {};
+    const formData = new FormData(form);
+    for (const [key, value] of formData.entries()) {
+        values[key] = value;
+    }
+    
+    const checkboxes = form.querySelectorAll("input[type='checkbox']");
+    checkboxes.forEach(cb => {
+        values[cb.name] = cb.checked;
+    });
+    
+    return values;
+}
+
+function evaluateAllConditions(form) {
+    const formValues = getFormValues(form);
+    const fields = form.querySelectorAll("[data-condition-field]");
+    
+    fields.forEach(wrapper => {
+        const conditions = wrapper.conditions;
+        if (!conditions) return;
+        
+        const visibilityCondition = conditions.visibility;
+        const requiredCondition = conditions.required;
+        
+        const isVisible = window.sproutForms.conditions.evaluate(visibilityCondition, formValues);
+        
+        const parentCol = wrapper.closest(".form-col");
+        
+        if (isVisible) {
+            wrapper.style.display = "";
+            wrapper.removeAttribute("hidden");
+            wrapper.classList.remove("sf-hidden");
+            if (parentCol) {
+                parentCol.style.display = "";
+                parentCol.classList.remove("sf-hidden");
+            }
+        } else {
+            wrapper.style.display = "none";
+            wrapper.setAttribute("hidden", "");
+            wrapper.classList.add("sf-hidden");
+            if (parentCol) {
+                parentCol.style.display = "none";
+                parentCol.classList.add("sf-hidden");
+            }
+        }
+        
+        const existingRequired = wrapper.querySelector("[data-conditional-required]");
+        if (existingRequired) {
+            existingRequired.removeAttribute("data-conditional-required");
+            existingRequired.removeAttribute("required");
+        }
+        
+        if (isVisible && requiredCondition && window.sproutForms.conditions.evaluate(requiredCondition, formValues)) {
+            const input = wrapper.querySelector("input, select, textarea");
+            if (input) {
+                input.setAttribute("data-conditional-required", "true");
+                input.setAttribute("required", "");
+            }
+        }
+    });
+}
 
 sproutForms.submissionGuard.register("recaptchaV3", {
     async load(form, settings) {

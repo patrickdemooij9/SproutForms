@@ -367,6 +367,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Alias == field.FieldTypeAlias);
             var descriptor = _fieldDescriptors.First(ft => ft.FieldTypeAlias == fieldType.Alias);
             result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
+            result.Conditions = field.Conditions;
             return result;
         }
 
@@ -381,7 +382,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Label = model.Label,
                 FieldTypeAlias = model.FieldTypeAlias,
                 Required = model.Required,
-                Configuration = configuration
+                Configuration = configuration,
+                Conditions = model.Conditions
             };
             return result;
         }

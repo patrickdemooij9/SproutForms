@@ -73,3 +73,9 @@
         width: 100% !important;
     }
 }
+
+/* Conditional field visibility */
+.form-col.sf-hidden,
+.form-group.sf-hidden {
+    display: none !important;
+}

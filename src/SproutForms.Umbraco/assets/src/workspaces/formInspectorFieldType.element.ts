@@ -13,7 +13,8 @@ import {
 import { FieldConfigPropertyElement } from "./fieldEditors/fieldConfigProperty.element";
 
 import "./fieldEditors/fieldConfigProperty.element";
-import { FormFieldDto, FormFieldTypeDto } from "../models";
+import "./fieldEditors/fieldConditionsEditor.element";
+import { FormFieldDto, FormFieldTypeDto, FormDefinitionDto } from "../models";
 
 export class FieldChangeEvent extends Event {
   static readonly TYPE = "field-change";
@@ -41,6 +42,9 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
 
   @property({ type: Object })
   public fieldType!: FormFieldTypeDto;
+
+  @property({ type: Array })
+  public fields: FormDefinitionDto["fields"] = [];
 
   @state()
   private _values: Array<UmbPropertyValueData> = [];
@@ -118,6 +122,18 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
     this.dispatchEvent(fieldChangeEvent);
   }
 
+  #onConditionsChange(event: CustomEvent) {
+    const conditions = event.detail;
+    const updatedField: Partial<FormFieldDto> = {
+      id: this.field.id,
+      conditions: conditions,
+    };
+
+    const fieldChangeEvent = new FieldChangeEvent();
+    fieldChangeEvent.field = updatedField;
+    this.dispatchEvent(fieldChangeEvent);
+  }
+
   protected render() {
     return html`
       <umb-property-dataset
@@ -133,6 +149,10 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
           <uui-tab
             label="Advanced"
             @click=${() => (this._activeTab = "advanced")}
+          ></uui-tab>
+          <uui-tab
+            label="Conditions"
+            @click=${() => (this._activeTab = "conditions")}
           ></uui-tab>
         </uui-tab-group>
 
@@ -182,6 +202,16 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
                 val
               ></umb-property>
+            `,
+          )}
+          ${when(
+            this._activeTab == "conditions",
+            () => html`
+              <sf-field-conditions-editor
+                .field=${this.field}
+                .fields=${this.fields}
+                @conditions-change=${this.#onConditionsChange}
+              ></sf-field-conditions-editor>
             `,
           )}
         </div>

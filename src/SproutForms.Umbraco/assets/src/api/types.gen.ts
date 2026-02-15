@@ -43,7 +43,6 @@ export enum EventMessageTypeModel {
 export type FieldConditions = {
     visibility?: ConditionDefinition | null;
     required?: ConditionDefinition | null;
-    enabled?: ConditionDefinition | null;
 };
 
 export type FormBackofficeModel = {

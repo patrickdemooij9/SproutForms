@@ -90,6 +90,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
                   <sf-inspector-field-type
                     .field=${this.selectedField!}
                     .fieldType=${this.getFieldType(this.selectedField!.fieldTypeAlias)!}
+                    .fields=${this.definition.fields}
                     @field-change=${this.#handleFieldUpdate}>
 
                   </sf-inspector-field-type>
