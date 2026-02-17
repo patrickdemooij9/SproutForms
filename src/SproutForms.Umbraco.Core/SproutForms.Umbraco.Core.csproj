@@ -9,7 +9,7 @@
     <Title>SproutForms for Umbraco</Title>
     <Description>An Umbraco plugin to easily add forms to your Umbraco CMS</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.0.0-beta001</Version>
+    <Version>1.0.0-beta002</Version>
 
     <ContentTargetFolders>.</ContentTargetFolders>
     <RazorCompileToolset>RazorSdk</RazorCompileToolset>

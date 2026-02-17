@@ -10,7 +10,7 @@
     <Title>SproutForms</Title>
     <Description>Core binaries for the SproutForms package which allows you to easily create forms in code</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Version>1.0.0-beta001</Version>
+    <Version>1.0.0-beta002</Version>
   </PropertyGroup>
 
   <ItemGroup>
