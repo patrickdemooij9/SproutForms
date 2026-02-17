@@ -7,6 +7,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         string FlowTypeAlias { get; }
 
         string DisplayName { get; }
+        string DisplayTemplate { get; }
         string Description { get; }
 
         FormPropertyBackofficeModel[] FromConfig(object configuration);

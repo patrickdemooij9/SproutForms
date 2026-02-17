@@ -96,4 +96,8 @@ export class SproutFormsSource {
       body: model
     }))
   }
+
+  async getDashboardInfo(){
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsDashboard());
+  }
 }

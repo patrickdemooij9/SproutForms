@@ -10,6 +10,7 @@ using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Models.ViewModels;
+using SproutForms.Umbraco.Core.Services;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
 using Umbraco.Cms.Core.Security;
@@ -38,9 +39,10 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IFormSubmissionRepository _formSubmissionRepository;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
+        private readonly ISproutFormsDashboardService _dashboardService;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService)
         {
             _formFieldTypes = formFieldTypes.ToArray();
             _outcomeTypes = outcomeTypes.ToArray();
@@ -55,6 +57,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             _fileStorageProvider = fileStorageProvider;
             _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
             _workflowExecutionRepository = workflowExecutionRepository;
+            _dashboardService = dashboardService;
         }
 
         [HttpGet("forms")]
@@ -255,6 +258,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     Alias = flowType.Alias,
                     DisplayName = descriptor.DisplayName,
+                    DisplayTemplate = descriptor.DisplayTemplate,
+                    Description = descriptor.Description,
                     Configuration = descriptor.FromConfig(flowType.GetDefaultConfiguration())
                 });
             }
@@ -399,6 +404,13 @@ namespace SproutForms.Umbraco.Core.Controllers
         public IActionResult GenerateAliasForForm(Guid? id, string name)
         {
             return Ok(GenerateAlias(id, name));
+        }
+
+        [HttpGet("dashboard")]
+        [ProducesResponseType(typeof(DashboardViewModel), 200)]
+        public IActionResult GetDashboard()
+        {
+            return Ok(_dashboardService.GetDashboard());
         }
 
         /*[HttpGet("downloadFile")]

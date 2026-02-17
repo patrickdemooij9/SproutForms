@@ -14,6 +14,7 @@ import { FormDto, FormFlowTypeDto, FormWorkflowDto } from "../models";
 import { FlowChangeEvent } from "./formIntegrationTypeInspector.element";
 
 import "./formIntegrationTypeInspector.element";
+import { FormFlowTypeBackofficeModel } from "../api";
 
 @customElement("form-integrations")
 export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
@@ -23,7 +24,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   private form!: FormDto;
 
   @state()
-  private flowTypes: FormFlowTypeDto[] = [];
+  private flowTypes: FormFlowTypeBackofficeModel[] = [];
 
   @state()
   private selectedFlowId?: string = undefined;
@@ -87,6 +88,30 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
 
   getFlowType(alias: string) {
     return this.flowTypes.find((item) => item.alias == alias);
+  }
+
+  getFlowTypeConfiguration(alias: string) {
+    return this.flowTypes.find((item) => item.alias == alias)?.configuration ?? [];
+  }
+
+  formatWorkflowTitle(workflow: FormWorkflowDto): string {
+    const flowType = this.getFlowType(workflow.typeAlias);
+    if (!flowType) {
+      return workflow.displayName;
+    }
+
+    let title = flowType.displayTemplate;
+    const configProps = flowType.configuration;
+
+    for (const prop of configProps) {
+      const token = `{${prop.alias}}`;
+      if (title.includes(token)) {
+        const value = workflow.configuration[prop.alias];
+        title = title.replace(token, value ? String(value) : "");
+      }
+    }
+
+    return title;
   }
 
   #handleFlowUpdated(e: FlowChangeEvent) {
@@ -193,7 +218,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
                     this.selectedFlow = this.form.definition.workflows.find((item) => item.id === this.selectedFlowId);
                   }}
                 >
-                  <span class="workflow-name">${item.displayName}</span>
+                  <span class="workflow-name">${this.formatWorkflowTitle(item)}</span>
                   <button
                     class="delete-btn"
                     @click=${(event: MouseEvent) => this.deleteWorkflow(event, item.id)}
@@ -232,9 +257,11 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
                   this.flowTypes,
                   (flowType) => flowType.alias,
                   (flowType) =>
-                    html` <button @click=${() => this.addFlowType(flowType)}>
-                      ${flowType.displayName}
-                    </button>`,
+                    html` <div class="flow-type-option">
+                      <button @click=${() => this.addFlowType(flowType)}>
+                        ${flowType.displayName}
+                      </button>
+                    </div>`,
                 )}
               </div>
             `,
@@ -247,7 +274,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   static styles = css`
     .integrations {
       padding: 0 16px;
-      background-color: white;
+      background-color: #f3f4f6;
       height: 100%;
 
       position: relative;
@@ -294,6 +321,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     }
 
     .inspector {
+      background-color: white;
       border-left: 1px solid #ccc;
 
       .content {
@@ -315,6 +343,10 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
         }
       }
 
+      .flow-type-option {
+        margin-bottom: 8px;
+      }
+
       umb-property-layout {
         padding: 0;
       }
@@ -328,6 +360,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       border: 1px solid #ccc;
       border-radius: 4px;
       cursor: pointer;
+      background-color: white;
 
       &.add {
         border: 1px dashed #ccc;

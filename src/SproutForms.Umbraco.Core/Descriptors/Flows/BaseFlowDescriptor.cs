@@ -15,6 +15,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         public abstract string FlowTypeAlias { get; }
 
         public abstract string DisplayName { get; }
+        public abstract string DisplayTemplate { get; }
         public abstract string Description { get; }
 
 

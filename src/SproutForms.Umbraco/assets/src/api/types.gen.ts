@@ -32,6 +32,14 @@ export type CreateFolderRequest = {
     parentId?: string | null;
 };
 
+export type DashboardViewModel = {
+    heroMetrics: HeroMetricsViewModel;
+    submissionTrend: SubmissionTrendViewModel;
+    formActivity: FormActivityViewModel;
+    workflowFeed: WorkflowFeedViewModel;
+    recentSubmissions: RecentSubmissionsViewModel;
+};
+
 export enum EventMessageTypeModel {
     DEFAULT = 'Default',
     INFO = 'Info',
@@ -43,6 +51,19 @@ export enum EventMessageTypeModel {
 export type FieldConditions = {
     visibility?: ConditionDefinition | null;
     required?: ConditionDefinition | null;
+};
+
+export type FormActivityItem = {
+    formId: string;
+    formName: string;
+    submissionsLast30Days: number;
+    lastSubmissionDate?: string | null;
+    workflowFailuresLast30Days: number;
+    status: string;
+};
+
+export type FormActivityViewModel = {
+    forms: Array<FormActivityItem>;
 };
 
 export type FormBackofficeModel = {
@@ -88,6 +109,8 @@ export type FormFieldTypeBackofficeModel = {
 export type FormFlowTypeBackofficeModel = {
     alias: string;
     displayName: string;
+    displayTemplate: string;
+    description: string;
     configuration: Array<FormPropertyBackofficeModel>;
 };
 
@@ -160,6 +183,15 @@ export type FormWorkflowBackofficeModel = {
     };
 };
 
+export type HeroMetricsViewModel = {
+    totalSubmissionsLast30Days: number;
+    totalSubmissionsPrevious30Days: number;
+    submissionsChangePercent: number;
+    submissionsToday: number;
+    workflowSuccessRate: number;
+    failedWorkflowsLast7Days: number;
+};
+
 export type NotificationHeaderModel = {
     message: string;
     category: string;
@@ -181,6 +213,25 @@ export type PagedFormTreeItemModel = {
     items: Array<FormTreeItemModel>;
 };
 
+export type RecentSubmissionItem = {
+    submissionId: string;
+    formName: string;
+    timestamp: string;
+};
+
+export type RecentSubmissionsViewModel = {
+    items: Array<RecentSubmissionItem>;
+};
+
+export type SubmissionTrendDataPoint = {
+    date: string;
+    submissionCount: number;
+};
+
+export type SubmissionTrendViewModel = {
+    data: Array<SubmissionTrendDataPoint>;
+};
+
 export enum TreeItemType {
     FOLDER = 'Folder',
     FORM = 'Form'
@@ -193,6 +244,19 @@ export enum WorkflowExecutionStatus {
     FAILED = 'Failed',
     RETRYING = 'Retrying'
 }
+
+export type WorkflowFeedItem = {
+    submissionId: string;
+    formName: string;
+    workflowType: string;
+    workflowAlias: string;
+    success: boolean;
+    timestamp: string;
+};
+
+export type WorkflowFeedViewModel = {
+    items: Array<WorkflowFeedItem>;
+};
 
 export type WorkflowStageStatusModel = {
     workflowAlias: string;
@@ -238,6 +302,22 @@ export type GetUmbracoSproutFormsChildrenResponses = {
 };
 
 export type GetUmbracoSproutFormsChildrenResponse = GetUmbracoSproutFormsChildrenResponses[keyof GetUmbracoSproutFormsChildrenResponses];
+
+export type GetUmbracoSproutFormsDashboardData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/dashboard';
+};
+
+export type GetUmbracoSproutFormsDashboardResponses = {
+    /**
+     * OK
+     */
+    200: DashboardViewModel;
+};
+
+export type GetUmbracoSproutFormsDashboardResponse = GetUmbracoSproutFormsDashboardResponses[keyof GetUmbracoSproutFormsDashboardResponses];
 
 export type GetUmbracoSproutFormsFieldTypesData = {
     body?: never;

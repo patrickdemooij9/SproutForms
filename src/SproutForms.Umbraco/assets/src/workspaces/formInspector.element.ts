@@ -136,7 +136,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
         width: 12 - rowSize,
         fieldId: newField.id,
       };
-      row.columns.push(newColumn);
+      row.columns = [...row.columns, newColumn];
       this.selectedState.column = newColumn;
     }
     this.selectedState.field = newField.id;

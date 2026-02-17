@@ -15,7 +15,6 @@ import {
 } from "@umbraco-cms/backoffice/extension-registry";
 import SproutFormsWorkspaceContext from "../workspaces/sproutFormsWorkspaceContext";
 import { ManifestDashboard } from "@umbraco-cms/backoffice/dashboard";
-import SproutFormsListElement from "../workspaces/sproutFormsList.element";
 import FormSubmissionsRepository from "../repositories/sproutFormSubmissionsRepository";
 import FormSubmissionCollectionElement from "../collections/formSubmissionCollection.element";
 import SproutFormSubmissionsListContext from "../workspaces/sproutFormSubmissionsContext";
@@ -30,6 +29,7 @@ import { ManifestPropertyEditorUi } from "@umbraco-cms/backoffice/property-edito
 import FormPickerElement from "../propertyEditors/formPickerElement";
 import CreateFolderAction from "../actions/CreateFolderAction";
 import FolderWorkspaceContext from "../workspaces/folderWorkspaceContext";
+import SproutFormsDashboardElement from "../workspaces/sproutFormsDashboard.element";
 
 const SproutFormSection: ManifestSection = {
   type: "section",
@@ -51,7 +51,7 @@ const SproutFormsDashboard: ManifestDashboard = {
   meta: {
     label: "Overview",
   },
-  element: SproutFormsListElement,
+  element: SproutFormsDashboardElement,
   conditions: [
     {
       alias: "Umb.Condition.SectionAlias",
@@ -59,6 +59,23 @@ const SproutFormsDashboard: ManifestDashboard = {
     },
   ],
 };
+
+/* const SproutFormsCommandCenterDashboard: ManifestDashboard = {
+  type: "dashboard",
+  alias: "sproutForms.dashboards.commandCenter",
+  name: "SproutForms Command Center",
+  weight: 5,
+  meta: {
+    label: "Command Center",
+  },
+  js: () => import("../workspaces/sproutFormsDashboard.element"),
+  conditions: [
+    {
+      alias: "Umb.Condition.SectionAlias",
+      match: "sproutForms",
+    },
+  ],
+}; */
 
 const SproutFormsWorkspace: ManifestWorkspace = {
   type: "workspace",

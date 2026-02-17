@@ -9,11 +9,11 @@ builder.CreateUmbracoBuilder()
     .AddComposers()
     .Build();
 
-builder.Services.AddCodeFirstForms((it) =>
+/*builder.Services.AddCodeFirstForms((it) =>
 {
     it.Add<TestFormCode>();
     it.Add<TestFileFormCode>();
-});
+});*/
 
 WebApplication app = builder.Build();
 

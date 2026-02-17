@@ -50,6 +50,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFolderRepository, FolderRepository>();
             builder.Services.AddSingleton<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
+            builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
 
             builder.Services.AddSingleton<IFormFieldType, TextFieldFormFieldType>();
@@ -91,6 +92,8 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
 
             builder.Services.AddSingleton<IFormSubmissionGuard, NoFormSubmissionGuard>();
+
+            builder.Services.AddCodeFirstForms((it) => { });
 
             //builder.EnableSproutFormsRecaptchaV3();
         }

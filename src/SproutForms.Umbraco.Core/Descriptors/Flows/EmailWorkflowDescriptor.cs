@@ -6,6 +6,8 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
     {
         public override string FlowTypeAlias => "email";
 
+        public override string DisplayTemplate => "Send an email from {from} to {to}";
+
         public override string DisplayName => "Send an email";
 
         public override string Description => "Sends an email after the form is submitted.";

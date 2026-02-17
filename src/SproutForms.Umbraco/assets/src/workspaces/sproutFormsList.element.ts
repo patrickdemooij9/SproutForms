@@ -5,9 +5,7 @@ import { UmbWorkspaceElement } from "@umbraco-cms/backoffice/workspace";
 export class SproutFormsListElement extends UmbWorkspaceElement {
     render() {
         return html`
-            <umb-body-layout main-no-padding headline='Forms'>
-                <umb-collection alias='sproutForms.collections.forms'></umb-collection>
-            </umb-body-layout>
+            <umb-collection alias='sproutForms.collections.forms'></umb-collection>
         `
     }
 }
