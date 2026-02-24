@@ -16,18 +16,17 @@ export class FormSubmissionNameLayout extends UmbLitElement {
     name: string;
   };
 
-  #handleClick(event: Event) {
+  async #handleClick(event: Event) {
     event.preventDefault();
 
-    this.consumeContext(UMB_MODAL_MANAGER_CONTEXT, async (instance) => {
-      const modal = instance!.open(this, "sproutForms.modal.submission.info", {
-        modal: { type: "sidebar", size: "medium" },
-        data: {
-          submissionId: this.value?.unique,
-        },
-      });
-      await modal.onSubmit();
+    const instance = await this.getContext(UMB_MODAL_MANAGER_CONTEXT);
+    const modal = instance!.open(this, "sproutForms.modal.submission.info", {
+      modal: { type: "sidebar", size: "medium" },
+      data: {
+        submissionId: this.value?.unique,
+      },
     });
+    await modal.onSubmit();
   }
 
   override render() {
