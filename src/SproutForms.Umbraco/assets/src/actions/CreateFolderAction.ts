@@ -10,12 +10,10 @@ export default class CreateFolderAction extends UmbWorkspaceActionBase<SproutFor
     const folderName = prompt("Enter folder name:");
     if (!folderName) return;
 
-    const folderDetailContext = await this.getContext(
-      SF_FOLDER_DETAIL_TOKEN_CONTEXT,
-    );
+    const folderUnique = await this.getFolderUnique();
 
-    const parentId = folderDetailContext
-      ? folderDetailContext.folderUnique
+    const parentId = folderUnique
+      ? folderUnique
       : undefined;
 
     const source = new SproutFormsSource(this);
@@ -26,5 +24,16 @@ export default class CreateFolderAction extends UmbWorkspaceActionBase<SproutFor
 
     const context = await this.getContext(ST_SPROUT_FORMS_LIST_TOKEN_CONTEXT);
     context?.loadCollection();
+  }
+
+  async getFolderUnique() {
+    try {
+      const folderContext = await this.getContext(
+        SF_FOLDER_DETAIL_TOKEN_CONTEXT,
+      );
+      return folderContext?.folderUnique;
+    } catch {
+      return undefined;
+    }
   }
 }

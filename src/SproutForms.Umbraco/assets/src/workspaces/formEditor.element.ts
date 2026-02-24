@@ -57,14 +57,15 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
       position: relative;
     }
 
-    form-inspector,
     form-canvas {
       overflow-y: auto;
-      background-color: white;
+      background-color: #f3f4f6;
     }
 
     form-inspector {
+      overflow-y: auto;
       border-left: 1px solid #ccc;
+      background-color: white;
     }
 
     .overlay {

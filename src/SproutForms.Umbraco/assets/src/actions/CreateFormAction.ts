@@ -4,13 +4,24 @@ import { SF_FOLDER_DETAIL_TOKEN_CONTEXT } from "../workspaces/folderWorkspaceCon
 
 export default class CreateFormAction extends UmbWorkspaceActionBase<SproutFormsListContext> {
   override async execute() {
-    const folderContext = await this.getContext(SF_FOLDER_DETAIL_TOKEN_CONTEXT);
+    const folderUnique = await this.getFolderUnique();
 
     let url = `/umbraco/section/sproutForms/workspace/sprout-form/create`;
-    if (folderContext) {
-      url += `/${folderContext.folderUnique}`;
+    if (folderUnique) {
+      url += `/${folderUnique}`;
     }
 
     history.pushState({}, "", url);
+  }
+
+  async getFolderUnique() {
+    try {
+      const folderContext = await this.getContext(
+        SF_FOLDER_DETAIL_TOKEN_CONTEXT,
+      );
+      return folderContext?.folderUnique;
+    } catch {
+      return undefined;
+    }
   }
 }
