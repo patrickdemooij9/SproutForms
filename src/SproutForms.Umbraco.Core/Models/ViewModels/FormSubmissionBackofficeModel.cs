@@ -8,6 +8,7 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
     public class FormSubmissionBackofficeModel
     {
         public Guid Id { get; set; }
+        public string? PageUrl { get; set; }
         public FormSubmissionValueBackofficeModel[] Values { get; set; } = [];
         public List<WorkflowStageStatusModel> WorkflowStages { get; set; } = [];
     }

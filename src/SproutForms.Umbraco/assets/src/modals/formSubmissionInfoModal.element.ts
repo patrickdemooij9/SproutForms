@@ -148,6 +148,19 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
   render() {
     return html`
       <umb-body-layout headline="Submission Info">
+        ${when(
+          this.submission?.pageUrl,
+          () => html`
+            <uui-box>
+              <h2>Page URL</h2>
+              <div class="page-url">
+                <a .href="${this.submission!.pageUrl ?? "#"}" target="_blank" rel="noopener noreferrer">
+                  ${this.submission!.pageUrl}
+                </a>
+              </div>
+            </uui-box>
+          `
+        )}
         <uui-box>
           ${when(
             this.submission,
@@ -197,6 +210,19 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
   }
 
   static styles = css`
+    .page-url {
+      word-break: break-all;
+    }
+
+    .page-url a {
+      color: var(--uui-color-interactive);
+      text-decoration: none;
+    }
+
+    .page-url a:hover {
+      text-decoration: underline;
+    }
+
     .workflow-item {
       display: flex;
       align-items: center;

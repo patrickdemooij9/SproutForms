@@ -130,6 +130,14 @@ document.addEventListener("DOMContentLoaded", () => {
 function initForm(form) {
     initFormGuards(form);
     initConditionalFields(form);
+    initPageUrl(form);
+}
+
+function initPageUrl(form) {
+    const pageUrlInput = form.querySelector('[data-sf-page-url="true"]');
+    if (pageUrlInput) {
+        pageUrlInput.value = window.location.href;
+    }
 }
 
 function initConditionalFields(form) {

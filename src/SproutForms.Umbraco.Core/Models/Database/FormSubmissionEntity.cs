@@ -1,4 +1,4 @@
-﻿using NPoco;
+using NPoco;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -28,5 +28,9 @@ namespace SproutForms.Umbraco.Core.Models.Database
         [Column("ValuesJson")]
         [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
         public string ValuesJson { get; set; }
+
+        [Column("PageUrl")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        public string? PageUrl { get; set; }
     }
 }

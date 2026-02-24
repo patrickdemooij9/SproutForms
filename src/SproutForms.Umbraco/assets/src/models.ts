@@ -112,6 +112,7 @@ export type FormSubmissionOverviewItem = {
 
   id: string;
   name: string;
+  pageUrl?: string;
   workflowStages?: Array<{
     workflowAlias: string;
     displayName: string;

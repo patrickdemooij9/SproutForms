@@ -148,6 +148,7 @@ export type FormRowBackofficeModel = {
 
 export type FormSubmissionBackofficeModel = {
     id: string;
+    pageUrl?: string;
     values: Array<FormSubmissionValueBackofficeModel>;
     workflowStages: Array<WorkflowStageStatusModel>;
 };
@@ -155,6 +156,7 @@ export type FormSubmissionBackofficeModel = {
 export type FormSubmissionListItemBackofficeModel = {
     id: string;
     name: string;
+    pageUrl?: string;
     workflowStages: Array<WorkflowStageStatusModel>;
 };
 

@@ -300,6 +300,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     Id = it.Id,
                     Name = "Submission at " + it.SubmittedAt.ToString("G"),
+                    PageUrl = it.PageUrl,
                     WorkflowStages = workflowStages
                 };
             }).ToArray();
@@ -339,6 +340,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             return Ok(new FormSubmissionBackofficeModel
             {
                 Id = submission.Id,
+                PageUrl = submission.PageUrl,
                 Values = submission.Values.Select(it =>
                 {
                     var field = formVersion.Definition.Fields.FirstOrDefault(f => f.Alias == it.Key);

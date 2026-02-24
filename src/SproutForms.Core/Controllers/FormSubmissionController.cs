@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
 using SproutForms.Core.Models;
@@ -98,11 +98,13 @@ namespace SproutForms.Core.Controllers
                 }
             }
 
+            values.TryGetValue("sf_PageUrl", out var pageUrl);
             var request = new FormSubmissionRequest
             {
                 Values = values.Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key)).ToDictionary(
                          kvp => kvp.Key,
-                         kvp => JsonSerializer.SerializeToElement(kvp.Value))
+                         kvp => JsonSerializer.SerializeToElement(kvp.Value)),
+                PageUrl = pageUrl
             };
 
             var result = await _submissionService.SubmitAsync(formVersion, request);

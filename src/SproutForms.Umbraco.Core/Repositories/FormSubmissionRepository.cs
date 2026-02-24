@@ -1,4 +1,4 @@
-﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.Database;
 using System;
@@ -28,7 +28,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 FormVersionId = submission.FormVersionId,
                 IpAddress = submission.IpAddress,
                 SubmittedAt = submission.SubmittedAt,
-                ValuesJson = JsonSerializer.Serialize(submission.Values)
+                ValuesJson = JsonSerializer.Serialize(submission.Values),
+                PageUrl = submission.PageUrl
             });
         }
 
@@ -61,7 +62,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 FormVersionId = entity.FormVersionId,
                 Values = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(entity.ValuesJson),
                 IpAddress = entity.IpAddress,
-                SubmittedAt = entity.SubmittedAt
+                SubmittedAt = entity.SubmittedAt,
+                PageUrl = entity.PageUrl
             };
         }
 
@@ -85,7 +87,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                     FormVersionId = entity.FormVersionId,
                     Values = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(entity.ValuesJson),
                     IpAddress = entity.IpAddress,
-                    SubmittedAt = entity.SubmittedAt
+                    SubmittedAt = entity.SubmittedAt,
+                    PageUrl = entity.PageUrl
                 });
             }
             return submissions;

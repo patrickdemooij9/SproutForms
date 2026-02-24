@@ -12,6 +12,7 @@
     {
         <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)'>
             @Html.AntiForgeryToken()
+            <input type="hidden" name="sf_PageUrl" value="" data-sf-page-url="true" />
             @foreach (var row in Model.Rows)
             {
                 <div class="form-row">

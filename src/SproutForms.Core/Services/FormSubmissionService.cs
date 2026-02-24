@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using SproutForms.Core.Fields.Configs;
 using SproutForms.Core.Flows;
 using SproutForms.Core.Models;
@@ -20,19 +20,22 @@ namespace SproutForms.Core.Services
         private readonly IConditionEvaluator _conditionEvaluator;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IFormFileStorageProvider[] _formFileStorageProviders;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public FormSubmissionService(
             IFormSubmissionRepository submissions,
             IEnumerable<IFormFieldType> fieldTypes,
             IConditionEvaluator conditionEvaluator,
             IWorkflowExecutionRepository workflowExecutionRepository,
-            IEnumerable<IFormFileStorageProvider> formFileStorageProviders)
+            IEnumerable<IFormFileStorageProvider> formFileStorageProviders,
+            IHttpContextAccessor httpContextAccessor)
         {
             _submissions = submissions;
             _fieldTypes = fieldTypes.ToArray();
             _conditionEvaluator = conditionEvaluator;
             _workflowExecutionRepository = workflowExecutionRepository;
             _formFileStorageProviders = [..formFileStorageProviders];
+            _httpContextAccessor = httpContextAccessor;
         }
 
         public async Task<FormSubmissionResult> SubmitAsync(
@@ -103,7 +106,8 @@ namespace SproutForms.Core.Services
                 Id = Guid.NewGuid(),
                 FormVersionId = formVersion.Id,
                 SubmittedAt = DateTime.UtcNow,
-                Values = request.Values
+                Values = request.Values,
+                PageUrl = ValidatePageUrl(request.PageUrl)
             };
 
             _submissions.Add(submission);
@@ -164,6 +168,31 @@ namespace SproutForms.Core.Services
                 result.Values.Add(field.Alias, JsonSerializer.Serialize(reference));
             }
             return result;
+        }
+
+        private string? ValidatePageUrl(string? pageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(pageUrl))
+                return null;
+
+            var context = _httpContextAccessor.HttpContext;
+            if (context == null)
+                return null;
+
+            try
+            {
+                var requestHost = new Uri(pageUrl).Host;
+                var currentHost = context.Request.Host.Host;
+
+                if (string.Equals(requestHost, currentHost, StringComparison.OrdinalIgnoreCase))
+                    return pageUrl;
+            }
+            catch
+            {
+                return pageUrl;
+            }
+
+            return null;
         }
     }
 
