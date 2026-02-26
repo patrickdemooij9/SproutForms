@@ -9,7 +9,7 @@
         name="@Model.Alias"
         class="form-control"
         aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
-        data-field-id="@Model.Id">
+        data-field-id="@Model.Alias">
     <option value="">Select an option</option>
 
     @foreach (var option in config.Options)

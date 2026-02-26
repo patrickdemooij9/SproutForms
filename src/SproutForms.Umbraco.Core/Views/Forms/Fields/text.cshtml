@@ -3,6 +3,20 @@
 @model FormFieldViewModel
 @{
     var config = (TextFieldConfig)Model.Configuration;
+    var dataAttrs = new List<string>();
+    
+    if (config.MinLength.HasValue)
+    {
+        dataAttrs.Add($"data-sf-min=\"{config.MinLength.Value}\"");
+    }
+    if (config.MaxLength.HasValue)
+    {
+        dataAttrs.Add($"data-sf-max=\"{config.MaxLength.Value}\"");
+    }
+    if (!string.IsNullOrWhiteSpace(config.Regex))
+    {
+        dataAttrs.Add($"data-sf-pattern=\"{config.Regex}\"");
+    }
 }
 
 <input type="text"
@@ -11,5 +25,4 @@
        value="@Model.Value"
        placeholder="@config.Placeholder"
        class="form-control"
-       aria-invalid="@(Model.Errors.Length == 0 ? "false" : "true")"
-       data-field-id="@Model.Id" />
+       @Html.Raw(string.Join(" ", dataAttrs)) />

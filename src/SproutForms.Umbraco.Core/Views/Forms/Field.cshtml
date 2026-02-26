@@ -1,3 +1,4 @@
+@using SproutForms.Umbraco.Core.Helpers
 @using SproutForms.Umbraco.Core.Models.ViewModels
 @model FormFieldViewModel
 @using System.Text.Json
@@ -10,7 +11,7 @@
     var conditionsJson = Model.Conditions != null ? Json.Serialize(Model.Conditions) : null;
 }
 
-<div class="form-group @(hasError ? "has-error" : "")" data-field-id="@Model.Alias" @if (conditionsJson != null) { <text> data-field-conditions='@conditionsJson'</text> }>
+<div class="form-group @(hasError ? "has-error" : "")" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model)) @if (conditionsJson != null) { <text> data-field-conditions='@conditionsJson'</text> }>
     @if (!Model.RendersOwnLabel)
     {
         <label for="@Model.Alias">

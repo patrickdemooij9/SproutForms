@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using SproutForms.Core.Models;
@@ -83,6 +83,7 @@ namespace SproutForms.Umbraco.Core.Services
                 RendersOwnLabel = fieldType.RendersOwnLabel,
                 Configuration = field.Configuration,
                 Conditions = field.Conditions,
+                ValidationRules = fieldType.GetValidationRules(field.Configuration),
             };
 
             if (_errors.TryGetValue(field.Alias, out var errors) is true)

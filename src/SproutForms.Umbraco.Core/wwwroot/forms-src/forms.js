@@ -1,4 +1,4 @@
-window.sproutForms = {
+window.SproutForms = {
     submissionGuard: {
         registry: {},
         register(alias, guard) {
@@ -25,11 +25,11 @@ window.sproutForms = {
             }
             const rules = fieldConditions.rules;
             const operator = fieldConditions.operator || "All";
-            
+
             const results = rules.map(rule => {
                 const fieldValue = formValues[rule.fieldAlias];
                 const targetValue = rule.value;
-                
+
                 switch (rule.comparison) {
                     case "Equals":
                         return String(fieldValue || "").toLowerCase() === String(targetValue || "").toLowerCase();
@@ -68,6 +68,36 @@ window.sproutForms = {
                 return results.some(r => r === true);
             }
         }
+    },
+    validation: {
+        registry: {},
+
+        register(alias, validator) {
+            this.registry[alias] = validator;
+        },
+
+        async validateField(fieldContainer) {
+            const rules = fieldContainer.dataset.sfValidate?.split(",") || [];
+            const value = fieldContainer.querySelector("input, textarea, select")?.value; //TODO: Make this more extendable
+
+            for (let rule of rules) {
+                const validator = this.registry[rule.trim()];
+                if (!validator) continue;
+
+                const isValid = await validator(value, fieldContainer.dataset);
+
+                if (!isValid) {
+                    const capitalizedType = rule.charAt(0).toUpperCase() + rule.slice(1)
+                    return {
+                        valid: false,
+                        rule,
+                        message: fieldContainer.dataset[`sf${capitalizedType}Message`]
+                    };
+                }
+            }
+
+            return { valid: true };
+        }
     }
 };
 
@@ -78,12 +108,17 @@ document.addEventListener("submit", async function (e) {
 
     e.preventDefault();
 
+    const validation = await validateAllFields(form);
+    if (!validation) {
+        return;
+    }
+
     const formData = new FormData(form);
 
     const submissionGuards = getSubmissionGuards(form);
     try {
         for (const guardDef of submissionGuards) {
-            const guard = window.sproutForms.submissionGuard?.registry?.[guardDef.alias];
+            const guard = window.SproutForms.submissionGuard?.registry?.[guardDef.alias];
             if (!guard) continue;
 
             if (guard.beforeSubmit) {
@@ -131,6 +166,7 @@ function initForm(form) {
     initFormGuards(form);
     initConditionalFields(form);
     initPageUrl(form);
+    initValidation(form);
 }
 
 function initPageUrl(form) {
@@ -140,15 +176,88 @@ function initPageUrl(form) {
     }
 }
 
+function initValidation(form) {
+    const validateGroups = form.querySelectorAll("[data-sf-validate]");
+
+    validateGroups.forEach(group => {
+        const inputs = group.querySelectorAll("input, select, textarea");
+
+        inputs.forEach(input => {
+            input.addEventListener("blur", async () => await validateGroup(group));
+        });
+
+        inputs.forEach(input => {
+            input.addEventListener("input", () => clearFieldError(group));
+        });
+    });
+}
+
+async function validateGroup(group) {
+    const result = await window.SproutForms.validation.validateField(group);
+
+    if (!result.valid) {
+        showFieldError(group, result.message);
+        return false;
+    }
+
+    clearFieldError(group);
+    return true;
+}
+
+function showFieldError(group, message) {
+    const inputs = group.querySelectorAll("input, select, textarea");
+    inputs.forEach(input => input.setAttribute("aria-invalid", "true"));
+
+    const existingError = group.querySelector(".form-error");
+    if (existingError) {
+        existingError.remove();
+    }
+
+    const errorContainer = document.createElement("div");
+    errorContainer.className = "form-error";
+    errorContainer.setAttribute("role", "alert");
+    errorContainer.textContent = message;
+
+    group.appendChild(errorContainer);
+}
+
+function clearFieldError(group) {
+    const inputs = group.querySelectorAll("input, select, textarea");
+    inputs.forEach(input => input.setAttribute("aria-invalid", "false"));
+
+    const existingError = group.querySelector(".form-error");
+    if (existingError) {
+        existingError.remove();
+    }
+}
+
+async function validateAllFields(form) {
+    let isValid = true;
+    const groups = form.querySelectorAll("[data-sf-validate]");
+
+    for (const group of groups) {
+        if (group.classList.contains("sf-hidden") || group.style.display === "none") {
+            continue;
+        }
+
+        const result = await validateGroup(group);
+        if (!result) {
+            isValid = false;
+        }
+    }
+
+    return isValid;
+}
+
 function initConditionalFields(form) {
     const formFields = form.querySelectorAll("[data-field-conditions]");
-    
+
     formFields.forEach(wrapper => {
-        const fieldAlias = wrapper.getAttribute("data-field-id");
+        const fieldAlias = wrapper.getAttribute("data-sf-field-id");
         const conditionsRaw = wrapper.getAttribute("data-field-conditions");
-        
+
         if (!conditionsRaw || !fieldAlias) return;
-        
+
         try {
             const conditions = JSON.parse(conditionsRaw);
             wrapper.setAttribute("data-condition-field", fieldAlias);
@@ -157,7 +266,7 @@ function initConditionalFields(form) {
             console.error("Failed to parse field conditions:", e);
         }
     });
-    
+
     const allInputs = form.querySelectorAll("input, select, textarea");
     allInputs.forEach(input => {
         input.addEventListener("input", () => evaluateAllConditions(form));
@@ -173,30 +282,30 @@ function getFormValues(form) {
     for (const [key, value] of formData.entries()) {
         values[key] = value;
     }
-    
+
     const checkboxes = form.querySelectorAll("input[type='checkbox']");
     checkboxes.forEach(cb => {
         values[cb.name] = cb.checked;
     });
-    
+
     return values;
 }
 
 function evaluateAllConditions(form) {
     const formValues = getFormValues(form);
     const fields = form.querySelectorAll("[data-condition-field]");
-    
+
     fields.forEach(wrapper => {
         const conditions = wrapper.conditions;
         if (!conditions) return;
-        
+
         const visibilityCondition = conditions.visibility;
         const requiredCondition = conditions.required;
-        
-        const isVisible = window.sproutForms.conditions.evaluate(visibilityCondition, formValues);
-        
+
+        const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, formValues);
+
         const parentCol = wrapper.closest(".form-col");
-        
+
         if (isVisible) {
             wrapper.style.display = "";
             wrapper.removeAttribute("hidden");
@@ -214,14 +323,14 @@ function evaluateAllConditions(form) {
                 parentCol.classList.add("sf-hidden");
             }
         }
-        
+
         const existingRequired = wrapper.querySelector("[data-conditional-required]");
         if (existingRequired) {
             existingRequired.removeAttribute("data-conditional-required");
             existingRequired.removeAttribute("required");
         }
-        
-        if (isVisible && requiredCondition && window.sproutForms.conditions.evaluate(requiredCondition, formValues)) {
+
+        if (isVisible && requiredCondition && window.SproutForms.conditions.evaluate(requiredCondition, formValues)) {
             const input = wrapper.querySelector("input, select, textarea");
             if (input) {
                 input.setAttribute("data-conditional-required", "true");
@@ -231,7 +340,7 @@ function evaluateAllConditions(form) {
     });
 }
 
-sproutForms.submissionGuard.register("recaptchaV3", {
+SproutForms.submissionGuard.register("recaptchaV3", {
     async load(form, settings) {
         if (window.grecaptcha) return;
 
@@ -249,6 +358,85 @@ sproutForms.submissionGuard.register("recaptchaV3", {
     }
 });
 
+SproutForms.validation.register("required", async (value, options) => {
+    if (!value) return false;
+    return value.trim().length > 0;
+});
+
+SproutForms.validation.register("minLength", async (value, options) => {
+    if (!value) return true;
+    return value.length >= parseInt(options.sfMinLength);
+});
+
+SproutForms.validation.register("maxLength", async (value, options) => {
+    if (!value) return true;
+    return value.length <= parseInt(options.sfMaxLength);
+});
+
+SproutForms.validation.register("sameAs", async (value, options, context) => {
+    const other = context.querySelector(`[name="${options.sfOther}"]`);
+    return other && value === other.value;
+});
+
+SproutForms.validation.register("regex", async (value, options) => {
+    if (!value) return true;
+
+    const pattern = options.sfRegex;
+    if (!pattern) return true;
+
+    let regex;
+
+    try {
+        regex = new RegExp(pattern);
+    } catch (e) {
+        console.warn("Invalid regex pattern:", pattern);
+        return false; // fail-safe
+    }
+
+    return regex.test(value);
+});
+
+SproutForms.validation.register("minDate", async (value, options) => {
+    if (!value) return true;
+
+    const minDateValue = options.sfMinDate;
+    if (!minDateValue) return true;
+
+    const inputDate = new Date(value);
+    const minDate = new Date(minDateValue);
+
+    if (isNaN(inputDate) || isNaN(minDate)) {
+        console.warn("Invalid date value in minDate validator.");
+        return true;
+    }
+
+    if (inputDate >= minDate) {
+        return true;
+    }
+
+    return false;
+});
+
+SproutForms.validation.register("maxDate", async (value, options) => {
+    if (!value) return true;
+
+    const minDateValue = options.sfMaxDate;
+    if (!minDateValue) return true;
+
+    const inputDate = new Date(value);
+    const minDate = new Date(minDateValue);
+
+    if (isNaN(inputDate) || isNaN(minDate)) {
+        console.warn("Invalid date value in minDate validator.");
+        return true;
+    }
+
+    if (inputDate < minDate) {
+        return true;
+    }
+
+    return false;
+});
 
 function clearErrors(form) {
     form.querySelectorAll(".form-error").forEach(e => e.remove());
@@ -265,7 +453,7 @@ function applyErrors(form, errors, values) {
 
     for (const fieldId in errors) {
         const messages = errors[fieldId];
-        const input = form.querySelector(`[data-field-id="${fieldId}"]`)
+        const input = form.querySelector(`[data-sf-field-id="${fieldId}"]`)
             || form.querySelector(`[name="${fieldId}"]`);
 
         if (!input) {
@@ -321,7 +509,7 @@ async function initFormGuards(form) {
     const submissionGuards = getSubmissionGuards(form);
 
     for (const guardDef of submissionGuards) {
-        const guard = window.sproutForms.submissionGuard?.registry?.[guardDef.alias];
+        const guard = window.SproutForms.submissionGuard?.registry?.[guardDef.alias];
         if (!guard || !guard.load) continue;
 
         try {

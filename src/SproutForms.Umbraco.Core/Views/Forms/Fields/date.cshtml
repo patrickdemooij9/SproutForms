@@ -4,10 +4,27 @@
 @{
     var config = (DateFieldConfig)Model.Configuration;
     var type = config.IncludeTime ? "datetime-local" : "date";
+    var dataAttrs = new List<string>();
+    
+    if (config.Min.HasValue)
+    {
+        var minValue = config.IncludeTime 
+            ? config.Min.Value.ToString("yyyy-MM-ddTHH:mm") 
+            : config.Min.Value.ToString("yyyy-MM-dd");
+        dataAttrs.Add($"min=\"{minValue}\"");
+    }
+    if (config.Max.HasValue)
+    {
+        var maxValue = config.IncludeTime 
+            ? config.Max.Value.ToString("yyyy-MM-ddTHH:mm") 
+            : config.Max.Value.ToString("yyyy-MM-dd");
+        dataAttrs.Add($"max=\"{maxValue}\"");
+    }
 }
 
 <input type="@type"
        id="@Model.Alias"
        name="@Model.Alias"
        value="@Model.Value"
-       class="form-control" />
+       class="form-control"
+       @Html.Raw(string.Join(" ", dataAttrs)) />

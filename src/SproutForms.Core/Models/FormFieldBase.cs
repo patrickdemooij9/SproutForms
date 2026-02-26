@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
@@ -24,6 +24,23 @@ namespace SproutForms.Core.Models
             var typedValue = ConvertValue(value);
 
             return Validate(typedValue, (TConfig) configuration);
+        }
+
+        public virtual IEnumerable<ValidationRule> GetValidationRules(object configuration)
+        {
+            var config = configuration as TConfig;
+            if (config == null)
+                yield break;
+
+            foreach (var rule in GetValidationRulesCore(config))
+            {
+                yield return rule;
+            }
+        }
+
+        protected virtual IEnumerable<ValidationRule> GetValidationRulesCore(TConfig config)
+        {
+            yield break;
         }
 
         protected abstract ValidationResult Validate(TValue value, TConfig configuration);
