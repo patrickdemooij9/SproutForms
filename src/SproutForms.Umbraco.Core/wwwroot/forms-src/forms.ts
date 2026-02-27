@@ -29,6 +29,14 @@ interface ValidatorRegistry {
     [alias: string]: Validator;
 }
 
+interface OutcomeHandler {
+    (form: HTMLFormElement, outcomeData: Record<string, unknown>): void | Promise<void>;
+}
+
+interface OutcomeHandlerRegistry {
+    [alias: string]: OutcomeHandler;
+}
+
 interface ValidationResult {
     valid: boolean;
     rule?: string;
@@ -46,8 +54,8 @@ interface GuardDefinition {
 }
 
 interface FormSubmitResult {
-    successMessage?: string;
-    redirectUrl?: string;
+    outcomeType?: string;
+    outcomeData?: Record<string, unknown>;
     errors?: Record<string, string[]>;
     values?: Record<string, unknown>;
 }
@@ -68,6 +76,10 @@ declare global {
                 registry: ValidatorRegistry;
                 register(alias: string, validator: Validator): void;
                 validateField(fieldContainer: Element): Promise<ValidationResult>;
+            };
+            outcomeHandlers: {
+                registry: OutcomeHandlerRegistry;
+                register(alias: string, handler: OutcomeHandler): void;
             };
         };
         grecaptcha?: {
@@ -178,6 +190,13 @@ window.SproutForms = {
 
             return { valid: true };
         }
+    },
+    outcomeHandlers: {
+        registry: {} as OutcomeHandlerRegistry,
+
+        register(alias: string, handler: OutcomeHandler) {
+            this.registry[alias] = handler;
+        }
     }
 };
 
@@ -228,14 +247,12 @@ document.addEventListener("submit", async function (e) {
         return;
     }
 
-    if (result.successMessage) {
-        form.innerHTML =
-            `<div class="form-success">${result.successMessage}</div>`;
-        return;
-    }
-
-    if (result.redirectUrl) {
-        window.location.href = result.redirectUrl;
+    if (result.outcomeType) {
+        const handler = window.SproutForms?.outcomeHandlers?.registry?.[result.outcomeType];
+        if (handler) {
+            await handler(form, result.outcomeData);
+            return;
+        }
     }
 });
 
@@ -631,5 +648,26 @@ function getSubmissionGuards(form: HTMLFormElement): GuardDefinition[] {
         return [];
     }
 }
+
+window.SproutForms.outcomeHandlers.register("message", (form, outcomeData) => {
+    const message = outcomeData.message as string;
+    if (message) {
+        form.innerHTML = `<div class="form-success">${message}</div>`;
+    }
+});
+
+window.SproutForms.outcomeHandlers.register("redirect", (form, outcomeData) => {
+    const url = outcomeData.url as string;
+    if (url) {
+        window.location.href = url;
+    }
+});
+
+window.SproutForms.outcomeHandlers.register("redirectUmbracoPage", (form, outcomeData) => {
+    const url = outcomeData.url as string;
+    if (url) {
+        window.location.href = url;
+    }
+});
 
 export {};

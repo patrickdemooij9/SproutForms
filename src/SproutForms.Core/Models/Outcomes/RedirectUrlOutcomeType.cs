@@ -1,4 +1,4 @@
-﻿
+
 namespace SproutForms.Core.Models.Outcomes
 {
     public class RedirectUrlOutcomeType : IFormSubmitOutcomeType
@@ -19,7 +19,11 @@ namespace SproutForms.Core.Models.Outcomes
             var config = (RedirectUrlOutcomeConfig) configuration;
             return new OutcomeResult
             {
-                RedirectUrl = config.RedirectUrl
+                OutcomeTypeAlias = Alias,
+                Data = new Dictionary<string, object?>
+                {
+                    ["url"] = config.RedirectUrl
+                }
             };
         }
     }

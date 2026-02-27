@@ -1,4 +1,4 @@
-﻿using SproutForms.Core.Models.Outcomes;
+using SproutForms.Core.Models.Outcomes;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
@@ -28,7 +28,11 @@ namespace SproutForms.Umbraco.Core.Implementations
             using var ctx = _umbracoContextFactory.EnsureUmbracoContext();
             return new OutcomeResult
             {
-                RedirectUrl = ctx.UmbracoContext.Content.GetById(config.NodeKey!.Value)?.Url()
+                OutcomeTypeAlias = Alias,
+                Data = new Dictionary<string, object?>
+                {
+                    ["url"] = ctx.UmbracoContext.Content.GetById(config.NodeKey!.Value)?.Url()
+                }
             };
         }
     }

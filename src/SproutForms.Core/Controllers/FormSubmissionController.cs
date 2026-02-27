@@ -113,16 +113,18 @@ namespace SproutForms.Core.Controllers
 
             var outcomeType = _outcomeTypes.First(it => it.Alias == formVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
             var outcomeResult = outcomeType.Handle(formVersion.Definition.SubmitOutcome.Configuration);
+            outcomeResult.OutcomeTypeAlias = outcomeType.Alias;
 
             if (IsAjaxRequest(Request))
             {
                 if (result.IsValid)
                 {
-                    var responseModel = new AjaxFormResponse { Success = true };
-                    if (!string.IsNullOrWhiteSpace(outcomeResult.RedirectUrl))
-                        responseModel.RedirectUrl = outcomeResult.RedirectUrl;
-                    else if (!string.IsNullOrWhiteSpace(outcomeResult.Message))
-                        responseModel.SuccessMessage = outcomeResult.Message;
+                    var responseModel = new AjaxFormResponse
+                    {
+                        Success = true,
+                        OutcomeType = outcomeResult.OutcomeTypeAlias,
+                        OutcomeData = outcomeResult.Data
+                    };
 
                     return Ok(responseModel);
                 }
@@ -138,10 +140,10 @@ namespace SproutForms.Core.Controllers
 
             if (result.IsValid)
             {
-                if (!string.IsNullOrWhiteSpace(outcomeResult.RedirectUrl))
-                    return Redirect(outcomeResult.RedirectUrl);
-                else if (!string.IsNullOrWhiteSpace(outcomeResult.Message))
-                    TempData[$"{formVersion.FormId}:SuccessMessage"] = outcomeResult.Message;
+                if (outcomeResult.Data.TryGetValue("url", out var redirectUrl) && redirectUrl is string url && !string.IsNullOrWhiteSpace(url))
+                    return Redirect(url);
+                else if (outcomeResult.Data.TryGetValue("message", out var message) && message is string msg && !string.IsNullOrWhiteSpace(msg))
+                    TempData[$"{formVersion.FormId}:SuccessMessage"] = msg;
 
                 return Redirect(Request.Headers["Referer"].ToString());
             }

@@ -1,4 +1,4 @@
-﻿namespace SproutForms.Core.Models.ViewModels
+namespace SproutForms.Core.Models.ViewModels
 {
     public class AjaxFormResponse
     {
@@ -10,7 +10,7 @@
         public IReadOnlyDictionary<string, string> Values { get; init; }
             = new Dictionary<string, string>();
 
-        public string? RedirectUrl { get; set; }
-        public string? SuccessMessage { get; set; }
+        public string? OutcomeType { get; set; }
+        public IReadOnlyDictionary<string, object?>? OutcomeData { get; set; }
     }
 }

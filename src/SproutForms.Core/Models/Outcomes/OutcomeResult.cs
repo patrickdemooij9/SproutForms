@@ -1,8 +1,8 @@
-﻿namespace SproutForms.Core.Models.Outcomes
+namespace SproutForms.Core.Models.Outcomes
 {
     public class OutcomeResult
     {
-        public string? RedirectUrl { get; set; }
-        public string? Message { get; set; }
+        public string OutcomeTypeAlias { get; set; } = string.Empty;
+        public Dictionary<string, object?> Data { get; set; } = new();
     }
 }

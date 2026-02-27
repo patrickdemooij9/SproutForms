@@ -1,4 +1,4 @@
-﻿
+
 namespace SproutForms.Core.Models.Outcomes
 {
     public class ShowMessageOutcome : IFormSubmitOutcomeType
@@ -22,7 +22,11 @@ namespace SproutForms.Core.Models.Outcomes
             var config = (ShowMessageOutcomeConfig) configuration;
             return new OutcomeResult
             {
-                Message = config.Message,
+                OutcomeTypeAlias = Alias,
+                Data = new Dictionary<string, object?>
+                {
+                    ["message"] = config.Message
+                }
             };
         }
     }
