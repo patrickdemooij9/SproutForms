@@ -1,13 +1,50 @@
+import {
+    SubmissionGuard,
+    SubmissionGuardRegistry,
+    FieldCondition,
+    FieldConditions,
+    Validator,
+    ValidatorRegistry,
+    ValidationResult,
+    GuardSettings,
+    GuardDefinition,
+    FormSubmitResult
+} from './models';
+
+declare global {
+    interface Window {
+        SproutForms: {
+            submissionGuard: {
+                registry: SubmissionGuardRegistry;
+                register(alias: string, guard: SubmissionGuard): void;
+            };
+            conditions: {
+                registry: FieldCondition[] | null;
+                init(form: Element): void;
+                evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>): boolean;
+            };
+            validation: {
+                registry: ValidatorRegistry;
+                register(alias: string, validator: Validator): void;
+                validateField(fieldContainer: Element): Promise<ValidationResult>;
+            };
+        };
+        grecaptcha?: {
+            execute(siteKey: string, options: { action: string }): Promise<string>;
+        };
+    }
+}
+
 window.SproutForms = {
     submissionGuard: {
         registry: {},
-        register(alias, guard) {
+        register(alias: string, guard: SubmissionGuard) {
             this.registry[alias] = guard;
         }
     },
     conditions: {
-        registry: null,
-        init(form) {
+        registry: null as FieldCondition[] | null,
+        init(form: Element) {
             const raw = form.getAttribute("data-field-conditions");
             if (!raw) {
                 this.registry = [];
@@ -19,7 +56,7 @@ window.SproutForms = {
                 this.registry = [];
             }
         },
-        evaluate(fieldConditions, formValues) {
+        evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>): boolean {
             if (!fieldConditions || !fieldConditions.rules || fieldConditions.rules.length === 0) {
                 return true;
             }
@@ -38,22 +75,22 @@ window.SproutForms = {
                     case "Contains":
                         return String(fieldValue || "").toLowerCase().includes(String(targetValue || "").toLowerCase());
                     case "GreaterThan":
-                        return parseFloat(fieldValue) > parseFloat(targetValue);
+                        return parseFloat(String(fieldValue)) > parseFloat(String(targetValue));
                     case "LessThan":
-                        return parseFloat(fieldValue) < parseFloat(targetValue);
+                        return parseFloat(String(fieldValue)) < parseFloat(String(targetValue));
                     case "IsEmpty":
                         return !fieldValue || String(fieldValue).trim() === "";
                     case "IsNotEmpty":
                         return fieldValue && String(fieldValue).trim() !== "";
                     case "MatchesRegex":
                         try {
-                            return new RegExp(targetValue).test(String(fieldValue || ""));
+                            return new RegExp(String(targetValue)).test(String(fieldValue || ""));
                         } catch {
                             return false;
                         }
                     case "DoesNotMatchRegex":
                         try {
-                            return !new RegExp(targetValue).test(String(fieldValue || ""));
+                            return !new RegExp(String(targetValue)).test(String(fieldValue || ""));
                         } catch {
                             return false;
                         }
@@ -70,28 +107,30 @@ window.SproutForms = {
         }
     },
     validation: {
-        registry: {},
+        registry: {} as ValidatorRegistry,
 
-        register(alias, validator) {
+        register(alias: string, validator: Validator) {
             this.registry[alias] = validator;
         },
 
-        async validateField(fieldContainer) {
-            const rules = fieldContainer.dataset.sfValidate?.split(",") || [];
-            const value = fieldContainer.querySelector("input, textarea, select")?.value; //TODO: Make this more extendable
+        async validateField(fieldContainer: Element): Promise<ValidationResult> {
+            const rules = (fieldContainer.getAttribute("data-sf-validate") || "").split(",");
+            const input = fieldContainer.querySelector("input, textarea, select") as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+            const value = input?.value;
+            const containerEl = fieldContainer as HTMLElement;
 
-            for (let rule of rules) {
+            for (const rule of rules) {
                 const validator = this.registry[rule.trim()];
                 if (!validator) continue;
 
-                const isValid = await validator(value, fieldContainer.dataset);
+                const isValid = await validator(value, containerEl.dataset as Record<string, string | undefined>);
 
                 if (!isValid) {
-                    const capitalizedType = rule.charAt(0).toUpperCase() + rule.slice(1)
+                    const capitalizedType = rule.charAt(0).toUpperCase() + rule.slice(1);
                     return {
                         valid: false,
                         rule,
-                        message: fieldContainer.dataset[`sf${capitalizedType}Message`]
+                        message: containerEl.dataset[`sf${capitalizedType}Message`]
                     };
                 }
             }
@@ -102,7 +141,7 @@ window.SproutForms = {
 };
 
 document.addEventListener("submit", async function (e) {
-    const form = e.target;
+    const form = e.target as HTMLFormElement;
 
     if (!form.matches("[data-form-ajax]")) return;
 
@@ -118,7 +157,7 @@ document.addEventListener("submit", async function (e) {
     const submissionGuards = getSubmissionGuards(form);
     try {
         for (const guardDef of submissionGuards) {
-            const guard = window.SproutForms.submissionGuard?.registry?.[guardDef.alias];
+            const guard = window.SproutForms?.submissionGuard?.registry?.[guardDef.alias];
             if (!guard) continue;
 
             if (guard.beforeSubmit) {
@@ -126,7 +165,8 @@ document.addEventListener("submit", async function (e) {
             }
         }
     } catch (err) {
-        applyGlobalError(form, err.message || "Something went wrong. Please try again.");
+        const error = err as Error;
+        applyGlobalError(form, error.message || "Something went wrong. Please try again.");
         return;
     }
 
@@ -138,12 +178,12 @@ document.addEventListener("submit", async function (e) {
         body: formData
     });
 
-    const result = await response.json();
+    const result = await response.json() as FormSubmitResult;
 
     clearErrors(form);
 
     if (!response.ok) {
-        applyErrors(form, result.errors, result.values);
+        applyErrors(form, result.errors || {}, result.values || {});
         return;
     }
 
@@ -162,37 +202,37 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("form[data-form-ajax]").forEach(initForm);
 });
 
-function initForm(form) {
-    initFormGuards(form);
-    initConditionalFields(form);
-    initPageUrl(form);
-    initValidation(form);
+function initForm(form: Element) {
+    initFormGuards(form as HTMLFormElement);
+    initConditionalFields(form as HTMLFormElement);
+    initPageUrl(form as HTMLFormElement);
+    initValidation(form as HTMLFormElement);
 }
 
-function initPageUrl(form) {
-    const pageUrlInput = form.querySelector('[data-sf-page-url="true"]');
+function initPageUrl(form: HTMLFormElement) {
+    const pageUrlInput = form.querySelector('[data-sf-page-url="true"]') as HTMLInputElement | null;
     if (pageUrlInput) {
         pageUrlInput.value = window.location.href;
     }
 }
 
-function initValidation(form) {
+function initValidation(form: HTMLFormElement) {
     const validateGroups = form.querySelectorAll("[data-sf-validate]");
 
     validateGroups.forEach(group => {
         const inputs = group.querySelectorAll("input, select, textarea");
 
         inputs.forEach(input => {
-            input.addEventListener("blur", async () => await validateGroup(group));
+            input.addEventListener("blur", async () => await validateGroup(group as HTMLElement));
         });
 
         inputs.forEach(input => {
-            input.addEventListener("input", () => clearFieldError(group));
+            input.addEventListener("input", () => clearFieldError(group as HTMLElement));
         });
     });
 }
 
-async function validateGroup(group) {
+async function validateGroup(group: HTMLElement): Promise<boolean> {
     const result = await window.SproutForms.validation.validateField(group);
 
     if (!result.valid) {
@@ -204,7 +244,7 @@ async function validateGroup(group) {
     return true;
 }
 
-function showFieldError(group, message) {
+function showFieldError(group: HTMLElement, message?: string) {
     const inputs = group.querySelectorAll("input, select, textarea");
     inputs.forEach(input => input.setAttribute("aria-invalid", "true"));
 
@@ -221,7 +261,7 @@ function showFieldError(group, message) {
     group.appendChild(errorContainer);
 }
 
-function clearFieldError(group) {
+function clearFieldError(group: HTMLElement) {
     const inputs = group.querySelectorAll("input, select, textarea");
     inputs.forEach(input => input.setAttribute("aria-invalid", "false"));
 
@@ -231,16 +271,17 @@ function clearFieldError(group) {
     }
 }
 
-async function validateAllFields(form) {
+async function validateAllFields(form: HTMLFormElement): Promise<boolean> {
     let isValid = true;
     const groups = form.querySelectorAll("[data-sf-validate]");
 
     for (const group of groups) {
-        if (group.classList.contains("sf-hidden") || group.style.display === "none") {
+        const groupEl = group as HTMLElement;
+        if (groupEl.classList.contains("sf-hidden") || groupEl.style.display === "none") {
             continue;
         }
 
-        const result = await validateGroup(group);
+        const result = await validateGroup(groupEl);
         if (!result) {
             isValid = false;
         }
@@ -249,7 +290,7 @@ async function validateAllFields(form) {
     return isValid;
 }
 
-function initConditionalFields(form) {
+function initConditionalFields(form: HTMLFormElement) {
     const formFields = form.querySelectorAll("[data-field-conditions]");
 
     formFields.forEach(wrapper => {
@@ -259,9 +300,9 @@ function initConditionalFields(form) {
         if (!conditionsRaw || !fieldAlias) return;
 
         try {
-            const conditions = JSON.parse(conditionsRaw);
+            const conditions: FieldConditions = JSON.parse(conditionsRaw);
             wrapper.setAttribute("data-condition-field", fieldAlias);
-            wrapper.conditions = conditions;
+            (wrapper as HTMLElement & { conditions: FieldConditions }).conditions = conditions;
         } catch (e) {
             console.error("Failed to parse field conditions:", e);
         }
@@ -276,8 +317,8 @@ function initConditionalFields(form) {
     evaluateAllConditions(form);
 }
 
-function getFormValues(form) {
-    const values = {};
+function getFormValues(form: HTMLFormElement): Record<string, unknown> {
+    const values: Record<string, unknown> = {};
     const formData = new FormData(form);
     for (const [key, value] of formData.entries()) {
         values[key] = value;
@@ -285,18 +326,20 @@ function getFormValues(form) {
 
     const checkboxes = form.querySelectorAll("input[type='checkbox']");
     checkboxes.forEach(cb => {
-        values[cb.name] = cb.checked;
+        const checkbox = cb as HTMLInputElement;
+        values[checkbox.name] = checkbox.checked;
     });
 
     return values;
 }
 
-function evaluateAllConditions(form) {
+function evaluateAllConditions(form: HTMLFormElement) {
     const formValues = getFormValues(form);
     const fields = form.querySelectorAll("[data-condition-field]");
 
     fields.forEach(wrapper => {
-        const conditions = wrapper.conditions;
+        const wrapperEl = wrapper as HTMLElement & { conditions?: FieldConditions };
+        const conditions = wrapperEl.conditions;
         if (!conditions) return;
 
         const visibilityCondition = conditions.visibility;
@@ -304,20 +347,20 @@ function evaluateAllConditions(form) {
 
         const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, formValues);
 
-        const parentCol = wrapper.closest(".form-col");
+        const parentCol = wrapper.closest(".form-col") as HTMLElement | null;
 
         if (isVisible) {
-            wrapper.style.display = "";
-            wrapper.removeAttribute("hidden");
-            wrapper.classList.remove("sf-hidden");
+            wrapperEl.style.display = "";
+            wrapperEl.removeAttribute("hidden");
+            wrapperEl.classList.remove("sf-hidden");
             if (parentCol) {
                 parentCol.style.display = "";
                 parentCol.classList.remove("sf-hidden");
             }
         } else {
-            wrapper.style.display = "none";
-            wrapper.setAttribute("hidden", "");
-            wrapper.classList.add("sf-hidden");
+            wrapperEl.style.display = "none";
+            wrapperEl.setAttribute("hidden", "");
+            wrapperEl.classList.add("sf-hidden");
             if (parentCol) {
                 parentCol.style.display = "none";
                 parentCol.classList.add("sf-hidden");
@@ -331,7 +374,7 @@ function evaluateAllConditions(form) {
         }
 
         if (isVisible && requiredCondition && window.SproutForms.conditions.evaluate(requiredCondition, formValues)) {
-            const input = wrapper.querySelector("input, select, textarea");
+            const input = wrapper.querySelector("input, select, textarea") as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
             if (input) {
                 input.setAttribute("data-conditional-required", "true");
                 input.setAttribute("required", "");
@@ -340,8 +383,8 @@ function evaluateAllConditions(form) {
     });
 }
 
-SproutForms.submissionGuard.register("recaptchaV3", {
-    async load(form, settings) {
+window.SproutForms.submissionGuard.register("recaptchaV3", {
+    async load(form: HTMLFormElement, settings: GuardSettings) {
         if (window.grecaptcha) return;
 
         await loadScript(
@@ -349,8 +392,8 @@ SproutForms.submissionGuard.register("recaptchaV3", {
         );
     },
 
-    async beforeSubmit(form, settings, payload) {
-        const token = await grecaptcha.execute(settings.siteKey, {
+    async beforeSubmit(form: HTMLFormElement, settings: GuardSettings, payload: FormData) {
+        const token = await window.grecaptcha!.execute(settings.siteKey!, {
             action: settings.action || "submit"
         });
 
@@ -358,45 +401,46 @@ SproutForms.submissionGuard.register("recaptchaV3", {
     }
 });
 
-SproutForms.validation.register("required", async (value, options) => {
+window.SproutForms.validation.register("required", async (value) => {
     if (!value) return false;
     return value.trim().length > 0;
 });
 
-SproutForms.validation.register("minLength", async (value, options) => {
+window.SproutForms.validation.register("minLength", async (value, options) => {
     if (!value) return true;
-    return value.length >= parseInt(options.sfMinLength);
+    return value.length >= parseInt(options.sfMinLength || "0");
 });
 
-SproutForms.validation.register("maxLength", async (value, options) => {
+window.SproutForms.validation.register("maxLength", async (value, options) => {
     if (!value) return true;
-    return value.length <= parseInt(options.sfMaxLength);
+    return value.length <= parseInt(options.sfMaxLength || "999999");
 });
 
-SproutForms.validation.register("sameAs", async (value, options, context) => {
-    const other = context.querySelector(`[name="${options.sfOther}"]`);
+window.SproutForms.validation.register("sameAs", async (value, options, context) => {
+    if (!context) return false;
+    const other = context.querySelector(`[name="${options.sfOther}"]`) as HTMLInputElement | null;
     return other && value === other.value;
 });
 
-SproutForms.validation.register("regex", async (value, options) => {
+window.SproutForms.validation.register("regex", async (value, options) => {
     if (!value) return true;
 
     const pattern = options.sfRegex;
     if (!pattern) return true;
 
-    let regex;
+    let regex: RegExp;
 
     try {
         regex = new RegExp(pattern);
     } catch (e) {
         console.warn("Invalid regex pattern:", pattern);
-        return false; // fail-safe
+        return false;
     }
 
     return regex.test(value);
 });
 
-SproutForms.validation.register("minDate", async (value, options) => {
+window.SproutForms.validation.register("minDate", async (value, options) => {
     if (!value) return true;
 
     const minDateValue = options.sfMinDate;
@@ -405,7 +449,7 @@ SproutForms.validation.register("minDate", async (value, options) => {
     const inputDate = new Date(value);
     const minDate = new Date(minDateValue);
 
-    if (isNaN(inputDate) || isNaN(minDate)) {
+    if (isNaN(inputDate.getTime()) || isNaN(minDate.getTime())) {
         console.warn("Invalid date value in minDate validator.");
         return true;
     }
@@ -417,38 +461,38 @@ SproutForms.validation.register("minDate", async (value, options) => {
     return false;
 });
 
-SproutForms.validation.register("maxDate", async (value, options) => {
+window.SproutForms.validation.register("maxDate", async (value, options) => {
     if (!value) return true;
 
-    const minDateValue = options.sfMaxDate;
-    if (!minDateValue) return true;
+    const maxDateValue = options.sfMaxDate;
+    if (!maxDateValue) return true;
 
     const inputDate = new Date(value);
-    const minDate = new Date(minDateValue);
+    const maxDate = new Date(maxDateValue);
 
-    if (isNaN(inputDate) || isNaN(minDate)) {
-        console.warn("Invalid date value in minDate validator.");
+    if (isNaN(inputDate.getTime()) || isNaN(maxDate.getTime())) {
+        console.warn("Invalid date value in maxDate validator.");
         return true;
     }
 
-    if (inputDate < minDate) {
+    if (inputDate <= maxDate) {
         return true;
     }
 
     return false;
 });
 
-function clearErrors(form) {
+function clearErrors(form: HTMLFormElement) {
     form.querySelectorAll(".form-error").forEach(e => e.remove());
     form.querySelectorAll("[aria-invalid]").forEach(el => {
         el.setAttribute("aria-invalid", "false");
     });
 }
 
-function applyErrors(form, errors, values) {
+function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>, values: Record<string, unknown>) {
     for (const key in values) {
-        const input = form.querySelector(`[name="${key}"]`);
-        if (input) input.value = values[key];
+        const input = form.querySelector(`[name="${key}"]`) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (input) input.value = String(values[key]);
     }
 
     for (const fieldId in errors) {
@@ -461,7 +505,7 @@ function applyErrors(form, errors, values) {
                 applyGlobalError(form, msg);
             });
             continue;
-        };
+        }
 
         input.setAttribute("aria-invalid", "true");
 
@@ -481,7 +525,7 @@ function applyErrors(form, errors, values) {
     }
 }
 
-function applyGlobalError(form, message) {
+function applyGlobalError(form: HTMLFormElement, message: string) {
     const container = getOrCreateGlobalErrorContainer(form);
 
     const div = document.createElement("div");
@@ -491,8 +535,8 @@ function applyGlobalError(form, message) {
     container.appendChild(div);
 }
 
-function getOrCreateGlobalErrorContainer(form) {
-    let container = form.querySelector(".form-global-errors");
+function getOrCreateGlobalErrorContainer(form: HTMLFormElement): HTMLElement {
+    let container = form.querySelector(".form-global-errors") as HTMLElement | null;
 
     if (!container) {
         container = document.createElement("div");
@@ -505,17 +549,18 @@ function getOrCreateGlobalErrorContainer(form) {
     return container;
 }
 
-async function initFormGuards(form) {
+async function initFormGuards(form: HTMLFormElement) {
     const submissionGuards = getSubmissionGuards(form);
 
     for (const guardDef of submissionGuards) {
-        const guard = window.SproutForms.submissionGuard?.registry?.[guardDef.alias];
+        const guard = window.SproutForms?.submissionGuard?.registry?.[guardDef.alias];
         if (!guard || !guard.load) continue;
 
         try {
             await guard.load(form, guardDef.settings);
         } catch (err) {
-            console.error(`Enhancer '${guardDef.alias}' failed to load`, err);
+            const error = err as Error;
+            console.error(`Enhancer '${guardDef.alias}' failed to load`, error);
             applyGlobalError(
                 form,
                 "This form could not be initialized correctly. Please try again later."
@@ -524,18 +569,18 @@ async function initFormGuards(form) {
     }
 }
 
-function loadScript(src) {
+function loadScript(src: string): Promise<void> {
     return new Promise((resolve, reject) => {
         const s = document.createElement("script");
         s.src = src;
         s.async = true;
-        s.onload = resolve;
-        s.onerror = reject;
+        s.onload = () => resolve();
+        s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
         document.head.appendChild(s);
     });
 }
 
-function getSubmissionGuards(form) {
+function getSubmissionGuards(form: HTMLFormElement): GuardDefinition[] {
     const raw = form.getAttribute("data-submission-guards");
     if (!raw) return [];
 
@@ -545,3 +590,5 @@ function getSubmissionGuards(form) {
         return [];
     }
 }
+
+export {};
