@@ -62,7 +62,8 @@ async function minifyFile(config) {
             }
 
             if (fs.existsSync(compiledPath)) {
-                const compiledContent = fs.readFileSync(compiledPath, 'utf-8');
+                let compiledContent = fs.readFileSync(compiledPath, 'utf-8');
+                compiledContent = compiledContent.replace(/export \{\};/g, '');
                 const result = await minifyJs(compiledContent);
                 fs.writeFileSync(outPath, result.code);
                 fs.unlinkSync(compiledPath);

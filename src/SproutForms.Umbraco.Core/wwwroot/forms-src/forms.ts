@@ -1,15 +1,56 @@
-import {
-    SubmissionGuard,
-    SubmissionGuardRegistry,
-    FieldCondition,
-    FieldConditions,
-    Validator,
-    ValidatorRegistry,
-    ValidationResult,
-    GuardSettings,
-    GuardDefinition,
-    FormSubmitResult
-} from './models';
+interface SubmissionGuard {
+    load?: (form: HTMLFormElement, settings: Record<string, unknown>) => Promise<void>;
+    beforeSubmit?: (form: HTMLFormElement, settings: Record<string, unknown>, payload: FormData) => Promise<void>;
+}
+
+interface SubmissionGuardRegistry {
+    [alias: string]: SubmissionGuard;
+}
+
+interface FieldCondition {
+    rules: Array<{
+        fieldAlias: string;
+        comparison: string;
+        value: unknown;
+    }>;
+    operator?: "All" | "Any";
+}
+
+interface FieldConditions {
+    visibility?: FieldCondition;
+    required?: FieldCondition;
+}
+
+interface Validator {
+    (value: string | undefined, options: Record<string, string | undefined>, context?: Element): Promise<boolean>;
+}
+
+interface ValidatorRegistry {
+    [alias: string]: Validator;
+}
+
+interface ValidationResult {
+    valid: boolean;
+    rule?: string;
+    message?: string;
+}
+
+interface GuardSettings {
+    siteKey?: string;
+    action?: string;
+}
+
+interface GuardDefinition {
+    alias: string;
+    settings: Record<string, unknown>;
+}
+
+interface FormSubmitResult {
+    successMessage?: string;
+    redirectUrl?: string;
+    errors?: Record<string, string[]>;
+    values?: Record<string, unknown>;
+}
 
 declare global {
     interface Window {
