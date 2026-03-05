@@ -6,7 +6,7 @@ namespace SproutForms.Core.Services
 {
     public class WorkflowMessageResolver
     {
-        private static readonly Regex TokenPattern = new Regex(@"#([a-zA-Z_][a-zA-Z0-9_]*)", RegexOptions.Compiled);
+        private static readonly Regex TokenPattern = new Regex(@"\{([^}]+)\}", RegexOptions.Compiled);
 
         public static string ResolveTokens(string template, FormSubmission submission, FormVersion formVersion)
         {

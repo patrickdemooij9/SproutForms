@@ -15,7 +15,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         public TeamsWorkflowDescriptor()
         {
             DefineMap(it => it.WebhookUrl, "webhookUrl", "Webhook URL", "Umb.PropertyEditorUi.TextBox");
-            DefineMap(it => it.Message, "message", "Message", "Umb.PropertyEditorUi.TextArea");
+            DefineMap(it => it.Message, "message", "Message", "sproutForms.propertyEditorUi.tokenTextarea");
         }
     }
 }

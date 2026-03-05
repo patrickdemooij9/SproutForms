@@ -301,7 +301,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
                               this.showTemplateSelectorFor = this.showTemplateSelectorFor === flowType.alias ? null : flowType.alias;
                             }}
                           >
-                            <uui-icon name="icon-profile"></uui-icon>
+                            <uui-icon name="icon-zip"></uui-icon>
                           </button>
                         ` : ''}
                       </div>
@@ -399,7 +399,6 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       button {
         display: block;
         width: 100%;
-        margin-bottom: 8px;
         border: 1px solid #ccc;
         border-radius: 4px;
         background-color: transparent;
@@ -482,11 +481,9 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     .template-btn {
       flex: 0 0 auto !important;
       width: 36px !important;
-      margin-bottom: 0 !important;
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 8px !important;
     }
 
     .template-selector {

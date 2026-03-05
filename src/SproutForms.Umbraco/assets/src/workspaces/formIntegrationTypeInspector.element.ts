@@ -114,10 +114,9 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
                         }}
                         val
                       >
-                        ${isLocked ? html`<span slot="label-icon" class="lock-icon" title="Locked by template"><uui-icon name="icon-lock"></uui-icon></span>` : ''}
                       </umb-property>
                     `;
-                  }
+                  },
                 )}`,
             )}
             ${when(

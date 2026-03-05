@@ -27,6 +27,7 @@ import { FormFieldConfigManifest } from "./formFieldConfigManifest";
 import KeyValuePairProperty from "../workspaces/fieldEditors/keyValuePairProperty.element";
 import { ManifestPropertyEditorUi } from "@umbraco-cms/backoffice/property-editor";
 import FormPickerElement from "../propertyEditors/formPickerElement";
+import TokenAutocompleteTextareaElement from "../propertyEditors/tokenAutocompleteTextarea.element";
 import CreateFolderAction from "../actions/CreateFolderAction";
 import FolderWorkspaceContext from "../workspaces/folderWorkspaceContext";
 import SproutFormsDashboardElement from "../workspaces/sproutFormsDashboard.element";
@@ -257,7 +258,20 @@ const FormsPickerPropertyEditor: ManifestPropertyEditorUi = {
     group: 'common',
     propertyEditorSchemaAlias: "Umbraco.Plain.String"
   }
-}
+};
+
+const TokenAutocompleteTextareaPropertyEditor: ManifestPropertyEditorUi = {
+  type: 'propertyEditorUi',
+  alias: 'sproutForms.propertyEditorUi.tokenTextarea',
+  name: 'SproutForms Token Textarea',
+  element: TokenAutocompleteTextareaElement,
+  meta: {
+    label: 'Token Textarea',
+    icon: 'icon-script',
+    group: 'common',
+    propertyEditorSchemaAlias: 'Umbraco.Plain.String'
+  }
+};
 
 export const SproutFormManifests = [
   SproutFormSection,
@@ -276,5 +290,6 @@ export const SproutFormManifests = [
   FormSubmissionInfoModal,
   FileFieldSubmissionField,
   KeyValuePairFieldConfigProperty,
-  FormsPickerPropertyEditor
+  FormsPickerPropertyEditor,
+  TokenAutocompleteTextareaPropertyEditor
 ];
