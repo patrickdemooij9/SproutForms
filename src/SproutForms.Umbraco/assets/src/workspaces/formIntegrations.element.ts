@@ -14,7 +14,7 @@ import { FormDto, FormFlowTypeDto, FormWorkflowDto } from "../models";
 import { FlowChangeEvent } from "./formIntegrationTypeInspector.element";
 
 import "./formIntegrationTypeInspector.element";
-import { FormFlowTypeBackofficeModel } from "../api";
+import { FormFlowTypeBackofficeModel, WorkflowTemplateBackofficeModel } from "../api";
 
 @customElement("form-integrations")
 export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
@@ -27,6 +27,9 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   private flowTypes: FormFlowTypeBackofficeModel[] = [];
 
   @state()
+  private templates: WorkflowTemplateBackofficeModel[] = [];
+
+  @state()
   private selectedFlowId?: string = undefined;
 
   @state()
@@ -35,11 +38,18 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
   @state()
   private draggedWorkflowId?: string = undefined;
 
+  @state()
+  private showTemplateSelectorFor: string | null = null;
+
   constructor() {
     super();
 
-    new SproutFormsSource(this).getWorkflowTypes().then((resp) => {
+    const source = new SproutFormsSource(this);
+    source.getWorkflowTypes().then((resp) => {
       this.flowTypes = resp.data;
+    });
+    source.getTemplates().then((resp) => {
+      this.templates = resp.data;
     });
 
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
@@ -52,7 +62,16 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     });
   }
 
-  addFlowType(type: FormFlowTypeDto) {
+  getTemplatesForType(typeAlias: string) {
+    return this.templates.filter(t => t.workflowTypeAlias === typeAlias);
+  }
+
+  getTemplateForFlow(templateId: string | null | undefined) {
+    if (!templateId) return null;
+    return this.templates.find(t => t.id === templateId) || null;
+  }
+
+  addFlowType(type: FormFlowTypeDto, template?: WorkflowTemplateBackofficeModel) {
     let order = 0;
     if (this.form.definition.workflows.length > 0) {
       order = Math.max(
@@ -61,10 +80,16 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     }
 
     const clonedDefinition = structuredClone(this.form.definition);
-    const configuration: Record<string, string> = {};
-    type.configuration.forEach((prop) => {
-      configuration[prop.alias] = (prop.value as string) ?? "";
-    });
+    let configuration: Record<string, string> = {};
+    
+    if (template) {
+      configuration = JSON.parse(template.configurationJson || "{}");
+    } else {
+      type.configuration.forEach((prop) => {
+        configuration[prop.alias] = (prop.value as string) ?? "";
+      });
+    }
+    
     const newFlow = {
       id: crypto.randomUUID(),
       alias: crypto.randomUUID(),
@@ -72,9 +97,11 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       displayName: type.displayName,
       order: order + 1,
       configuration: configuration,
+      templateId: template?.id || null,
     };
     clonedDefinition.workflows.push(newFlow);
     this.selectedFlowId = newFlow.id;
+    this.showTemplateSelectorFor = null;
     this.context?.updateForm({
       definition: clonedDefinition,
     });
@@ -247,6 +274,7 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
               <sf-integration-type-inspector
                 .flow=${this.selectedFlow!}
                 .flowType=${this.getFlowType(this.selectedFlow!.typeAlias)!}
+                .lockedFields=${this.getTemplateForFlow(this.selectedFlow!.templateId)?.lockedFields ?? []}
                 @flow-change=${this.#handleFlowUpdated}
               ></sf-integration-type-inspector>
             `,
@@ -256,11 +284,49 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
                 ${repeat(
                   this.flowTypes,
                   (flowType) => flowType.alias,
-                  (flowType) =>
-                    html` <div class="flow-type-option">
-                      <button @click=${() => this.addFlowType(flowType)}>
-                        ${flowType.displayName}
-                      </button>
+                  (flowType) => html`
+                    <div class="flow-type-option">
+                      <div class="option-row">
+                        <button @click=${() => this.addFlowType(flowType)}>
+                          ${flowType.displayName}
+                        </button>
+                        ${this.getTemplatesForType(flowType.alias).length > 0 ? html`
+                          <button 
+                            class="template-btn"
+                            title="Use template"
+                            @click=${(e: Event) => {
+                              e.stopPropagation();
+                              this.showTemplateSelectorFor = this.showTemplateSelectorFor === flowType.alias ? null : flowType.alias;
+                            }}
+                          >
+                            <uui-icon name="icon-profile"></uui-icon>
+                          </button>
+                        ` : ''}
+                      </div>
+                      ${this.showTemplateSelectorFor === flowType.alias ? html`
+                        <div class="template-selector">
+                          <p class="selector-label">Select a template:</p>
+                          ${this.getTemplatesForType(flowType.alias).map(template => html`
+                            <button 
+                              class="template-option"
+                              @click=${() => {
+                                this.addFlowType(flowType, template);
+                              }}
+                            >
+                              ${template.name}
+                            </button>
+                          `)}
+                          <button 
+                            class="cancel-btn"
+                            @click=${(e: Event) => {
+                              e.stopPropagation();
+                              this.showTemplateSelectorFor = null;
+                            }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ` : ''}
                     </div>`,
                 )}
               </div>
@@ -400,6 +466,49 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
       &:hover .delete-btn {
         opacity: 1;
       }
+    }
+
+    .option-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .option-row button:first-child {
+      flex: 1;
+    }
+
+    .template-btn {
+      flex: 0 0 auto !important;
+      width: 36px !important;
+      margin-bottom: 0 !important;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px !important;
+    }
+
+    .template-selector {
+      margin-top: 8px;
+      padding: 12px;
+      background-color: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+    }
+
+    .selector-label {
+      margin: 0 0 8px 0;
+      font-size: 0.85em;
+      color: #6b7280;
+    }
+
+    .template-option {
+      text-align: left !important;
+      margin-bottom: 4px !important;
+    }
+
+    .cancel-btn {
+      margin-top: 8px !important;
+      background-color: #f3f4f6 !important;
     }
   `;
 }

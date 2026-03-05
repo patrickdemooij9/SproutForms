@@ -9,12 +9,16 @@ namespace SproutForms.Core.Flows
     {
         private readonly IFormWorkflowType[] _formWorkflowTypes;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
+        private readonly IFormVersionRepository _formVersionRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
 
-        public WorkflowRunner(IWorkflowExecutionRepository workflowExecutionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFormWorkflowType> formWorkflowTypes)
+        public WorkflowRunner(IWorkflowExecutionRepository workflowExecutionRepository,
+            IFormVersionRepository formVersionRepository,
+            IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFormWorkflowType> formWorkflowTypes)
         {
             _formWorkflowTypes = formWorkflowTypes.ToArray();
             _workflowExecutionRepository = workflowExecutionRepository;
+            _formVersionRepository = formVersionRepository;
             _formSubmissionRepository = formSubmissionRepository;
         }
 
@@ -30,16 +34,19 @@ namespace SproutForms.Core.Flows
             {
                 var workflowType = _formWorkflowTypes.FirstOrDefault(wt => wt.Alias == execution.WorkflowTypeAlias) ?? throw new Exception($"Could not find workflow type with alias {execution.WorkflowTypeAlias}");
                 var submission = await _formSubmissionRepository.Get(execution.SubmissionId);
+                var version = _formVersionRepository.Get(submission.FormVersionId);
 
-                var result = await workflowType.ExecuteAsync(
-                    new FormWorkflow
+                var result = await workflowType.ExecuteAsync(new WorkflowContext
+                {
+                    Workflow = new FormWorkflow
                     {
                         Alias = execution.WorkflowAlias,
                         WorkflowTypeAlias = execution.WorkflowTypeAlias,
                         Configuration = JsonSerializer.Deserialize(execution.ConfigurationJson, workflowType.ConfigurationType)!,
                     },
-                    submission!,
-                    ct);
+                    Submission = submission!,
+                    Version = version!
+                }, ct);
 
                 if (result.Success)
                 {
@@ -66,18 +73,6 @@ namespace SproutForms.Core.Flows
             }
 
             await _workflowExecutionRepository.SaveExecution(execution);
-        }
-
-        public async Task RunAsync(IEnumerable<FormWorkflow> workflows, FormSubmission submission, CancellationToken ct)
-        {
-            foreach (var workflow in workflows.OrderBy(w => w.Order))
-            {
-                var type = _formWorkflowTypes.FirstOrDefault(it => it.Alias == workflow.WorkflowTypeAlias);
-                if (type is null)
-                    continue;
-
-                await type.ExecuteAsync(workflow, submission, ct);
-            }
         }
     }
 }

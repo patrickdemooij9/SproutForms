@@ -670,4 +670,4 @@ window.SproutForms.outcomeHandlers.register("redirectUmbracoPage", (form, outcom
     }
 });
 
-export {};
+export {}

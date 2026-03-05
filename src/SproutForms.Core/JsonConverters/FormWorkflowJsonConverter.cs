@@ -24,6 +24,7 @@ namespace SproutForms.Core.JsonConverters
             var alias = root.GetProperty("Alias").GetString()!;
             var workflowTypeAlias = root.GetProperty("WorkflowTypeAlias").GetString()!;
             var order = root.TryGetProperty("Order", out var orderEl) ? orderEl.GetInt32() : 0;
+            var templateId = root.TryGetProperty("TemplateId", out var templateIdEl) ? templateIdEl.GetGuid() : (Guid?)null; 
 
             object configuration = null!;
             if (root.TryGetProperty("Configuration", out var conf) && conf.ValueKind != JsonValueKind.Null)
@@ -43,7 +44,8 @@ namespace SproutForms.Core.JsonConverters
                 Alias = alias,
                 WorkflowTypeAlias = workflowTypeAlias,
                 Configuration = configuration!,
-                Order = order
+                Order = order,
+                TemplateId = templateId
             };
         }
 
@@ -54,6 +56,10 @@ namespace SproutForms.Core.JsonConverters
             writer.WriteString("Alias", value.Alias);
             writer.WriteString("WorkflowTypeAlias", value.WorkflowTypeAlias);
             writer.WriteNumber("Order", value.Order);
+            if (value.TemplateId.HasValue)
+            {
+                writer.WriteString("TemplateId", value.TemplateId?.ToString());
+            }
 
             writer.WritePropertyName("Configuration");
             if (value.Configuration is null)

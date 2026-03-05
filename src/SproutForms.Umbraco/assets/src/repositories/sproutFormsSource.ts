@@ -1,6 +1,6 @@
 import { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 import { tryExecute } from "@umbraco-cms/backoffice/resources";
-import { BackofficeSproutForms, CreateFolderRequest, FormBackofficeModel } from "../api";
+import { BackofficeSproutForms, CreateFolderRequest, FormBackofficeModel, WorkflowTemplateBackofficeModel } from "../api";
 
 export class SproutFormsSource {
      #host: UmbControllerHost;
@@ -99,5 +99,28 @@ export class SproutFormsSource {
 
   async getDashboardInfo(){
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsDashboard());
+  }
+
+  async getTemplates(){
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsTemplates());
+  }
+
+  async createTemplate(template: WorkflowTemplateBackofficeModel){
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsTemplates({
+      body: template
+    }));
+  }
+
+  async updateTemplate(template: WorkflowTemplateBackofficeModel){
+    return await tryExecute(this.#host, BackofficeSproutForms.putUmbracoSproutFormsTemplatesById({
+      path: { id: template.id! },
+      body: template
+    }));
+  }
+
+  async deleteTemplate(id: string){
+    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsTemplatesById({
+      path: { id }
+    }));
   }
 }

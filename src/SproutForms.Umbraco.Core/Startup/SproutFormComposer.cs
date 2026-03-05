@@ -77,6 +77,9 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IOutcomeDescriptor, RedirectUmbracoPageOutcomeDescriptor>();
 
             builder.Services.AddSingleton<IFlowDescriptor, EmailWorkflowDescriptor>();
+            builder.Services.AddSingleton<IFlowDescriptor, SlackWorkflowDescriptor>();
+            builder.Services.AddSingleton<IFlowDescriptor, TeamsWorkflowDescriptor>();
+            builder.Services.AddSingleton<IFlowDescriptor, CustomPostWorkflowDescriptor>();
 
             builder.Services.AddSingleton<IFormFileStorageProvider, LocalDiskFileStorageProvider>();
 
@@ -85,8 +88,14 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormSubmitOutcomeType, RedirectUmbracoPageOutcomeType>();
 
             builder.Services.AddSingleton<IFormWorkflowType, EmailWorkflowType>();
+            builder.Services.AddSingleton<IFormWorkflowType, SlackWorkflowType>();
+            builder.Services.AddSingleton<IFormWorkflowType, TeamsWorkflowType>();
+            builder.Services.AddSingleton<IFormWorkflowType, CustomPostWorkflowType>();
             builder.Services.AddSingleton<IWorkflowRunner, WorkflowRunner>();
             builder.Services.AddSingleton<IEmailSender, UmbracoEmailSender>();
+
+            builder.Services.AddSingleton<IWorkflowTemplateRepository, WorkflowTemplateRepository>();
+            builder.Services.AddSingleton<WorkflowTemplateService>();
 
             builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();

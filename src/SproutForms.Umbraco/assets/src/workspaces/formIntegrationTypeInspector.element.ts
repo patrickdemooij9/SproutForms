@@ -48,6 +48,9 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
   @property({ type: Object })
   public flowType!: FormFlowTypeDto;
 
+  @property({ type: Array })
+  public lockedFields: string[] = [];
+
   @state()
   private _values: Array<UmbPropertyValueData> = [];
 
@@ -60,7 +63,9 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
     const clonedWorkflow = structuredClone(this.flow);
     value.forEach((item) => {
       if (Object.keys(clonedWorkflow.configuration).includes(item.alias)) {
-        clonedWorkflow.configuration[item.alias] = item.value as string;
+        if (!this.lockedFields.includes(item.alias)) {
+          clonedWorkflow.configuration[item.alias] = item.value as string;
+        }
       }
     });
 
@@ -95,18 +100,24 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
                 html` ${repeat(
                   this.flowType?.configuration ?? [],
                   (prop) => prop.alias,
-                  (prop) => html`
-                    <umb-property
-                      alias=${prop.alias}
-                      label=${prop.displayName}
-                      description=""
-                      property-editor-ui-alias=${prop.propertyEditor}
-                      .appearance=${{
-                        labelOnTop: true,
-                      }}
-                      val
-                    ></umb-property>
-                  `,
+                  (prop) => {
+                    const isLocked = this.lockedFields.includes(prop.alias);
+                    return html`
+                      <umb-property
+                        alias=${prop.alias}
+                        label=${prop.displayName}
+                        description=${isLocked ? "Locked by template" : ""}
+                        property-editor-ui-alias=${prop.propertyEditor}
+                        ?readonly=${isLocked}
+                        .appearance=${{
+                          labelOnTop: true,
+                        }}
+                        val
+                      >
+                        ${isLocked ? html`<span slot="label-icon" class="lock-icon" title="Locked by template"><uui-icon name="icon-lock"></uui-icon></span>` : ''}
+                      </umb-property>
+                    `;
+                  }
                 )}`,
             )}
             ${when(
@@ -134,6 +145,18 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
 
     .tab-group {
       border-bottom: 1px solid #ccc;
+    }
+
+    .lock-icon {
+      display: inline-flex;
+      align-items: center;
+      margin-left: 4px;
+      color: #f59e0b;
+    }
+
+    .lock-icon uui-icon {
+      width: 14px;
+      height: 14px;
     }
   `;
 }

@@ -1,4 +1,4 @@
-﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.Database;
 using System.Text.Json;
@@ -11,6 +11,7 @@ using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Models.Flows;
 using Umbraco.Cms.Core.Cache;
 using SproutForms.Umbraco.Core.Caching;
+using SproutForms.Core.Services;
 
 namespace SproutForms.Umbraco.Core.Repositories
 {
@@ -20,6 +21,7 @@ namespace SproutForms.Umbraco.Core.Repositories
         private readonly IEnumerable<IFormFieldType> _fieldTypes;
         private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
         private readonly IEnumerable<IFormWorkflowType> _workflowTypes;
+        private readonly WorkflowTemplateService? _templateService;
 
         private readonly Caching.IRepositoryCachePolicy<FormVersion, Guid> _cachePolicy;
 
@@ -27,12 +29,14 @@ namespace SproutForms.Umbraco.Core.Repositories
             IEnumerable<IFormFieldType> fieldTypes,
             IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
             IEnumerable<IFormWorkflowType> workflowTypes,
-            IAppPolicyCache cache)
+            IAppPolicyCache cache,
+            WorkflowTemplateService? templateService = null)
         {
             _scopeProvider = scopeProvider;
             _fieldTypes = fieldTypes;
             _outcomeTypes = outcomeTypes;
             _workflowTypes = workflowTypes;
+            _templateService = templateService;
 
             _cachePolicy = new Caching.DefaultRepositoryCachePolicy<FormVersion, Guid>(cache, new RepositoryPolicyOptions<FormVersion, Guid>(it => it.Id));
         }
@@ -112,7 +116,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
 
-            return [.. entities.Select(entity => new FormVersion
+            var results = entities.Select(entity => new FormVersion
             {
                 Id = entity.Id,
                 FormId = entity.FormId,
@@ -122,7 +126,17 @@ namespace SproutForms.Umbraco.Core.Repositories
                 DefinitionHash = entity.DefinitionHash,
                 CreatedBy = entity.CreatedBy,
                 CreatedAt = entity.CreatedAt
-            })];
+            }).ToList();
+
+            if (_templateService != null)
+            {
+                foreach (var version in results.Where(v => v.Definition?.Workflows != null))
+                {
+                    _templateService.ResolveFormWorkflows(version.Definition.Workflows);
+                }
+            }
+
+            return [.. results];
         }
 
         public FormVersion? Get(Guid formVersionId)
@@ -146,7 +160,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
 
-            return new FormVersion
+            var version = new FormVersion
             {
                 Id = entity.Id,
                 FormId = entity.FormId,
@@ -157,6 +171,13 @@ namespace SproutForms.Umbraco.Core.Repositories
                 CreatedBy = entity.CreatedBy,
                 CreatedAt = entity.CreatedAt
             };
+
+            if (_templateService != null && version.Definition?.Workflows != null)
+            {
+                _templateService.ResolveFormWorkflows(version.Definition.Workflows);
+            }
+
+            return version;
         }
 
         public void Publish(Guid versionId)

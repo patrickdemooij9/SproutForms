@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsDashboardData, GetUmbracoSproutFormsDashboardResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFolderData, PostUmbracoSproutFormsFolderResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses, PostUmbracoSproutFormsSubmissionWorkflowApproveData, PostUmbracoSproutFormsSubmissionWorkflowApproveResponses, PostUmbracoSproutFormsSubmissionWorkflowDeclineData, PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses, PostUmbracoSproutFormsSubmissionWorkflowRetryData, PostUmbracoSproutFormsSubmissionWorkflowRetryResponses } from './types.gen';
+import type { DeleteUmbracoSproutFormsFormData, DeleteUmbracoSproutFormsFormResponses, DeleteUmbracoSproutFormsTemplatesByIdData, DeleteUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsDashboardData, GetUmbracoSproutFormsDashboardResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsTemplatesByIdData, GetUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsTemplatesData, GetUmbracoSproutFormsTemplatesResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFolderData, PostUmbracoSproutFormsFolderResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses, PostUmbracoSproutFormsSubmissionWorkflowApproveData, PostUmbracoSproutFormsSubmissionWorkflowApproveResponses, PostUmbracoSproutFormsSubmissionWorkflowDeclineData, PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses, PostUmbracoSproutFormsSubmissionWorkflowRetryData, PostUmbracoSproutFormsSubmissionWorkflowRetryResponses, PostUmbracoSproutFormsTemplatesData, PostUmbracoSproutFormsTemplatesResponses, PutUmbracoSproutFormsTemplatesByIdData, PutUmbracoSproutFormsTemplatesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -147,6 +147,49 @@ export class BackofficeSproutForms {
         return (options?.client ?? client).get<GetUmbracoSproutFormsSubmissionsResponses, unknown, ThrowOnError>({
             url: '/umbraco/sproutForms/submissions',
             ...options
+        });
+    }
+    
+    public static getUmbracoSproutFormsTemplates<ThrowOnError extends boolean = true>(options?: Options<GetUmbracoSproutFormsTemplatesData, ThrowOnError>) {
+        return (options?.client ?? client).get<GetUmbracoSproutFormsTemplatesResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/templates',
+            ...options
+        });
+    }
+    
+    public static postUmbracoSproutFormsTemplates<ThrowOnError extends boolean = true>(options?: Options<PostUmbracoSproutFormsTemplatesData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostUmbracoSproutFormsTemplatesResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/templates',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteUmbracoSproutFormsTemplatesById<ThrowOnError extends boolean = true>(options: Options<DeleteUmbracoSproutFormsTemplatesByIdData, ThrowOnError>) {
+        return (options.client ?? client).delete<DeleteUmbracoSproutFormsTemplatesByIdResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/templates/{id}',
+            ...options
+        });
+    }
+    
+    public static getUmbracoSproutFormsTemplatesById<ThrowOnError extends boolean = true>(options: Options<GetUmbracoSproutFormsTemplatesByIdData, ThrowOnError>) {
+        return (options.client ?? client).get<GetUmbracoSproutFormsTemplatesByIdResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/templates/{id}',
+            ...options
+        });
+    }
+    
+    public static putUmbracoSproutFormsTemplatesById<ThrowOnError extends boolean = true>(options: Options<PutUmbracoSproutFormsTemplatesByIdData, ThrowOnError>) {
+        return (options.client ?? client).put<PutUmbracoSproutFormsTemplatesByIdResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/templates/{id}',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers
+            }
         });
     }
     

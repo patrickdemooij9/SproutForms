@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text;
 
@@ -12,6 +12,7 @@ namespace SproutForms.Core.Models.Flows
         public required object Configuration { get; set; }
 
         public int Order { get; set; }
-        //public WorkflowConditions? Conditions { get; set; }
+        
+        public Guid? TemplateId { get; set; }
     }
 }

@@ -20,18 +20,25 @@ namespace SproutForms.Core.Flows
             _emailSender = emailSender;
         }
 
-        public async Task<WorkflowExecutionResult> ExecuteAsync(FormWorkflow workflow, FormSubmission submission, CancellationToken ct)
+        public async Task<WorkflowExecutionResult> ExecuteAsync(WorkflowContext context, CancellationToken ct)
         {
-            var config = (EmailWorkflowConfig) workflow.Configuration;
+            var config = (EmailWorkflowConfig)context.Workflow.Configuration;
 
-            var body = BuildBody(submission);
+            var body = BuildBody(context.Submission);
 
-            await _emailSender.SendAsync(
+            try
+            {
+                await _emailSender.SendAsync(
                 config.From,
                 config.To,
                 config.Subject,
                 body,
                 ct);
+            }
+            catch (Exception ex)
+            {
+                return new WorkflowExecutionResult(false, ex.Message);
+            }
 
             return new WorkflowExecutionResult(true);
         }

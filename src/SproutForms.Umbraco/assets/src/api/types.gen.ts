@@ -148,7 +148,7 @@ export type FormRowBackofficeModel = {
 
 export type FormSubmissionBackofficeModel = {
     id: string;
-    pageUrl?: string;
+    pageUrl?: string | null;
     values: Array<FormSubmissionValueBackofficeModel>;
     workflowStages: Array<WorkflowStageStatusModel>;
 };
@@ -156,7 +156,7 @@ export type FormSubmissionBackofficeModel = {
 export type FormSubmissionListItemBackofficeModel = {
     id: string;
     name: string;
-    pageUrl?: string;
+    pageUrl?: string | null;
     workflowStages: Array<WorkflowStageStatusModel>;
 };
 
@@ -183,6 +183,7 @@ export type FormWorkflowBackofficeModel = {
     configuration: {
         [key: string]: unknown;
     };
+    templateId?: string | null;
 };
 
 export type HeroMetricsViewModel = {
@@ -265,6 +266,14 @@ export type WorkflowStageStatusModel = {
     displayName: string;
     order: number;
     status: WorkflowExecutionStatus;
+};
+
+export type WorkflowTemplateBackofficeModel = {
+    id?: string | null;
+    name: string;
+    workflowTypeAlias: string;
+    configurationJson: string;
+    lockedFields: Array<string>;
 };
 
 export type GetUmbracoSproutFormsAncestorsData = {
@@ -568,6 +577,92 @@ export type GetUmbracoSproutFormsSubmissionsResponses = {
 };
 
 export type GetUmbracoSproutFormsSubmissionsResponse = GetUmbracoSproutFormsSubmissionsResponses[keyof GetUmbracoSproutFormsSubmissionsResponses];
+
+export type GetUmbracoSproutFormsTemplatesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/templates';
+};
+
+export type GetUmbracoSproutFormsTemplatesResponses = {
+    /**
+     * OK
+     */
+    200: Array<WorkflowTemplateBackofficeModel>;
+};
+
+export type GetUmbracoSproutFormsTemplatesResponse = GetUmbracoSproutFormsTemplatesResponses[keyof GetUmbracoSproutFormsTemplatesResponses];
+
+export type PostUmbracoSproutFormsTemplatesData = {
+    body?: WorkflowTemplateBackofficeModel;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/templates';
+};
+
+export type PostUmbracoSproutFormsTemplatesResponses = {
+    /**
+     * OK
+     */
+    200: WorkflowTemplateBackofficeModel;
+};
+
+export type PostUmbracoSproutFormsTemplatesResponse = PostUmbracoSproutFormsTemplatesResponses[keyof PostUmbracoSproutFormsTemplatesResponses];
+
+export type DeleteUmbracoSproutFormsTemplatesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/sproutForms/templates/{id}';
+};
+
+export type DeleteUmbracoSproutFormsTemplatesByIdResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteUmbracoSproutFormsTemplatesByIdResponse = DeleteUmbracoSproutFormsTemplatesByIdResponses[keyof DeleteUmbracoSproutFormsTemplatesByIdResponses];
+
+export type GetUmbracoSproutFormsTemplatesByIdData = {
+    body?: never;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/sproutForms/templates/{id}';
+};
+
+export type GetUmbracoSproutFormsTemplatesByIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkflowTemplateBackofficeModel;
+};
+
+export type GetUmbracoSproutFormsTemplatesByIdResponse = GetUmbracoSproutFormsTemplatesByIdResponses[keyof GetUmbracoSproutFormsTemplatesByIdResponses];
+
+export type PutUmbracoSproutFormsTemplatesByIdData = {
+    body?: WorkflowTemplateBackofficeModel;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/umbraco/sproutForms/templates/{id}';
+};
+
+export type PutUmbracoSproutFormsTemplatesByIdResponses = {
+    /**
+     * OK
+     */
+    200: WorkflowTemplateBackofficeModel;
+};
+
+export type PutUmbracoSproutFormsTemplatesByIdResponse = PutUmbracoSproutFormsTemplatesByIdResponses[keyof PutUmbracoSproutFormsTemplatesByIdResponses];
 
 export type GetUmbracoSproutFormsWorkflowTypesData = {
     body?: never;

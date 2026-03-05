@@ -8,6 +8,7 @@ import {
   state,
 } from "@umbraco-cms/backoffice/external/lit";
 import "./sproutFormsList.element";
+import "./templates.element";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { DashboardViewModel } from "../api";
 
@@ -17,7 +18,7 @@ export class SproutFormsDashboardElement extends UmbElementMixin(LitElement) {
   data?: DashboardViewModel;
 
   @state()
-  private activeTab: "dashboard" | "forms" = "dashboard";
+  private activeTab: "dashboard" | "forms" | "templates" = "dashboard";
 
   constructor() {
     super();
@@ -42,6 +43,12 @@ export class SproutFormsDashboardElement extends UmbElementMixin(LitElement) {
         >
           Forms
         </button>
+        <button
+          class="tab ${this.activeTab === "templates" ? "active" : ""}"
+          @click=${() => (this.activeTab = "templates")}
+        >
+          Templates
+        </button>
       </div>
 
       <div
@@ -52,6 +59,10 @@ export class SproutFormsDashboardElement extends UmbElementMixin(LitElement) {
 
       <div class="tab-content ${this.activeTab === "forms" ? "active" : ""}">
         <sprout-forms-list></sprout-forms-list>
+      </div>
+
+      <div class="tab-content ${this.activeTab === "templates" ? "active" : ""}">
+        <sf-templates></sf-templates>
       </div>
     `;
   }

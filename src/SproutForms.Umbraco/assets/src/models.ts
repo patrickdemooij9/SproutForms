@@ -49,6 +49,7 @@ export interface FormWorkflowDto {
   configuration: {
     [key: string]: unknown;
   };
+  templateId?: string | null;
 }
 
 export type FormOutcomeDto = {
@@ -112,7 +113,6 @@ export type FormSubmissionOverviewItem = {
 
   id: string;
   name: string;
-  pageUrl?: string;
   workflowStages?: Array<{
     workflowAlias: string;
     displayName: string;
@@ -131,3 +131,11 @@ export type FormSubmissionInfoModalItem = {
 
 export const SOURCE_UI = 0;
 export const SOURCE_CODE = 1;
+
+export interface WorkflowTemplateDto {
+  id: string;
+  name: string;
+  workflowTypeAlias: string;
+  configurationJson: string;
+  lockedFields: string[];
+}

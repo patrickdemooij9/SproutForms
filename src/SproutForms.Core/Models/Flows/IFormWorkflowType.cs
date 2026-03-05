@@ -12,8 +12,7 @@ namespace SproutForms.Core.Models.Flows
         object GetDefaultConfiguration();
 
         Task<WorkflowExecutionResult> ExecuteAsync(
-            FormWorkflow workflow,
-            FormSubmission submission,
+            WorkflowContext context,
             CancellationToken ct);
     }
 }

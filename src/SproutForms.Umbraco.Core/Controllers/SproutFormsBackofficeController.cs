@@ -17,6 +17,7 @@ using Umbraco.Cms.Core.Security;
 using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Cms.Web.Common.Routing;
 using Umbraco.Extensions;
+using WorkflowTemplate = SproutForms.Core.Models.WorkflowTemplate;
 
 namespace SproutForms.Umbraco.Core.Controllers
 {
@@ -40,9 +41,10 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
         private readonly ISproutFormsDashboardService _dashboardService;
+        private readonly IWorkflowTemplateRepository _templateRepository;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository)
         {
             _formFieldTypes = formFieldTypes.ToArray();
             _outcomeTypes = outcomeTypes.ToArray();
@@ -58,6 +60,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             _backOfficeSecurityAccessor = backOfficeSecurityAccessor;
             _workflowExecutionRepository = workflowExecutionRepository;
             _dashboardService = dashboardService;
+            _templateRepository = templateRepository;
         }
 
         [HttpGet("forms")]
@@ -117,9 +120,10 @@ namespace SproutForms.Umbraco.Core.Controllers
                             TypeAlias = flow.WorkflowTypeAlias,
                             DisplayName = flowDescriptor.DisplayName,
                             Order = flow.Order,
-                            Configuration = flowDescriptor.FromConfig(flow.Configuration).ToDictionary(it => it.Alias, it => it.Value)
+                            Configuration = flowDescriptor.FromConfig(flow.Configuration).ToDictionary(it => it.Alias, it => it.Value),
+                            TemplateId = flow.TemplateId
                         };
-                    }).ToList()
+                    }).ToList(),
                 }
             });
         }
@@ -181,7 +185,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                         Alias = it.Alias,
                         WorkflowTypeAlias = it.TypeAlias,
                         Order = it.Order,
-                        Configuration = workflowDescriptor.ToConfig(it.Configuration)
+                        Configuration = workflowDescriptor.ToConfig(it.Configuration),
+                        TemplateId = it.TemplateId
                     };
                 }).ToList(),
                 SubmitOutcome = new FormSubmitOutcome
@@ -264,6 +269,76 @@ namespace SproutForms.Umbraco.Core.Controllers
                 });
             }
             return Ok(workflowTypes);
+        }
+
+        [HttpGet("templates")]
+        [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel[]), 200)]
+        public IActionResult GetTemplates()
+        {
+            var templates = _templateRepository.GetAll();
+            return Ok(templates.Select(t => MapTemplate(t)).ToList());
+        }
+
+        [HttpGet("templates/{id}")]
+        [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
+        public IActionResult GetTemplate(Guid id)
+        {
+            var template = _templateRepository.GetById(id);
+            if (template is null) return NotFound();
+            return Ok(MapTemplate(template));
+        }
+
+        [HttpPost("templates")]
+        [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
+        public IActionResult CreateTemplate([FromBody] WorkflowTemplateBackofficeModel model)
+        {
+            var template = new WorkflowTemplate
+            {
+                Id = model.Id ?? Guid.Empty,
+                Name = model.Name,
+                WorkflowTypeAlias = model.WorkflowTypeAlias,
+                Configuration = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(model.ConfigurationJson ?? "{}"),
+                LockedFields = model.LockedFields ?? []
+            };
+            var savedId = _templateRepository.Save(template);
+            template.Id = savedId;
+            return Ok(MapTemplate(template));
+        }
+
+        [HttpPut("templates/{id}")]
+        [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
+        public IActionResult UpdateTemplate(Guid id, [FromBody] WorkflowTemplateBackofficeModel model)
+        {
+            var template = new WorkflowTemplate
+            {
+                Id = id,
+                Name = model.Name,
+                WorkflowTypeAlias = model.WorkflowTypeAlias,
+                Configuration = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(model.ConfigurationJson ?? "{}"),
+                LockedFields = model.LockedFields ?? []
+            };
+            _templateRepository.Save(template);
+            return Ok(MapTemplate(template));
+        }
+
+        [HttpDelete("templates/{id}")]
+        [ProducesResponseType(204)]
+        public IActionResult DeleteTemplate(Guid id)
+        {
+            _templateRepository.Delete(id);
+            return NoContent();
+        }
+
+        private static WorkflowTemplateBackofficeModel MapTemplate(WorkflowTemplate template)
+        {
+            return new WorkflowTemplateBackofficeModel
+            {
+                Id = template.Id,
+                Name = template.Name,
+                WorkflowTypeAlias = template.WorkflowTypeAlias,
+                ConfigurationJson = template.Configuration.GetRawText(),
+                LockedFields = template.LockedFields
+            };
         }
 
         [HttpGet("submissions")]
