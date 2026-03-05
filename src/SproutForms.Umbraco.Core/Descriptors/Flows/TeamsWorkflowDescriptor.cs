@@ -16,7 +16,6 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         {
             DefineMap(it => it.WebhookUrl, "webhookUrl", "Webhook URL", "Umb.PropertyEditorUi.TextBox");
             DefineMap(it => it.Message, "message", "Message", "Umb.PropertyEditorUi.TextArea");
-            DefineMap(it => it.ThemeColor, "themeColor", "Theme Color (optional)", "Umb.PropertyEditorUi.TextBox");
         }
     }
 }

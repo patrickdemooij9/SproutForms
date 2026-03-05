@@ -57,6 +57,7 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
                     Alias = mapping.Alias,
                     DisplayName = mapping.DisplayName,
                     PropertyEditor = mapping.PropertyTypeAlias,
+                    PropertyName = GetPropertyInfo(mapping)!.Name,
                     Value = frontendValue
                 });
             }
@@ -95,6 +96,31 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
                 }
             }
             return config;
+        }
+
+        public string? ToPropertyName(string alias)
+        {
+            var mapping = _mappings.FirstOrDefault(it => it.Alias == alias);
+            if (mapping is null) return null;
+
+            return GetPropertyInfo(mapping)?.Name;
+        }
+
+        private PropertyInfo? GetPropertyInfo(DescriptorMapping<TConfig> mapping)
+        {
+            var body = mapping.Expression.Body;
+
+            // Handle UnaryExpression (Convert) that wraps the actual MemberExpression
+            if (body is UnaryExpression unaryExpression)
+            {
+                body = unaryExpression.Operand;
+            }
+
+            if (body is MemberExpression memberSelectorExpression)
+            {
+                return memberSelectorExpression.Member as PropertyInfo;
+            }
+            return null;
         }
     }
 }

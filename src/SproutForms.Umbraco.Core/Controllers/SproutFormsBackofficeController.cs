@@ -292,13 +292,14 @@ namespace SproutForms.Umbraco.Core.Controllers
         [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
         public IActionResult CreateTemplate([FromBody] WorkflowTemplateBackofficeModel model)
         {
+            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == model.WorkflowTypeAlias);
             var template = new WorkflowTemplate
             {
                 Id = model.Id ?? Guid.Empty,
                 Name = model.Name,
                 WorkflowTypeAlias = model.WorkflowTypeAlias,
-                Configuration = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(model.ConfigurationJson ?? "{}"),
-                LockedFields = model.LockedFields ?? []
+                Configuration = flowDescriptor.ToConfig(model.Configuration),
+                LockedFields = model.LockedFields.Select(flowDescriptor.ToPropertyName).WhereNotNull().ToList() ?? []
             };
             var savedId = _templateRepository.Save(template);
             template.Id = savedId;
@@ -309,13 +310,14 @@ namespace SproutForms.Umbraco.Core.Controllers
         [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
         public IActionResult UpdateTemplate(Guid id, [FromBody] WorkflowTemplateBackofficeModel model)
         {
+            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == model.WorkflowTypeAlias);
             var template = new WorkflowTemplate
             {
                 Id = id,
                 Name = model.Name,
                 WorkflowTypeAlias = model.WorkflowTypeAlias,
-                Configuration = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(model.ConfigurationJson ?? "{}"),
-                LockedFields = model.LockedFields ?? []
+                Configuration = flowDescriptor.ToConfig(model.Configuration),
+                LockedFields = model.LockedFields.Select(flowDescriptor.ToPropertyName).WhereNotNull().ToList() ?? []
             };
             _templateRepository.Save(template);
             return Ok(MapTemplate(template));
@@ -329,15 +331,17 @@ namespace SproutForms.Umbraco.Core.Controllers
             return NoContent();
         }
 
-        private static WorkflowTemplateBackofficeModel MapTemplate(WorkflowTemplate template)
+        private WorkflowTemplateBackofficeModel MapTemplate(WorkflowTemplate template)
         {
+            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == template.WorkflowTypeAlias);
+            var configuration = flowDescriptor.FromConfig(template.Configuration);
             return new WorkflowTemplateBackofficeModel
             {
                 Id = template.Id,
                 Name = template.Name,
                 WorkflowTypeAlias = template.WorkflowTypeAlias,
-                ConfigurationJson = template.Configuration.GetRawText(),
-                LockedFields = template.LockedFields
+                Configuration = configuration.ToDictionary(it => it.Alias, it => it.Value),
+                LockedFields = template.LockedFields.Select(it => configuration.FirstOrDefault(c => c.PropertyName.Equals(it))?.Alias).WhereNotNull().ToList()
             };
         }
 

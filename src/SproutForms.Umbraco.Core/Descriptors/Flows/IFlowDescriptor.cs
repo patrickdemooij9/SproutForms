@@ -12,5 +12,6 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
 
         FormPropertyBackofficeModel[] FromConfig(object configuration);
         object ToConfig(Dictionary<string, object?> properties);
+        string? ToPropertyName(string alias);
     }
 }

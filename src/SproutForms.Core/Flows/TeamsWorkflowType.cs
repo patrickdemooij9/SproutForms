@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using SproutForms.Core.Flows.Configs;
+using SproutForms.Core.Flows.Models;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Services;
@@ -29,9 +30,9 @@ namespace SproutForms.Core.Flows
             if (string.IsNullOrEmpty(config.WebhookUrl))
                 return new WorkflowExecutionResult(false, "Teams webhook URL is required");
 
-            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission);
+            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
 
-            var payload = BuildTeamsPayload(resolvedMessage, config.ThemeColor, context.Submission);
+            var payload = BuildTeamsPayload(resolvedMessage, context.Submission);
 
             try
             {
@@ -54,37 +55,26 @@ namespace SproutForms.Core.Flows
             return new WorkflowExecutionResult(true);
         }
 
-        private static object BuildTeamsPayload(string message, string themeColor, FormSubmission submission)
+        private static TeamsMessageModel BuildTeamsPayload(string message, FormSubmission submission)
         {
-            var sections = new List<object>
+            var payload = new TeamsMessageModel
             {
-                new
-                {
-                    text = message
-                }
-            };
-
-            var facts = submission.Values
-                .Where(v => !string.IsNullOrEmpty(v.Value.GetString()))
-                .Select(v => new
-                {
-                    name = v.Key,
-                    value = v.Value.GetString()
-                })
-                .ToList();
-
-            if (facts.Count > 0)
-            {
-                sections.Add(new
-                {
-                    facts = facts
-                });
-            }
-
-            var payload = new
-            {
-                themeColor = string.IsNullOrEmpty(themeColor) ? "0078D4" : themeColor,
-                sections = sections
+                Attachments =
+                [
+                    new TeamsAttachmentModel
+                    {
+                        Content = new TeamsAdaptiveCardModel
+                        {
+                            Body =
+                            [
+                                new TeamsTextBlockModel
+                                {
+                                    Text = message
+                                }
+                            ]
+                        }
+                    }
+                ]
             };
 
             return payload;
@@ -92,7 +82,10 @@ namespace SproutForms.Core.Flows
 
         public object GetDefaultConfiguration()
         {
-            return new TeamsWorkflowConfig();
+            return new TeamsWorkflowConfig
+            {
+                Message = "A new submission has been submitted:\r\n#AllValues"
+            };
         }
     }
 }

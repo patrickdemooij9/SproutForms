@@ -15,7 +15,6 @@ namespace SproutForms.Umbraco.Core.Descriptors.Flows
         public CustomPostWorkflowDescriptor()
         {
             DefineMap(it => it.Url, "url", "URL", "Umb.PropertyEditorUi.TextBox");
-            DefineMap(it => it.Method, "method", "Method", "Umb.PropertyEditorUi.TextBox");
         }
     }
 }

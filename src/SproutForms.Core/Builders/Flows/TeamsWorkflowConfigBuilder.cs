@@ -18,12 +18,6 @@ namespace SproutForms.Core.Builders.Flows
             return this;
         }
 
-        public TeamsWorkflowConfigBuilder ThemeColor(string themeColor)
-        {
-            _config.ThemeColor = themeColor;
-            return this;
-        }
-
         internal TeamsWorkflowConfig Build() => _config;
     }
 }

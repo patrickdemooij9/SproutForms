@@ -83,7 +83,9 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     let configuration: Record<string, string> = {};
     
     if (template) {
-      configuration = JSON.parse(template.configurationJson || "{}");
+      Object.entries(template.configuration).forEach(([alias, value]) => {
+        configuration[alias] = (value as string) ?? "";
+      });
     } else {
       type.configuration.forEach((prop) => {
         configuration[prop.alias] = (prop.value as string) ?? "";

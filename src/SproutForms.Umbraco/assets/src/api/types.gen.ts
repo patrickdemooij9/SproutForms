@@ -272,7 +272,9 @@ export type WorkflowTemplateBackofficeModel = {
     id?: string | null;
     name: string;
     workflowTypeAlias: string;
-    configurationJson: string;
+    configuration: {
+        [key: string]: unknown;
+    };
     lockedFields: Array<string>;
 };
 

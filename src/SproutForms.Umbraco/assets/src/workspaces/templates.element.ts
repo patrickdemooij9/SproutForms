@@ -31,7 +31,7 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
   private formWorkflowTypeAlias = "";
 
   @state()
-  private formConfiguration: Record<string, string> = {};
+  private formConfiguration: Record<string, unknown> = {};
 
   @state()
   private formLockedFields: string[] = [];
@@ -69,11 +69,12 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
   }
 
   openEditModal(template: WorkflowTemplateBackofficeModel) {
+    //TODO: Move towards modal umbraco structure
     this.isEditing = true;
     this.editingTemplate = template;
     this.formName = template.name;
     this.formWorkflowTypeAlias = template.workflowTypeAlias;
-    this.formConfiguration = JSON.parse(template.configurationJson || "{}");
+    this.formConfiguration = template.configuration || {};
     this.formLockedFields = template.lockedFields || [];
   }
 
@@ -83,6 +84,7 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
   }
 
   updateDefaultConfiguration() {
+    this.formConfiguration = {};
     const flowType = this.flowTypes.find(
       (f) => f.alias === this.formWorkflowTypeAlias
     );
@@ -123,7 +125,7 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
       id: this.editingTemplate?.id,
       name: this.formName,
       workflowTypeAlias: this.formWorkflowTypeAlias,
-      configurationJson: JSON.stringify(this.formConfiguration),
+      configuration: this.formConfiguration,
       lockedFields: this.formLockedFields,
     };
 
@@ -235,11 +237,12 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
               <label>Workflow Type</label>
               <select
                 .value=${this.formWorkflowTypeAlias}
+                .disabled=${this.editingTemplate !== null}
                 @change=${this.workflowTypeChanged}
               >
                 ${this.flowTypes.map(
                   (ft) =>
-                    html`<option value=${ft.alias}>
+                    html`<option value=${ft.alias} .selected=${ft.alias === this.formWorkflowTypeAlias}>
                       ${ft.displayName}
                     </option>`
                 )}
@@ -257,7 +260,7 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
                           ${prop.propertyEditor.includes("TextArea")
                             ? html`
                                 <textarea
-                                  .value=${this.formConfiguration[prop.alias] || ""}
+                                  .value=${this.formConfiguration[prop.alias] as string || ""}
                                   @input=${(e: Event) =>
                                     this.configFieldChanged(
                                       prop.alias,
@@ -268,7 +271,7 @@ export class SfTemplatesElement extends UmbElementMixin(LitElement) {
                             : html`
                                 <input
                                   type="text"
-                                  .value=${this.formConfiguration[prop.alias] || ""}
+                                  .value=${this.formConfiguration[prop.alias] as string || ""}
                                   @input=${(e: Event) =>
                                     this.configFieldChanged(
                                       prop.alias,

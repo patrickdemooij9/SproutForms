@@ -28,14 +28,12 @@ namespace SproutForms.Core.Flows
             if (string.IsNullOrEmpty(config.Url))
                 return new WorkflowExecutionResult(false, "URL is required");
 
-            var method = string.IsNullOrEmpty(config.Method) ? HttpMethod.Post : new HttpMethod(config.Method.ToUpperInvariant());
-
             var jsonBody = BuildJsonBody(context.Submission);
 
             try
             {
                 var client = _httpClientFactory.CreateClient();
-                var request = new HttpRequestMessage(method, config.Url)
+                var request = new HttpRequestMessage(HttpMethod.Post, config.Url)
                 {
                     Content = new StringContent(jsonBody, Encoding.UTF8, "application/json")
                 };
@@ -65,12 +63,7 @@ namespace SproutForms.Core.Flows
                 ["submittedAt"] = submission.SubmittedAt,
                 ["ipAddress"] = submission.IpAddress ?? string.Empty,
                 ["pageUrl"] = submission.PageUrl ?? string.Empty,
-                ["values"] = submission.Values.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.ValueKind == JsonValueKind.String
-                        ? kvp.Value.GetString() ?? string.Empty
-                        : kvp.Value.GetRawText()
-                )
+                ["values"] = submission.Values
             };
 
             return JsonSerializer.Serialize(dict);

@@ -30,7 +30,7 @@ namespace SproutForms.Core.Flows
             if (string.IsNullOrEmpty(config.WebhookUrl))
                 return new WorkflowExecutionResult(false, "Slack webhook URL is required");
 
-            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission);
+            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
 
             var payload = BuildSlackPayload(resolvedMessage, context.Submission, context.Version);
 
@@ -57,14 +57,6 @@ namespace SproutForms.Core.Flows
 
         private object BuildSlackPayload(string message, FormSubmission submission, FormVersion version)
         {
-            var fields = submission.Values
-                .Where(v => !string.IsNullOrEmpty(v.Value.GetString()))
-                .Select(v => new
-                {
-                    type = "mrkdwn",
-                    text = $"*{version.Definition.Fields.First(it => it.Alias == v.Key).Label}:*\n{v.Value.GetString()}"
-                })
-                .ToList();
             var blocks = new List<object>
             {
                 new
@@ -73,26 +65,20 @@ namespace SproutForms.Core.Flows
                     text = new
                     {
                         type = "mrkdwn",
-                        text = "New submission:\r\n" + message + "\r\n" + string.Join("\r\n", fields.Select(it => it.text))
+                        text = message
                     }
                 }
             };
-
-            if (fields.Count > 0)
-            {
-                blocks.Add(new
-                {
-                    type = "section",
-                    fields = fields.Take(10).ToList()
-                });
-            }
 
             return new { blocks };
         }
 
         public object GetDefaultConfiguration()
         {
-            return new SlackWorkflowConfig();
+            return new SlackWorkflowConfig()
+            {
+                Message = "A new submission has been submitted:\r\n#AllValues"
+            };
         }
     }
 }

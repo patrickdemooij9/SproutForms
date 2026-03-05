@@ -1,5 +1,6 @@
 using System.Text.Json;
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.Database;
 using Umbraco.Cms.Infrastructure.Scoping;
@@ -10,10 +11,12 @@ namespace SproutForms.Umbraco.Core.Repositories
     public class WorkflowTemplateRepository : IWorkflowTemplateRepository
     {
         private readonly IScopeProvider _scopeProvider;
+        private readonly IFormWorkflowType[] _formWorkflowTypes;
 
-        public WorkflowTemplateRepository(IScopeProvider scopeProvider)
+        public WorkflowTemplateRepository(IScopeProvider scopeProvider, IEnumerable<IFormWorkflowType> formWorkflowTypes)
         {
             _scopeProvider = scopeProvider;
+            _formWorkflowTypes = formWorkflowTypes.ToArray();
         }
 
         public WorkflowTemplate? GetById(Guid id)
@@ -77,7 +80,7 @@ namespace SproutForms.Umbraco.Core.Repositories
 
             entity.Name = template.Name;
             entity.WorkflowTypeAlias = template.WorkflowTypeAlias;
-            entity.ConfigurationJson = template.Configuration.GetRawText();
+            entity.ConfigurationJson = JsonSerializer.Serialize(template.Configuration);
             entity.LockedFieldsJson = JsonSerializer.Serialize(template.LockedFields);
             entity.UpdatedAt = DateTime.UtcNow;
 
@@ -91,17 +94,19 @@ namespace SproutForms.Umbraco.Core.Repositories
             scope.Database.Delete<WorkflowTemplateEntity>(id);
         }
 
-        private static WorkflowTemplate MapToModel(WorkflowTemplateEntity entity)
+        private WorkflowTemplate MapToModel(WorkflowTemplateEntity entity)
         {
+            var workflowType = _formWorkflowTypes.First(it => it.Alias == entity.WorkflowTypeAlias);
+
             var lockedFields = JsonSerializer.Deserialize<List<string>>(entity.LockedFieldsJson) ?? [];
-            var configuration = JsonSerializer.Deserialize<JsonElement>(entity.ConfigurationJson);
+            var configuration = JsonSerializer.Deserialize(entity.ConfigurationJson, workflowType.ConfigurationType);
 
             return new WorkflowTemplate
             {
                 Id = entity.Id,
                 Name = entity.Name,
                 WorkflowTypeAlias = entity.WorkflowTypeAlias,
-                Configuration = configuration,
+                Configuration = configuration!,
                 LockedFields = lockedFields,
                 CreatedAt = entity.CreatedAt,
                 UpdatedAt = entity.UpdatedAt

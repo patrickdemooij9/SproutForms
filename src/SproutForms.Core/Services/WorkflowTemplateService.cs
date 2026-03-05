@@ -30,41 +30,20 @@ namespace SproutForms.Core.Services
                 return;
 
             var templateConfig = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
-                template.Configuration.GetRawText());
+                JsonSerializer.Serialize(template.Configuration));
 
             if (templateConfig is null)
                 return;
 
-            var mergedConfig = new Dictionary<string, JsonElement>();
-
             foreach (var templateKey in templateConfig.Keys)
             {
-                if (templateConfig.TryGetValue(templateKey, out var templateValue))
+                if (templateConfig.TryGetValue(templateKey, out var templateValue) && template.LockedFields.Contains(templateKey))
                 {
-                    if (template.LockedFields.Contains(templateKey))
-                    {
-                        mergedConfig[templateKey] = templateValue;
-                    }
-                    else if (workflowConfig.TryGetValue(templateKey, out var workflowValue))
-                    {
-                        mergedConfig[templateKey] = workflowValue;
-                    }
-                    else
-                    {
-                        mergedConfig[templateKey] = templateValue;
-                    }
+                    workflowConfig[templateKey] = templateValue;
                 }
             }
 
-            foreach (var workflowKey in workflowConfig.Keys)
-            {
-                if (!mergedConfig.ContainsKey(workflowKey))
-                {
-                    mergedConfig[workflowKey] = workflowConfig[workflowKey];
-                }
-            }
-
-            workflow.Configuration = mergedConfig;
+            workflow.Configuration = JsonSerializer.Deserialize(JsonSerializer.Serialize(workflowConfig), workflow.Configuration.GetType())!;
         }
 
         public void ResolveFormWorkflows(IEnumerable<FormWorkflow> workflows)

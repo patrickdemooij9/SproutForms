@@ -12,12 +12,6 @@ namespace SproutForms.Core.Builders.Flows
             return this;
         }
 
-        public CustomPostWorkflowConfigBuilder Method(string method)
-        {
-            _config.Method = method;
-            return this;
-        }
-
         internal CustomPostWorkflowConfig Build() => _config;
     }
 }

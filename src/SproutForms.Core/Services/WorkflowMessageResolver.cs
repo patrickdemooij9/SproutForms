@@ -8,7 +8,7 @@ namespace SproutForms.Core.Services
     {
         private static readonly Regex TokenPattern = new Regex(@"#([a-zA-Z_][a-zA-Z0-9_]*)", RegexOptions.Compiled);
 
-        public static string ResolveTokens(string template, FormSubmission submission)
+        public static string ResolveTokens(string template, FormSubmission submission, FormVersion formVersion)
         {
             if (string.IsNullOrEmpty(template))
                 return template;
@@ -16,12 +16,20 @@ namespace SproutForms.Core.Services
             return TokenPattern.Replace(template, match =>
             {
                 var fieldAlias = match.Groups[1].Value;
-                return GetFieldValue(fieldAlias, submission);
+                return GetFieldValue(fieldAlias, submission, formVersion);
             });
         }
 
-        private static string GetFieldValue(string fieldAlias, FormSubmission submission)
+        private static string GetFieldValue(string fieldAlias, FormSubmission submission, FormVersion formVersion)
         {
+            if (fieldAlias.Equals("AllValues", StringComparison.InvariantCultureIgnoreCase))
+            {
+                var fields = submission.Values
+                .Where(v => !string.IsNullOrEmpty(v.Value.GetString()))
+                .Select(v => $"*{formVersion.Definition.Fields.First(it => it.Alias == v.Key).Label}:*\n{v.Value.GetString()}")
+                .ToList();
+                return string.Join("\r\n", fields);
+            }
             if (submission.Values.TryGetValue(fieldAlias, out var jsonElement))
             {
                 try
