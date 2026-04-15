@@ -71,6 +71,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFieldDescriptor, DateFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, SelectFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, RadioFieldDescriptor>();
+            builder.Services.AddSingleton<IFieldDescriptor, CheckboxFieldDescriptor>();
 
             builder.Services.AddSingleton<IOutcomeDescriptor, ShowMessageOutcomeDescriptor>();
             builder.Services.AddSingleton<IOutcomeDescriptor, RedirectUrlOutcomeDescriptor>();
