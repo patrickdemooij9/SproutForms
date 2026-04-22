@@ -72,6 +72,9 @@ namespace SproutForms.Core.Controllers
                     TempData[$"{formVersion.FormId}:FormValues"] = JsonSerializer.Serialize(values);
                     return Redirect(Request.Headers["Referer"].ToString());
                 }
+
+                foreach (var guardField in _formSubmissionGuard.GetFormFields())
+                    values.Remove(guardField.Name);
             }
 
             if (Request.Form.Files.Any())
