@@ -49,6 +49,7 @@ namespace SproutForms.Umbraco.Core.Services
                 Id = version.FormId,
                 Rows = version.Definition.Rows.Select(it => BuildRow(it, version.Definition.Fields.ToArray())).ToList(),
                 SubmissionGuards = submissionGuards,
+                GuardFields = _formSubmissionGuard?.GetFormFields().ToList() ?? [],
                 HasErrors = _errors.Count > 0
             };
         }

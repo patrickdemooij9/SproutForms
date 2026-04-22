@@ -25,5 +25,20 @@ namespace SproutForms.Core.Models.SubmissionGuard
         {
             return null;
         }
+
+        public IEnumerable<GuardFormField> GetFormFields()
+        {
+            yield return new GuardFormField
+            {
+                Name = HoneypotFieldName,
+                Type = "text",
+                Id = HoneypotFieldName,
+                Label = "Leave this field empty",
+                Value = "",
+                VisuallyHidden = true,
+                AutoComplete = "off",
+                TabIndex = -1
+            };
+        }
     }
 }

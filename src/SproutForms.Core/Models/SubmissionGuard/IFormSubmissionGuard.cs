@@ -6,5 +6,6 @@
 
         Task<SubmissionGuardResult> EvaluateAsync(Dictionary<string, string> postedValues);
         object? GetFrontendSettings();
+        IEnumerable<GuardFormField> GetFormFields() => [];
     }
 }
