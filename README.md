@@ -25,6 +25,11 @@ Installation is simple with just a few steps being required.
 4) Add the following to your "_ViewImports.cshtml": `@addTagHelper *, SproutForms.Umbraco.Core`
 5) You can now render your forms by using `<vc:render-form form-alias="testFileForm"></vc:render-form>` or `<vc:render-form form-id="[guid]"></vc:render-form>`
 
+## Spam protection
+
+By default, SproutForms includes a simple honeypot field to reduce bot spam on form submissions.
+If you prefer reCAPTCHA v3, enable it in your setup to replace the default submission guard.
+
 ## Contents
 
 SproutForms currently supports these field types:

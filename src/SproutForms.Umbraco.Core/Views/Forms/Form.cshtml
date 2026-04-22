@@ -13,6 +13,10 @@
         <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)'>
             @Html.AntiForgeryToken()
             <input type="hidden" name="sf_PageUrl" value="" data-sf-page-url="true" />
+            <div style="position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden;" aria-hidden="true">
+                <label for="sf_Honeypot">Leave this field empty</label>
+                <input id="sf_Honeypot" type="text" name="sf_Honeypot" value="" tabindex="-1" autocomplete="off" />
+            </div>
             @foreach (var row in Model.Rows)
             {
                 <div class="form-row">

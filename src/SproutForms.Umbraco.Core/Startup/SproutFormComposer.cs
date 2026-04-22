@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SproutForms.Core.Fields;
 using SproutForms.Core.Flows;
 using SproutForms.Core.Models;
@@ -100,7 +101,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
 
-            builder.Services.AddSingleton<IFormSubmissionGuard, NoFormSubmissionGuard>();
+            builder.Services.TryAddSingleton<IFormSubmissionGuard, HoneypotFormSubmissionGuard>();
 
             builder.Services.AddCodeFirstForms((it) => { });
 
