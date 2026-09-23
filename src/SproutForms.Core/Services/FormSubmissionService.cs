@@ -64,7 +64,7 @@ namespace SproutForms.Core.Services
 
                 var fieldType = _fieldTypes.First(it => it.Alias == field.FieldTypeAlias);
 
-                if (fieldType is IFormTypeRequiredHandler requiredHandler) // Additional required logic for checkboxes
+                if (isRequired && fieldType is IFormTypeRequiredHandler requiredHandler) // Additional required logic for checkboxes
                 {
                     var result = requiredHandler.CheckForRequired(rawValue.ToString() ?? string.Empty);
                     if (!result.IsValid)
@@ -179,20 +179,13 @@ namespace SproutForms.Core.Services
             if (context == null)
                 return null;
 
-            try
-            {
-                var requestHost = new Uri(pageUrl).Host;
-                var currentHost = context.Request.Host.Host;
+            if (!Uri.TryCreate(pageUrl, UriKind.Absolute, out var uri))
+                return null;
 
-                if (string.Equals(requestHost, currentHost, StringComparison.OrdinalIgnoreCase))
-                    return pageUrl;
-            }
-            catch
-            {
-                return pageUrl;
-            }
-
-            return null;
+            var currentHost = context.Request.Host.Host;
+            return string.Equals(uri.Host, currentHost, StringComparison.OrdinalIgnoreCase)
+                ? pageUrl
+                : null;
         }
     }
 

@@ -2,6 +2,7 @@
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.Flows.Email;
+using System.Net;
 using System.Text;
 using System.Text.Json;
 
@@ -52,7 +53,10 @@ namespace SproutForms.Core.Flows
 
             foreach (var field in submission.Values)
             {
-                sb.AppendLine($"{field.Key}: {field.Value}");
+                var value = field.Value.ValueKind == JsonValueKind.String
+                    ? field.Value.GetString()
+                    : field.Value.GetRawText();
+                sb.AppendLine($"{WebUtility.HtmlEncode(field.Key)}: {WebUtility.HtmlEncode(value)}");
                 sb.AppendLine("<br/>");
             }
 

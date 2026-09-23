@@ -475,6 +475,9 @@ umbraco-package-schema.json
 /umbraco/Data/*.sqlite.db-shm
 /umbraco/Data/*.sqlite.db-wal
 
+# AiTest environment: throwaway database and mail pickup folder
+/umbraco/Data/AiTest/
+
 # Log files
 /umbraco/Logs/
 

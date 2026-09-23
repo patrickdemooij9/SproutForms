@@ -21,7 +21,7 @@ namespace SproutForms.Core.Models.Flows
         public string? LastError { get; set; }
 
         public DateTime CreatedUtc { get; init; }
-        public DateTime? NextAttemptUtc { get; init; }
+        public DateTime? NextAttemptUtc { get; set; }
         public DateTime? StartedUtc { get; set; }
         public DateTime? CompletedUtc { get; set; }
     }

@@ -1,0 +1,15 @@
+@model string
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>AI test: @Model</title>
+        <render-form-dependencies></render-form-dependencies>
+    </head>
+    <body>
+        <vc:render-form form-alias="@Model"></vc:render-form>
+    </body>
+</html>

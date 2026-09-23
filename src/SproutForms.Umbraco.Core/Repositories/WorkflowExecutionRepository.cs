@@ -11,6 +11,8 @@ namespace SproutForms.Umbraco.Core.Repositories
 {
     public class WorkflowExecutionRepository : IWorkflowExecutionRepository
     {
+        private static readonly TimeSpan StaleRunningTimeout = TimeSpan.FromMinutes(15);
+
         private readonly IScopeProvider _scopeProvider;
 
         public WorkflowExecutionRepository(IScopeProvider scopeProvider)
@@ -42,15 +44,24 @@ namespace SproutForms.Umbraco.Core.Repositories
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
 
             // I am not sure how to change this to an NPOCO in code query, so using raw SQL for now.
+            // Executions still Running after the timeout were interrupted (e.g. an app restart) and are picked up again.
             var utcNow = DateTime.UtcNow;
             var entities = await scope.Database.FetchAsync<WorkflowExecutionEntity>(@"
     SELECT *
     FROM SproutForms_WorkflowExecutions AS w
     WHERE
-        w.Status IN (@0, @1)
-        AND (
-            w.NextAttemptUtc IS NULL
-            OR w.NextAttemptUtc <= @2
+        (
+            (
+                w.Status IN (@0, @1)
+                AND (
+                    w.NextAttemptUtc IS NULL
+                    OR w.NextAttemptUtc <= @2
+                )
+            )
+            OR (
+                w.Status = @4
+                AND w.StartedUtc <= @5
+            )
         )
         AND NOT EXISTS (
             SELECT 1
@@ -67,7 +78,9 @@ namespace SproutForms.Umbraco.Core.Repositories
                 (int)WorkflowExecutionStatus.Pending,
                 (int)WorkflowExecutionStatus.Retrying,
                 utcNow,
-                (int)WorkflowExecutionStatus.Succeeded
+                (int)WorkflowExecutionStatus.Succeeded,
+                (int)WorkflowExecutionStatus.Running,
+                utcNow.Subtract(StaleRunningTimeout)
             ]
             );
 

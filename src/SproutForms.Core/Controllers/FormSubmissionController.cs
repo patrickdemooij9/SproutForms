@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json.Linq;
+using SproutForms.Core.Fields.Configs;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Models.SubmissionGuard;
@@ -72,6 +73,12 @@ namespace SproutForms.Core.Controllers
                     TempData[$"{formVersion.FormId}:FormValues"] = JsonSerializer.Serialize(values);
                     return Redirect(Request.Headers["Referer"].ToString());
                 }
+            }
+
+            // File field values may only come from an actual upload, never from a posted text value
+            foreach (var fileField in formVersion.Definition.Fields.Where(f => f.Configuration is FileFieldConfig))
+            {
+                values.Remove(fileField.Alias);
             }
 
             if (Request.Form.Files.Any())
