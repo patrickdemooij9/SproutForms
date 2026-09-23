@@ -11,5 +11,8 @@ namespace SproutForms.Core.Models
 
         public IReadOnlyDictionary<string, JsonElement> Values { get; init; }
             = new Dictionary<string, JsonElement>();
+
+        // The saved submission; null when it was rejected
+        public FormSubmission? Submission { get; init; }
     }
 }

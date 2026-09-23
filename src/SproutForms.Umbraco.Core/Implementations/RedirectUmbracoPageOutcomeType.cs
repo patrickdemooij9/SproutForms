@@ -22,18 +22,18 @@ namespace SproutForms.Umbraco.Core.Implementations
             return new RedirectUmbracoPageOutcomeConfig();
         }
 
-        public OutcomeResult Handle(object configuration)
+        public Task<OutcomeResult> HandleAsync(FormSubmitOutcomeContext context, CancellationToken cancellationToken)
         {
-            var config = (RedirectUmbracoPageOutcomeConfig)configuration;
+            var config = (RedirectUmbracoPageOutcomeConfig)context.Configuration;
             using var ctx = _umbracoContextFactory.EnsureUmbracoContext();
-            return new OutcomeResult
+            return Task.FromResult(new OutcomeResult
             {
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
                     ["url"] = ctx.UmbracoContext.Content.GetById(config.NodeKey!.Value)?.Url()
                 }
-            };
+            });
         }
     }
 }

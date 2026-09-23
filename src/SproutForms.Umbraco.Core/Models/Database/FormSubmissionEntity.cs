@@ -32,5 +32,10 @@ namespace SproutForms.Umbraco.Core.Models.Database
         [Column("PageUrl")]
         [NullSetting(NullSetting = NullSettings.Null)]
         public string? PageUrl { get; set; }
+
+        [Column("ResultsJson")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
+        public string? ResultsJson { get; set; }
     }
 }

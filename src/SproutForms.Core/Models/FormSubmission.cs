@@ -15,5 +15,8 @@ namespace SproutForms.Core.Models
         public string? PageUrl { get; set; }
 
         public IReadOnlyDictionary<string, JsonElement> Values { get; init; } = new Dictionary<string, JsonElement>();
+
+        // What the form's type computed from the values, such as a quiz score
+        public IReadOnlyDictionary<string, JsonElement> Results { get; init; } = new Dictionary<string, JsonElement>();
     }
 }

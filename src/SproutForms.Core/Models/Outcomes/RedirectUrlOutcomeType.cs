@@ -14,17 +14,17 @@ namespace SproutForms.Core.Models.Outcomes
             return new RedirectUrlOutcomeConfig();
         }
 
-        public OutcomeResult Handle(object configuration)
+        public Task<OutcomeResult> HandleAsync(FormSubmitOutcomeContext context, CancellationToken cancellationToken)
         {
-            var config = (RedirectUrlOutcomeConfig) configuration;
-            return new OutcomeResult
+            var config = (RedirectUrlOutcomeConfig) context.Configuration;
+            return Task.FromResult(new OutcomeResult
             {
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
                     ["url"] = config.RedirectUrl
                 }
-            };
+            });
         }
     }
 }

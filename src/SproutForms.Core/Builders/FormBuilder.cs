@@ -40,11 +40,17 @@ namespace SproutForms.Core.Builders
             return this;
         }
 
-        internal FormBuilder SetOutcome(IFormSubmitOutcomeType outcome, object configuration)
+        public FormBuilder SetOutcome(IFormSubmitOutcomeType outcome, object configuration)
+            => SetOutcome(outcome.Alias, configuration);
+
+        /// <summary>
+        /// Sets what the visitor sees after a successful submit, using any registered outcome type.
+        /// </summary>
+        public FormBuilder SetOutcome(string outcomeTypeAlias, object configuration)
         {
             _outcome = new FormSubmitOutcome
             {
-                OutcomeTypeAlias = outcome.Alias,
+                OutcomeTypeAlias = outcomeTypeAlias,
                 Configuration = configuration
             };
             return this;

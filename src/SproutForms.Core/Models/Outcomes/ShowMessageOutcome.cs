@@ -17,17 +17,17 @@ namespace SproutForms.Core.Models.Outcomes
             };
         }
 
-        public OutcomeResult Handle(object configuration)
+        public Task<OutcomeResult> HandleAsync(FormSubmitOutcomeContext context, CancellationToken cancellationToken)
         {
-            var config = (ShowMessageOutcomeConfig) configuration;
-            return new OutcomeResult
+            var config = (ShowMessageOutcomeConfig) context.Configuration;
+            return Task.FromResult(new OutcomeResult
             {
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
                     ["message"] = config.Message
                 }
-            };
+            });
         }
     }
 }

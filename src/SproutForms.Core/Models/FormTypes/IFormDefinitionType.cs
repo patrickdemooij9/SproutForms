@@ -17,5 +17,11 @@ namespace SproutForms.Core.Models.FormTypes
         bool AllowsOutcomeType(IFormSubmitOutcomeType outcomeType);
 
         IReadOnlyCollection<IFormFieldExtension> FieldExtensions { get; }
+
+        /// <summary>
+        /// Runs after field validation, before the submission is saved. Returns results to store with the submission, such as a
+        /// quiz score, or errors that reject it.
+        /// </summary>
+        Task<FormTypeSubmissionResult> ProcessSubmissionAsync(FormTypeSubmissionContext context, CancellationToken cancellationToken);
     }
 }

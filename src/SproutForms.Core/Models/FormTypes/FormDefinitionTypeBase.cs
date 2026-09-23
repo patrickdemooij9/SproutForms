@@ -18,6 +18,21 @@ namespace SproutForms.Core.Models.FormTypes
 
         public virtual bool AllowsOutcomeType(IFormSubmitOutcomeType outcomeType) => true;
 
+        public virtual Task<FormTypeSubmissionResult> ProcessSubmissionAsync(FormTypeSubmissionContext context, CancellationToken cancellationToken)
+            => Task.FromResult(FormTypeSubmissionResult.None);
+
+        /// <summary>
+        /// The form's settings for this type, typed.
+        /// </summary>
+        protected static TSettings GetSettings(FormDefinition definition)
+            => definition.Type.Settings as TSettings ?? new TSettings();
+
+        /// <summary>
+        /// A field's settings for the extension this type adds to its field type; defaults when the field has none.
+        /// </summary>
+        protected static TFieldSettings GetFieldSettings<TFieldSettings>(FormField field) where TFieldSettings : class, new()
+            => field.Extension?.Settings as TFieldSettings ?? new TFieldSettings();
+
         /// <summary>
         /// Adds settings of <typeparamref name="TFieldSettings"/> to every field of the given field type in a form of this type.
         /// </summary>
