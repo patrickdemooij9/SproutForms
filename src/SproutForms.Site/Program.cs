@@ -1,7 +1,20 @@
 using SproutForms.Core.Registry;
 using SproutForms.Site.Code;
+using System.Security.Cryptography;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+if (builder.Environment.IsEnvironment("AiTest"))
+{
+    // Throwaway admin for the unattended install; nobody signs in to this environment
+    builder.Configuration["Umbraco:CMS:Unattended:UnattendedUserPassword"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+    builder.Services.AddCodeFirstForms(it =>
+    {
+        it.Add<TestFormCode>();
+        it.Add<TestFileFormCode>();
+        it.Add<AiTestRequiredCheckboxForm>();
+    });
+}
 
 builder.CreateUmbracoBuilder()
     .AddBackOffice()

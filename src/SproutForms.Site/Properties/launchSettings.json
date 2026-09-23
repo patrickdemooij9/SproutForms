@@ -23,7 +23,16 @@
       "applicationUrl": "https://localhost:44388;http://localhost:62959",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
-      }      
+      }
+    },
+    "AiTest": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:62970",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "AiTest"
+      }
     }
   }
 }

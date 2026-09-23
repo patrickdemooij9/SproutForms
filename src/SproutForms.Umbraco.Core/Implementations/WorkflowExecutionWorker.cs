@@ -1,51 +1,54 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using Umbraco.Cms.Infrastructure.BackgroundJobs;
 
 namespace SproutForms.Umbraco.Core.Implementations
 {
     public class WorkflowExecutionWorker : IRecurringBackgroundJob
     {
-        private readonly IServiceScopeFactory _scopeFactory;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IWorkflowRunner _workflowRunner;
+        private readonly ILogger<WorkflowExecutionWorker> _logger;
 
         public TimeSpan Period => TimeSpan.FromSeconds(10);
         public TimeSpan Delay => TimeSpan.FromSeconds(1);
 
         public event EventHandler PeriodChanged { add { } remove { } }
 
-        public WorkflowExecutionWorker(IServiceScopeFactory scopeFactory,
-            IWorkflowExecutionRepository workflowExecutionRepository,
-            IWorkflowRunner workflowRunner)
+        public WorkflowExecutionWorker(IWorkflowExecutionRepository workflowExecutionRepository,
+            IWorkflowRunner workflowRunner,
+            ILogger<WorkflowExecutionWorker> logger)
         {
-            _scopeFactory = scopeFactory;
             _workflowExecutionRepository = workflowExecutionRepository;
             _workflowRunner = workflowRunner;
+            _logger = logger;
         }
 
         public async Task RunJobAsync()
         {
+            WorkflowExecution[] pendingExecutions;
             try
             {
-                using var scope = _scopeFactory.CreateScope();
-                var pendingExecutions = await _workflowExecutionRepository.GetPendingExecutions(10);
+                pendingExecutions = await _workflowExecutionRepository.GetPendingExecutions(10);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not fetch pending workflow executions");
+                return;
+            }
 
-                ExecutionContext.SuppressFlow();
-                foreach (var execution in pendingExecutions)
+            foreach (var execution in pendingExecutions)
+            {
+                try
                 {
                     await _workflowRunner.ExecuteWorkflowAsync(execution, CancellationToken.None);
                 }
-                ExecutionContext.RestoreFlow();
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Workflow execution {ExecutionId} ({WorkflowAlias}) failed", execution.Id, execution.WorkflowAlias);
+                }
             }
-            catch(Exception ex)
-            {
-                // Log exception
-            }   
         }
     }
 }

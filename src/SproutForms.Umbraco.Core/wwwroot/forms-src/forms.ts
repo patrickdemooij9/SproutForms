@@ -243,7 +243,7 @@ document.addEventListener("submit", async function (e) {
     clearErrors(form);
 
     if (!response.ok) {
-        applyErrors(form, result.errors || {}, result.values || {});
+        applyErrors(form, result.errors || {});
         return;
     }
 
@@ -547,12 +547,9 @@ function clearErrors(form: HTMLFormElement) {
     });
 }
 
-function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>, values: Record<string, unknown>) {
-    for (const key in values) {
-        const input = form.querySelector(`[name="${key}"]`) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-        if (input) input.value = String(values[key]);
-    }
-
+// The inputs still hold what the visitor entered, so only the errors are applied. Writing the
+// echoed values back would overwrite the value attribute of checkboxes and radios.
+function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>) {
     for (const fieldId in errors) {
         const messages = errors[fieldId];
         const input = form.querySelector(`[data-sf-field-id="${fieldId}"]`)

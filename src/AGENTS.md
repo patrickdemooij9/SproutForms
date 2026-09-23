@@ -77,7 +77,4 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 
 ## Testing
 
-Run tests with:
-```bash
-dotnet test
-```
+There is no automated test project yet. To verify a change end-to-end in a running site (throwaway SQLite database, emails captured to disk), follow the `verify-in-site` skill in `.claude/skills/verify-in-site/SKILL.md`. It uses the `AiTest` launch profile of `SproutForms.Site`.

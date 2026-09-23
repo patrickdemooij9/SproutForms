@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using SproutForms.Core.Models.SubmissionGuard;
 using System.Net.Http.Json;
 
@@ -6,14 +6,14 @@ namespace SproutForms.Umbraco.Core.Implementations
 {
     public class RecaptchaV3SubmissionGuard : IFormSubmissionGuard
     {
-        private readonly HttpClient _httpClient;
+        private readonly IHttpClientFactory _httpClientFactory;
         private readonly RecaptchaV3Options _config;
 
         public string Alias => "recaptchaV3";
 
-        public RecaptchaV3SubmissionGuard(HttpClient httpClient, IOptions<RecaptchaV3Options> options)
+        public RecaptchaV3SubmissionGuard(IHttpClientFactory httpClientFactory, IOptions<RecaptchaV3Options> options)
         {
-            _httpClient = httpClient;
+            _httpClientFactory = httpClientFactory;
             _config = options.Value;
         }
 
@@ -28,14 +28,19 @@ namespace SproutForms.Umbraco.Core.Implementations
             };
 
                 using var content = new FormUrlEncodedContent(parameters);
-                var response = await _httpClient.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.PostAsync("https://www.google.com/recaptcha/api/siteverify", content);
 
                 if (!response.IsSuccessStatusCode)
                     return new SubmissionGuardResult() { Allowed = false, ErrorMessage = "Recaptcha failed" };
                 else
                 {
                     var responseContent = await response.Content.ReadFromJsonAsync<RecaptchaV3VerifyResultModel>();
-                    if (responseContent is null || !responseContent.Success)
+                    // v3 returns success for any valid token, bots included; the score is what tells them apart
+                    if (responseContent is null
+                        || !responseContent.Success
+                        || responseContent.Score < _config.MinimumScore
+                        || !string.Equals(responseContent.Action, _config.Action, StringComparison.Ordinal))
                         return new SubmissionGuardResult() { Allowed = false, ErrorMessage = "Recaptcha failed" };
                     return new SubmissionGuardResult { Allowed = true };
                 }
@@ -48,6 +53,7 @@ namespace SproutForms.Umbraco.Core.Implementations
             return new
             {
                 SiteKey = _config.SiteKey,
+                Action = _config.Action,
             };
         }
     }

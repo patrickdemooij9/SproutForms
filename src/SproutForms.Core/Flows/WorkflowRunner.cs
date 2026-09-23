@@ -7,6 +7,8 @@ namespace SproutForms.Core.Flows
 {
     public class WorkflowRunner : IWorkflowRunner
     {
+        private const int MaxAttempts = 5;
+
         private readonly IFormWorkflowType[] _formWorkflowTypes;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IFormVersionRepository _formVersionRepository;
@@ -54,9 +56,10 @@ namespace SproutForms.Core.Flows
                     execution.CompletedUtc = DateTime.UtcNow;
                     execution.LastError = null;
                 }
-                else if (result.Retryable)
+                else if (result.Retryable && execution.AttemptCount < MaxAttempts)
                 {
                     execution.Status = WorkflowExecutionStatus.Retrying;
+                    execution.NextAttemptUtc = DateTime.UtcNow.Add(GetRetryDelay(execution.AttemptCount));
                     execution.LastError = result.Error;
                 }
                 else
@@ -69,10 +72,17 @@ namespace SproutForms.Core.Flows
             catch (Exception ex)
             {
                 execution.Status = WorkflowExecutionStatus.Failed;
+                execution.CompletedUtc = DateTime.UtcNow;
                 execution.LastError = ex.Message;
             }
 
             await _workflowExecutionRepository.SaveExecution(execution);
+        }
+
+        // 1, 2, 4, 8 minutes between attempts
+        private static TimeSpan GetRetryDelay(int attemptCount)
+        {
+            return TimeSpan.FromMinutes(Math.Pow(2, attemptCount - 1));
         }
     }
 }
