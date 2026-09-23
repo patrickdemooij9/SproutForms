@@ -2,6 +2,7 @@
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.Flows.Email;
+using SproutForms.Core.Services;
 using System.Net;
 using System.Text;
 using System.Text.Json;
@@ -53,9 +54,7 @@ namespace SproutForms.Core.Flows
 
             foreach (var field in submission.Values)
             {
-                var value = field.Value.ValueKind == JsonValueKind.String
-                    ? field.Value.GetString()
-                    : field.Value.GetRawText();
+                var value = WorkflowMessageResolver.GetDisplayValue(field.Value) ?? string.Empty;
                 sb.AppendLine($"{WebUtility.HtmlEncode(field.Key)}: {WebUtility.HtmlEncode(value)}");
                 sb.AppendLine("<br/>");
             }

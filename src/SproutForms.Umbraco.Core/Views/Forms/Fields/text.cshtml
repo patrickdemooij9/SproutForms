@@ -3,26 +3,16 @@
 @model FormFieldViewModel
 @{
     var config = (TextFieldConfig)Model.Configuration;
-    var dataAttrs = new List<string>();
-    
-    if (config.MinLength.HasValue)
-    {
-        dataAttrs.Add($"data-sf-min=\"{config.MinLength.Value}\"");
-    }
-    if (config.MaxLength.HasValue)
-    {
-        dataAttrs.Add($"data-sf-max=\"{config.MaxLength.Value}\"");
-    }
-    if (!string.IsNullOrWhiteSpace(config.Regex))
-    {
-        dataAttrs.Add($"data-sf-pattern=\"{config.Regex}\"");
-    }
+    var pattern = string.IsNullOrWhiteSpace(config.Regex) ? null : config.Regex;
 }
 
+@* Razor encodes these attribute values and leaves out the ones that are null *@
 <input type="text"
        id="@Model.Alias"
        name="@Model.Alias"
        value="@Model.Value"
        placeholder="@config.Placeholder"
        class="form-control"
-       @Html.Raw(string.Join(" ", dataAttrs)) />
+       data-sf-min="@config.MinLength"
+       data-sf-max="@config.MaxLength"
+       data-sf-pattern="@pattern" />

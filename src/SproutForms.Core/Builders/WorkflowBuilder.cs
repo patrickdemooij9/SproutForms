@@ -1,9 +1,5 @@
 using SproutForms.Core.Builders.Flows;
 using SproutForms.Core.Models.Flows;
-using System;
-using System.Collections.Generic;
-using System.Text;
-using System.Text.Json;
 
 namespace SproutForms.Core.Builders
 {
@@ -17,21 +13,7 @@ namespace SproutForms.Core.Builders
         {
             var builder = new EmailWorkflowConfigBuilder();
             configure(builder);
-
-            var order = 0;
-            if (_workflows.Count > 0)
-            {
-                order = _workflows.Min(it => it.Order) + 1;
-            }
-
-            _workflows.Add(new FormWorkflow
-            {
-                Alias = alias,
-                Configuration = builder.Build(),
-                WorkflowTypeAlias = "email",
-                Order = order
-            });
-            return this;
+            return Add(alias, "email", builder.Build());
         }
 
         public WorkflowBuilder SendToSlack(
@@ -40,21 +22,7 @@ namespace SproutForms.Core.Builders
         {
             var builder = new SlackWorkflowConfigBuilder();
             configure(builder);
-
-            var order = 0;
-            if (_workflows.Count > 0)
-            {
-                order = _workflows.Min(it => it.Order) + 1;
-            }
-
-            _workflows.Add(new FormWorkflow
-            {
-                Alias = alias,
-                Configuration = builder.Build(),
-                WorkflowTypeAlias = "slack",
-                Order = order
-            });
-            return this;
+            return Add(alias, "slack", builder.Build());
         }
 
         public WorkflowBuilder SendToTeams(
@@ -63,21 +31,7 @@ namespace SproutForms.Core.Builders
         {
             var builder = new TeamsWorkflowConfigBuilder();
             configure(builder);
-
-            var order = 0;
-            if (_workflows.Count > 0)
-            {
-                order = _workflows.Min(it => it.Order) + 1;
-            }
-
-            _workflows.Add(new FormWorkflow
-            {
-                Alias = alias,
-                Configuration = builder.Build(),
-                WorkflowTypeAlias = "teams",
-                Order = order
-            });
-            return this;
+            return Add(alias, "teams", builder.Build());
         }
 
         public WorkflowBuilder PostToCustomEndpoint(
@@ -86,19 +40,18 @@ namespace SproutForms.Core.Builders
         {
             var builder = new CustomPostWorkflowConfigBuilder();
             configure(builder);
+            return Add(alias, "customPost", builder.Build());
+        }
 
-            var order = 0;
-            if (_workflows.Count > 0)
-            {
-                order = _workflows.Min(it => it.Order) + 1;
-            }
-
+        // Workflows run in the order they are added: each one waits until every workflow with a lower order has succeeded
+        private WorkflowBuilder Add(string alias, string workflowTypeAlias, object configuration)
+        {
             _workflows.Add(new FormWorkflow
             {
                 Alias = alias,
-                Configuration = builder.Build(),
-                WorkflowTypeAlias = "customPost",
-                Order = order
+                Configuration = configuration,
+                WorkflowTypeAlias = workflowTypeAlias,
+                Order = _workflows.Count == 0 ? 0 : _workflows.Max(it => it.Order) + 1
             });
             return this;
         }

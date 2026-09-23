@@ -25,6 +25,22 @@ Installation is simple with just a few steps being required.
 4) Add the following to your "_ViewImports.cshtml": `@addTagHelper *, SproutForms.Umbraco.Core`
 5) You can now render your forms by using `<vc:render-form form-alias="testFileForm"></vc:render-form>` or `<vc:render-form form-id="[guid]"></vc:render-form>`
 
+## Configuration
+
+Settings go in a `SproutForms` section in `appsettings.json`. All of them are optional:
+
+```json
+"SproutForms": {
+  "StoreIpAddress": false,
+  "LocalDiskFileStorage": {
+    "RootPath": "App_Data/SproutForms/Uploads"
+  }
+}
+```
+
+- `StoreIpAddress` (default `false`) stores the visitor's IP address with each submission. An IP address is personal data under the GDPR, so only turn this on when you have a reason to keep it. Behind a proxy or load balancer, configure ASP.NET Core's forwarded headers middleware, or you store the proxy's address instead of the visitor's.
+- `LocalDiskFileStorage:RootPath` is where uploaded files are stored, relative to the site's content root.
+
 ## Contents
 
 SproutForms currently supports these field types:

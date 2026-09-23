@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
+using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
+using SproutForms.Core.Services;
 
 namespace SproutForms.Site.Controllers
 {
@@ -14,17 +16,23 @@ namespace SproutForms.Site.Controllers
         private readonly IFormRepository _formRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
+        private readonly IWorkflowRunner _workflowRunner;
+        private readonly FormDeletionService _formDeletionService;
 
         public AiTestController(
             IWebHostEnvironment environment,
             IFormRepository formRepository,
             IFormSubmissionRepository formSubmissionRepository,
-            IWorkflowExecutionRepository workflowExecutionRepository)
+            IWorkflowExecutionRepository workflowExecutionRepository,
+            IWorkflowRunner workflowRunner,
+            FormDeletionService formDeletionService)
         {
             _environment = environment;
             _formRepository = formRepository;
             _formSubmissionRepository = formSubmissionRepository;
             _workflowExecutionRepository = workflowExecutionRepository;
+            _workflowRunner = workflowRunner;
+            _formDeletionService = formDeletionService;
         }
 
         public override void OnActionExecuting(ActionExecutingContext context)
@@ -84,6 +92,26 @@ namespace SproutForms.Site.Controllers
             }
 
             return Ok(new { total, items });
+        }
+
+        // The backoffice endpoints need a signed-in user; these call the same services so the flow can exercise them
+
+        [HttpPost("submissions/{submissionId:guid}/workflows/{workflowAlias}/retry")]
+        public async Task<IActionResult> RetryWorkflow(Guid submissionId, string workflowAlias)
+        {
+            var result = await _workflowRunner.RetryAsync(submissionId, workflowAlias);
+            return Ok(new { result = result.ToString() });
+        }
+
+        [HttpDelete("forms/{alias}")]
+        public async Task<IActionResult> DeleteForm(string alias)
+        {
+            var form = _formRepository.GetByAlias(alias);
+            if (form is null)
+                return NotFound($"No form with alias '{alias}'");
+
+            await _formDeletionService.DeleteAsync(form.Id);
+            return Ok(new { deleted = form.Id });
         }
     }
 }

@@ -141,6 +141,19 @@ namespace SproutForms.Umbraco.Core.Repositories
                 .ToArray();
         }
 
+        public async Task DeleteAllByForm(Guid formId)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            await scope.Database.ExecuteAsync(@"
+    DELETE FROM SproutForms_WorkflowExecutions
+    WHERE SubmissionId IN (
+        SELECT s.Id
+        FROM SproutForms_FormSubmissions AS s
+        INNER JOIN SproutForms_FormVersions AS v ON v.Id = s.FormVersionId
+        WHERE v.FormId = @0
+    )", formId);
+        }
+
         private WorkflowExecutionEntity ToEntity(WorkflowExecution execution)
         {
             return new WorkflowExecutionEntity

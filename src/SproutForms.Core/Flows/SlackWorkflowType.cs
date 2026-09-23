@@ -77,7 +77,7 @@ namespace SproutForms.Core.Flows
         {
             return new SlackWorkflowConfig()
             {
-                Message = "A new submission has been submitted:\r\n#AllValues"
+                Message = "A new submission has been submitted:\r\n{AllValues}"
             };
         }
     }

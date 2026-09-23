@@ -57,11 +57,27 @@ namespace SproutForms.Core.Fields
             {
                 return ValidationResult.Fail($"The field must be no more than {config.MaxLength.Value} characters long.");
             }
-            if (!string.IsNullOrWhiteSpace(config.Regex) && !Regex.IsMatch(value, config.Regex))
+            if (!string.IsNullOrWhiteSpace(config.Regex) && !MatchesRegex(value, config.Regex))
             {
                 return ValidationResult.Fail("Invalid format");
             }
             return ValidationResult.Success();
         }
+
+        // The pattern comes from the form's configuration and the input from the visitor; a pattern that backtracks
+        // badly would otherwise hold the request thread for as long as the input makes it take
+        private static bool MatchesRegex(string value, string pattern)
+        {
+            try
+            {
+                return Regex.IsMatch(value, pattern, RegexOptions.None, RegexMatchTimeout);
+            }
+            catch (RegexMatchTimeoutException)
+            {
+                return false;
+            }
+        }
+
+        private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(500);
     }
 }
