@@ -9,5 +9,6 @@ namespace SproutForms.Core.Repositories
         Task SaveExecution(WorkflowExecution execution);
         Task<WorkflowExecution[]> GetPendingExecutions(int take);
         Task<WorkflowExecution[]> GetBySubmissionId(Guid submissionId);
+        Task DeleteAllByForm(Guid formId);
     }
 }

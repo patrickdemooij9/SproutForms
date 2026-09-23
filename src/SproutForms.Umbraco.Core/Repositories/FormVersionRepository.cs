@@ -87,7 +87,8 @@ namespace SproutForms.Umbraco.Core.Repositories
         private void DoDelete(FormVersion version)
         {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
-            scope.Database.Delete<FormVersionEntity>(version);
+            // By primary key: given anything but a FormVersionEntity, NPoco binds the argument itself as the key value
+            scope.Database.Delete<FormVersionEntity>(version.Id);
         }
 
         public FormVersion? GetLatest(Guid formId)

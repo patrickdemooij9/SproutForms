@@ -13,6 +13,10 @@ if (builder.Environment.IsEnvironment("AiTest"))
         it.Add<TestFormCode>();
         it.Add<TestFileFormCode>();
         it.Add<AiTestRequiredCheckboxForm>();
+        it.Add<AiTestEdgeCasesForm>();
+        it.Add<AiTestFailingWorkflowForm>();
+        it.Add<AiTestWorkflowOrderForm>();
+        it.Add<AiTestUnknownOutcomeForm>();
     });
 }
 

@@ -79,6 +79,27 @@ namespace SproutForms.Core.Flows
             await _workflowExecutionRepository.SaveExecution(execution);
         }
 
+        public async Task<WorkflowRetryResult> RetryAsync(Guid submissionId, string workflowAlias)
+        {
+            var executions = await _workflowExecutionRepository.GetBySubmissionId(submissionId);
+            var execution = executions.FirstOrDefault(e => e.WorkflowAlias == workflowAlias);
+            if (execution is null)
+                return WorkflowRetryResult.NotFound;
+
+            // Pending, Running and Succeeded executions are already queued, in progress or done
+            if (execution.Status is not (WorkflowExecutionStatus.Failed or WorkflowExecutionStatus.Retrying))
+                return WorkflowRetryResult.NotRetryable;
+
+            // A manual retry starts a fresh series of attempts; LastError stays until the next run replaces it
+            execution.Status = WorkflowExecutionStatus.Pending;
+            execution.AttemptCount = 0;
+            execution.NextAttemptUtc = null;
+            execution.CompletedUtc = null;
+            await _workflowExecutionRepository.SaveExecution(execution);
+
+            return WorkflowRetryResult.Queued;
+        }
+
         // 1, 2, 4, 8 minutes between attempts
         private static TimeSpan GetRetryDelay(int attemptCount)
         {

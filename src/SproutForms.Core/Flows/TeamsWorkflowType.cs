@@ -84,7 +84,7 @@ namespace SproutForms.Core.Flows
         {
             return new TeamsWorkflowConfig
             {
-                Message = "A new submission has been submitted:\r\n#AllValues"
+                Message = "A new submission has been submitted:\r\n{AllValues}"
             };
         }
     }

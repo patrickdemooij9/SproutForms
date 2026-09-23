@@ -254,7 +254,19 @@ document.addEventListener("submit", async function (e) {
             return;
         }
     }
+
+    // The submission was saved, but there's no outcome to show (none configured, or no handler registered for it).
+    // Confirm it anyway, so the visitor doesn't think it failed and submit again.
+    showFallbackSuccess(form);
 });
+
+function showFallbackSuccess(form: HTMLFormElement) {
+    const success = document.createElement("div");
+    success.className = "form-success";
+    success.setAttribute("role", "status");
+    success.textContent = "Thank you, your submission has been received.";
+    form.replaceChildren(success);
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("form[data-form-ajax]").forEach(initForm);

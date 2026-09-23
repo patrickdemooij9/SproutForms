@@ -63,14 +63,14 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
     }
   }
 
-  #renderWorkflowActionButtons(_stage: {
+  #renderWorkflowActionButtons(stage: {
     workflowAlias: string;
     status: string;
   }) {
-    /* if (stage.status === "Failed") {
+    if (stage.status === "Failed" || stage.status === "Retrying") {
       return html`
-        <uui-button 
-          look="secondary" 
+        <uui-button
+          look="secondary"
           size="xs"
           @click=${() => this.#handleRetry(stage.workflowAlias)}
         >
@@ -78,8 +78,9 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
         </uui-button>
       `;
     }
-    
-    // TODO: Check if workflow supports manual approval based on workflow type configuration
+
+    // Approve/Decline return 501 until manual approval is designed
+    /* // TODO: Check if workflow supports manual approval based on workflow type configuration
     // For now, show Approve/Decline buttons for all non-completed workflows
     if (stage.status === "Pending" || stage.status === "Running") {
       return html`
@@ -106,12 +107,12 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
     return html``;
   }
 
-  /* async #handleRetry(workflowAlias: string) {
+  async #handleRetry(workflowAlias: string) {
     if (!this.submission) return;
-    
+
     const source = new SproutFormsSource(this);
     const result = await source.retryWorkflow(this.submission.id, workflowAlias);
-    
+
     if (result.data) {
       // Refresh the submission data to show updated status
       const response = await source.getSubmission(this.data!.submissionId);
@@ -119,7 +120,7 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
     }
   }
 
-  async #handleApprove(workflowAlias: string) {
+  /* async #handleApprove(workflowAlias: string) {
     if (!this.submission) return;
     
     const source = new SproutFormsSource(this);

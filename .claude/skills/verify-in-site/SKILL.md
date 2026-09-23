@@ -10,12 +10,20 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 - **Database:** a throwaway SQLite file at `src/SproutForms.Site/umbraco/Data/AiTest/`, installed unattended on first start. The admin password is random per start, so the backoffice is out of scope; never try to sign in.
 - **Forms:** code-first forms from `src/SproutForms.Site/Code/`, registered on startup in this environment only.
   - `testFormCode` and `testFileForm` are the demo forms.
-  - `aiTestRequiredCheckbox` is a regression form: one required and one optional checkbox.
+  - Regression forms, one per awkward case:
+    - `aiTestRequiredCheckbox`: one required and one optional checkbox.
+    - `aiTestEdgeCases`: a regex containing `"`, a regex that backtracks badly (`^(a+)+$`), and an upload field whose storage provider doesn't exist.
+    - `aiTestFailingWorkflow`: a Custom POST workflow to a dead port, so it always fails. Use it for retry and failure handling.
+    - `aiTestWorkflowOrder`: three workflows (email, dead-port Custom POST, email). The first should reach `Succeeded`, the second `Failed`, and the third stay `Pending` behind it. The stored `Order` values are 0, 1, 2.
+    - `aiTestUnknownOutcome`: its submit outcome type isn't registered. A submit is still saved, and `forms.js` shows its fallback confirmation.
 - **Email:** goes to the pickup folder `src/SproutForms.Site/umbraco/Data/AiTest/Mail/*.eml`. Nothing is ever delivered, whatever address a form's workflow names.
+- **Uploads:** stored in `src/SproutForms.Site/umbraco/Data/AiTest/Uploads/`, set by `SproutForms:LocalDiskFileStorage:RootPath` in `appsettings.AiTest.json`.
+- **Settings:** `appsettings.AiTest.json` also sets `SproutForms:StoreIpAddress` (`false`, the package default). Edits to it apply without a restart. Put it back when you're done.
 - **Test endpoints** (`src/SproutForms.Site/Controllers/AiTestController.cs`), which return 404 outside `AiTest`:
   - `GET /ai-test/forms` lists the forms, with alias and source.
   - `GET /ai-test/forms/{alias}` renders one form on a bare page, with the real `forms.js` and CSS.
-  - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values and every workflow execution (status, attempts, last error).
+  - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values, the IP address and every workflow execution (status, attempts, last error).
+  - `POST /ai-test/submissions/{submissionId}/workflows/{workflowAlias}/retry` and `DELETE /ai-test/forms/{alias}` call the same services as the backoffice's retry and delete, which need a signed-in user. Deleting a code-first form only lasts until the next start, when it is registered again.
 
 ## The loop
 
@@ -43,7 +51,15 @@ For a clean install (a schema or migration change, or leftover data getting in t
 pwsh -NoProfile -File scripts/ai-test/reset.ps1
 ```
 
-It deletes `umbraco/Data/AiTest/`, which holds the database and the mail. Uploaded files are not reset: `LocalDiskFileStorageProvider` writes to the shared `App_Data/SproutForms/Uploads`.
+It deletes `umbraco/Data/AiTest/`, which holds the database, the mail and the uploads.
+
+## Going below the UI
+
+Some cases can't be reached through the rendered form. Client-side validation stops the request, the browser pane can't pick a file, or you need a response header.
+
+- **Post directly from the page** with `javascript_tool`. Build a `FormData` holding the page's `__RequestVerificationToken`, `sf_PageUrl` and the fields, add a file as `new Blob([...])` with a file name, and `fetch(form.action, { method: 'POST', headers: { 'X-Requested-With': 'XMLHttpRequest' }, body })`. The JSON response carries `errors`. Time the call with `performance.now()` when the change is about speed.
+- **Check a non-AJAX submit (the redirect)** from PowerShell, since `fetch` can't read a redirect's `Location`. Use `Invoke-WebRequest` with a `WebRequestSession`: GET the page for the token and cookie, then POST with `-MaximumRedirection 0 -SkipHttpErrorCheck` and read `$r.Headers.Location`. PowerShell prints a "maximum redirection count" error each time; the response is still returned.
+- **Query the database** with Python's `sqlite3` module (`python` is on the PATH). Open `umbraco/Data/AiTest/SproutForms.sqlite.db` read-only (`file:...?mode=ro`, `uri=True`). The tables are `SproutForms_Forms`, `SproutForms_FormVersions`, `SproutForms_FormSubmissions` and `SproutForms_WorkflowExecutions`, with GUIDs stored as text, so compare with `lower(...)`. Use it to count rows before and after a delete.
 
 ## Gotchas
 

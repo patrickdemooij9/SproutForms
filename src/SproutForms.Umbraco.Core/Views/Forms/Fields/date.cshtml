@@ -1,25 +1,14 @@
+@using System.Globalization
 @using SproutForms.Core.Fields.Configs
 @using SproutForms.Umbraco.Core.Models.ViewModels
 @model FormFieldViewModel
 @{
     var config = (DateFieldConfig)Model.Configuration;
     var type = config.IncludeTime ? "datetime-local" : "date";
-    var dataAttrs = new List<string>();
-    
-    if (config.Min.HasValue)
-    {
-        var minValue = config.IncludeTime 
-            ? config.Min.Value.ToString("yyyy-MM-ddTHH:mm") 
-            : config.Min.Value.ToString("yyyy-MM-dd");
-        dataAttrs.Add($"min=\"{minValue}\"");
-    }
-    if (config.Max.HasValue)
-    {
-        var maxValue = config.IncludeTime 
-            ? config.Max.Value.ToString("yyyy-MM-ddTHH:mm") 
-            : config.Max.Value.ToString("yyyy-MM-dd");
-        dataAttrs.Add($"max=\"{maxValue}\"");
-    }
+    // Invariant culture: in a custom format ":" is the culture's time separator, and the input needs a literal ":"
+    var format = config.IncludeTime ? "yyyy-MM-ddTHH:mm" : "yyyy-MM-dd";
+    var minValue = config.Min?.ToString(format, CultureInfo.InvariantCulture);
+    var maxValue = config.Max?.ToString(format, CultureInfo.InvariantCulture);
 }
 
 <input type="@type"
@@ -27,4 +16,5 @@
        name="@Model.Alias"
        value="@Model.Value"
        class="form-control"
-       @Html.Raw(string.Join(" ", dataAttrs)) />
+       min="@minValue"
+       max="@maxValue" />

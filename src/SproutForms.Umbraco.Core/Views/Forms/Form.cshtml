@@ -2,7 +2,7 @@
 @model RenderedFormViewModel
 
 <div class="form-root">
-    @if (TempData["FormSuccessMessage"] is string message)
+    @if (TempData[$"{Model.Id}:SuccessMessage"] is string message)
     {
         <div class="form-success" role="status">
             @message

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
@@ -6,6 +7,7 @@ using SproutForms.Core.Models.Files;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Repositories;
+using SproutForms.Core.Services;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
@@ -42,10 +44,14 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IBackOfficeSecurityAccessor _backOfficeSecurityAccessor;
         private readonly ISproutFormsDashboardService _dashboardService;
         private readonly IWorkflowTemplateRepository _templateRepository;
+        private readonly IWorkflowRunner _workflowRunner;
+        private readonly FormDeletionService _formDeletionService;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService)
         {
+            _workflowRunner = workflowRunner;
+            _formDeletionService = formDeletionService;
             _formFieldTypes = formFieldTypes.ToArray();
             _outcomeTypes = outcomeTypes.ToArray();
             _workflowTypes = workflowTypes.ToArray();
@@ -91,8 +97,9 @@ namespace SproutForms.Umbraco.Core.Controllers
             var latestVersion = _formVersionRepository.GetLatest(id);
             if (latestVersion is null) return NotFound();
 
-            var outcomeType = _outcomeTypes.First(it => it.Alias == latestVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
-            var outcomeDescriptor = _outcomeDescriptors.First(it => it.OutcomeTypeAlias == latestVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
+            var outcomeAlias = latestVersion.Definition.SubmitOutcome.OutcomeTypeAlias;
+            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == outcomeAlias, "submit outcome", outcomeAlias);
+            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == outcomeAlias, "submit outcome", outcomeAlias);
             return Ok(new FormBackofficeModel
             {
                 Id = id,
@@ -112,8 +119,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Fields = [.. latestVersion.Definition.Fields.Select(field => Map(field))],
                     Workflows = latestVersion.Definition.Workflows.Select(flow =>
                     {
-                        var flowType = _workflowTypes.First(it => it.Alias == flow.WorkflowTypeAlias);
-                        var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == flow.WorkflowTypeAlias);
+                        var flowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == flow.WorkflowTypeAlias, "workflow type", flow.WorkflowTypeAlias);
                         return new FormWorkflowBackofficeModel
                         {
                             Alias = flow.Alias,
@@ -163,8 +169,8 @@ namespace SproutForms.Umbraco.Core.Controllers
             form.Id = _formRepository.Save(form);
 
             var latestVersion = _formVersionRepository.GetLatest(form.Id);
-            var outcomeType = _outcomeTypes.First(it => it.Alias == model.Definition.Outcome.TypeAlias);
-            var outcomeDescriptor = _outcomeDescriptors.First(it => it.OutcomeTypeAlias == model.Definition.Outcome.TypeAlias);
+            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
+            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
             var newDefinition = new FormDefinition
             {
                 Rows = model.Definition.Rows.Select(r => new FormRow
@@ -178,8 +184,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Fields = model.Definition.Fields.Select(Map).ToList(),
                 Workflows = model.Definition.Workflows.Select(it =>
                 {
-                    var workflowType = _workflowTypes.First(w => w.Alias == it.TypeAlias);
-                    var workflowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == it.TypeAlias);
+                    GetRegistered(_workflowTypes, w => w.Alias == it.TypeAlias, "workflow type", it.TypeAlias);
+                    var workflowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == it.TypeAlias, "workflow type", it.TypeAlias);
                     return new FormWorkflow
                     {
                         Alias = it.Alias,
@@ -292,7 +298,7 @@ namespace SproutForms.Umbraco.Core.Controllers
         [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
         public IActionResult CreateTemplate([FromBody] WorkflowTemplateBackofficeModel model)
         {
-            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == model.WorkflowTypeAlias);
+            var flowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == model.WorkflowTypeAlias, "workflow type", model.WorkflowTypeAlias);
             var template = new WorkflowTemplate
             {
                 Id = model.Id ?? Guid.Empty,
@@ -310,7 +316,7 @@ namespace SproutForms.Umbraco.Core.Controllers
         [ProducesResponseType(typeof(WorkflowTemplateBackofficeModel), 200)]
         public IActionResult UpdateTemplate(Guid id, [FromBody] WorkflowTemplateBackofficeModel model)
         {
-            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == model.WorkflowTypeAlias);
+            var flowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == model.WorkflowTypeAlias, "workflow type", model.WorkflowTypeAlias);
             var template = new WorkflowTemplate
             {
                 Id = id,
@@ -333,7 +339,7 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         private WorkflowTemplateBackofficeModel MapTemplate(WorkflowTemplate template)
         {
-            var flowDescriptor = _flowDescriptors.First(f => f.FlowTypeAlias == template.WorkflowTypeAlias);
+            var flowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == template.WorkflowTypeAlias, "workflow type", template.WorkflowTypeAlias);
             var configuration = flowDescriptor.FromConfig(template.Configuration);
             return new WorkflowTemplateBackofficeModel
             {
@@ -424,10 +430,9 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     var field = formVersion.Definition.Fields.FirstOrDefault(f => f.Alias == it.Key);
                     if (field is null) return null; //TODO: Fallback in place!!
-                    var fieldType = _formFieldTypes.First(ft => ft.Alias == field.FieldTypeAlias);
                     return new FormSubmissionValueBackofficeModel
                     {
-                        FieldTypeAlias = fieldType.Alias,
+                        FieldTypeAlias = field.FieldTypeAlias,
                         Name = field.Label,
                         Value = it.Value.ToString()
                     };
@@ -438,34 +443,31 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         [HttpPost("submission/workflow/retry")]
         [ProducesResponseType(typeof(bool), 200)]
-        public IActionResult RetryWorkflow(Guid submissionId, string workflowAlias)
+        [ProducesResponseType(404)]
+        [ProducesResponseType(409)]
+        public async Task<IActionResult> RetryWorkflow(Guid submissionId, string workflowAlias)
         {
-            // TODO: Regenerate SDK after implementing retry logic
-            // This would involve:
-            // 1. Getting the workflow execution for the given submission and workflow alias
-            // 2. Resetting its status to Pending
-            // 3. The workflow worker will pick it up again
-            return Ok(true);
+            return await _workflowRunner.RetryAsync(submissionId, workflowAlias) switch
+            {
+                WorkflowRetryResult.Queued => Ok(true),
+                WorkflowRetryResult.NotFound => NotFound(),
+                _ => Conflict("Only a failed or retrying workflow can be retried.")
+            };
         }
 
+        // Manual approval needs a design first: no workflow type supports it yet
         [HttpPost("submission/workflow/approve")]
-        [ProducesResponseType(typeof(bool), 200)]
+        [ProducesResponseType(501)]
         public IActionResult ApproveWorkflow(Guid submissionId, string workflowAlias)
         {
-            // TODO: Regenerate SDK after implementing manual approval logic
-            // This would check if the workflow type supports manual approval
-            // and then either skip the workflow execution or mark it as approved
-            return Ok(true);
+            return StatusCode(StatusCodes.Status501NotImplemented);
         }
 
         [HttpPost("submission/workflow/decline")]
-        [ProducesResponseType(typeof(bool), 200)]
+        [ProducesResponseType(501)]
         public IActionResult DeclineWorkflow(Guid submissionId, string workflowAlias)
         {
-            // TODO: Regenerate SDK after implementing manual decline logic
-            // This would check if the workflow type supports manual approval
-            // and then mark the workflow as failed with a decline message
-            return Ok(true);
+            return StatusCode(StatusCodes.Status501NotImplemented);
         }
 
         [HttpDelete("form")]
@@ -473,9 +475,7 @@ namespace SproutForms.Umbraco.Core.Controllers
         {
             foreach (var form in formIds)
             {
-                _formSubmissionRepository.DeleteAllByForm(form);
-                _formVersionRepository.DeleteAllByForm(form);
-                _formRepository.Delete(form);
+                await _formDeletionService.DeleteAsync(form);
             }
             return Ok();
         }
@@ -519,29 +519,34 @@ namespace SproutForms.Umbraco.Core.Controllers
             }
         }
 
-        private List<string> GetDuplicateAliasses(FormBackofficeModel model) 
+        // Posted form values are matched case-insensitively, so "Name" and "name" would collide
+        private static List<string> GetDuplicateAliasses(FormBackofficeModel model)
         {
             var duplicateAliasses = new List<string>();
-            var aliasses = new List<string>();
+            var aliasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var field in model.Definition.Fields)
             {
-                if (aliasses.Contains(field.Alias.ToLower()))
+                if (!aliasses.Add(field.Alias))
                 {
                     duplicateAliasses.Add(field.Alias);
-                }
-                else
-                {
-                    aliasses.Add(field.Alias);
                 }
             }
             return duplicateAliasses;
         }
 
+        /// <summary>
+        /// Finds the registered type or descriptor for an alias stored in a form, with an error that names the alias when it is no longer registered.
+        /// </summary>
+        private static T GetRegistered<T>(IEnumerable<T> items, Func<T, bool> match, string kind, string alias)
+        {
+            return items.FirstOrDefault(match)
+                ?? throw new InvalidOperationException($"The form uses {kind} '{alias}', which is not registered. Register it again, or remove it from the form.");
+        }
+
         private FormFieldBackofficeModel Map(FormField field)
         {
             var result = new FormFieldBackofficeModel(field);
-            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Alias == field.FieldTypeAlias);
-            var descriptor = _fieldDescriptors.First(ft => ft.FieldTypeAlias == fieldType.Alias);
+            var descriptor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == field.FieldTypeAlias, "field type", field.FieldTypeAlias);
             result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
             result.Conditions = field.Conditions;
             return result;
@@ -549,8 +554,8 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         private FormField Map(FormFieldBackofficeModel model)
         {
-            var fieldType = _formFieldTypes.FirstOrDefault(ft => ft.Alias == model.FieldTypeAlias);
-            var fieldDescritor = _fieldDescriptors.First(it => it.FieldTypeAlias == fieldType.Alias);
+            GetRegistered(_formFieldTypes, it => it.Alias == model.FieldTypeAlias, "field type", model.FieldTypeAlias);
+            var fieldDescritor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == model.FieldTypeAlias, "field type", model.FieldTypeAlias);
             var configuration = fieldDescritor.ToConfig(model.Configuration);
             var result = new FormField
             {

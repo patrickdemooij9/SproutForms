@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using SproutForms.Core;
 using SproutForms.Core.Fields;
 using SproutForms.Core.Flows;
 using SproutForms.Core.Models;
@@ -30,10 +31,8 @@ namespace SproutForms.Umbraco.Core.Startup
     {
         public void Compose(IUmbracoBuilder builder)
         {
-            builder.Services.Configure<LocalDiskFileStorageOptions>(options =>
-            {
-                options.RootPath = "App_Data/SproutForms/Uploads";
-            });
+            builder.Services.Configure<SproutFormsOptions>(builder.Config.GetSection("SproutForms"));
+            builder.Services.Configure<LocalDiskFileStorageOptions>(builder.Config.GetSection("SproutForms:LocalDiskFileStorage"));
             builder.Services.Configure<SwaggerGenOptions>(options =>
             {
                 options.SwaggerDoc("sproutForms", new Microsoft.OpenApi.OpenApiInfo
@@ -49,7 +48,9 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormRepository, FormRepository>();
             builder.Services.AddSingleton<IFolderRepository, FolderRepository>();
             builder.Services.AddSingleton<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
+            builder.Services.AddSingleton<IUnitOfWorkProvider, ScopeUnitOfWorkProvider>();
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
+            builder.Services.AddSingleton<FormDeletionService>();
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
 
