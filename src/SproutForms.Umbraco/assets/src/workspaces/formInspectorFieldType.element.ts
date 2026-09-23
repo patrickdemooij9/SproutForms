@@ -14,7 +14,12 @@ import { FieldConfigPropertyElement } from "./fieldEditors/fieldConfigProperty.e
 
 import "./fieldEditors/fieldConfigProperty.element";
 import "./fieldEditors/fieldConditionsEditor.element";
-import { FormFieldDto, FormFieldTypeDto, FormDefinitionDto } from "../models";
+import {
+  FormFieldDto,
+  FormFieldTypeDto,
+  FormDefinitionDto,
+  FormDefinitionTypeDto,
+} from "../models";
 
 export class FieldChangeEvent extends Event {
   static readonly TYPE = "field-change";
@@ -45,6 +50,32 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
 
   @property({ type: Array })
   public fields: FormDefinitionDto["fields"] = [];
+
+  @property({ type: Object })
+  public set formType(value: FormDefinitionTypeDto | undefined) {
+    this._formType = value;
+    this.setValues();
+  }
+  public get formType() {
+    return this._formType;
+  }
+  private _formType?: FormDefinitionTypeDto;
+
+  // The properties the form's type adds to this field's type, if it extends it
+  get #extension() {
+    return this.formType?.fieldExtensions.find(
+      (it) => it.fieldTypeAlias === this.field?.fieldTypeAlias,
+    );
+  }
+
+  // The field's extension settings, with defaults for any it doesn't have yet
+  #getExtensionValues(): Record<string, unknown> {
+    const values: Record<string, unknown> = {};
+    this.#extension?.properties.forEach((prop) => {
+      values[prop.alias] = this.field.extension?.[prop.alias] ?? prop.value ?? null;
+    });
+    return values;
+  }
 
   @state()
   private _values: Array<UmbPropertyValueData> = [];
@@ -77,6 +108,12 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
         value: value,
       });
     });
+    Object.entries(this.#getExtensionValues()).forEach(([key, value]) => {
+      this._values.push({
+        alias: "extension-" + key,
+        value: value,
+      });
+    });
   }
 
   #onPropertyDataChange(e: Event) {
@@ -86,8 +123,14 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
       id: this.field.id
     };
     updatedField.configuration = structuredClone(this.field?.configuration);
+    const extension = this.#extension ? this.#getExtensionValues() : undefined;
     value.forEach((item) => {
-      if (item.alias == "label") {
+      if (item.alias.startsWith("extension-")) {
+        const actualAlias = item.alias.replace("extension-", "");
+        if (extension && Object.keys(extension).includes(actualAlias)) {
+          extension[actualAlias] = item.value;
+        }
+      } else if (item.alias == "label") {
         updatedField.label = item.value as string;
       } else if (item.alias == "required") {
         updatedField.required = item.value as boolean;
@@ -100,6 +143,10 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
         }
       }
     });
+
+    if (extension) {
+      updatedField.extension = extension;
+    }
 
     const fieldChangeEvent = new FieldChangeEvent();
     fieldChangeEvent.field = updatedField;
@@ -119,6 +166,22 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
 
     const fieldChangeEvent = new FieldChangeEvent();
     fieldChangeEvent.field = updatedField;
+    this.dispatchEvent(fieldChangeEvent);
+  }
+
+  // A custom editor's change; plain property editors report through the dataset instead
+  #onExtensionEditorChange(event: Event) {
+    const target = (event.target as FieldConfigPropertyElement).Element;
+    if (!target) return;
+    event.stopPropagation();
+
+    const extension = this.#getExtensionValues();
+    const alias = target.field.alias.replace("extension-", "");
+    if (!Object.keys(extension).includes(alias)) return;
+    extension[alias] = target.value;
+
+    const fieldChangeEvent = new FieldChangeEvent();
+    fieldChangeEvent.field = { id: this.field.id, extension: extension };
     this.dispatchEvent(fieldChangeEvent);
   }
 
@@ -154,6 +217,15 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
             label="Conditions"
             @click=${() => (this._activeTab = "conditions")}
           ></uui-tab>
+          ${when(
+            this.#extension,
+            () => html`
+              <uui-tab
+                label=${this.formType!.displayName}
+                @click=${() => (this._activeTab = "extension")}
+              ></uui-tab>
+            `,
+          )}
         </uui-tab-group>
 
         <div class="inspector-content">
@@ -185,6 +257,7 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                       ...item,
                       value: this.field!.configuration[item.alias] as string,
                     }}
+                    .formField=${this.field}
                     @change=${this.#test}
                   >
                   </sf-field-config-property>
@@ -202,6 +275,26 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
                 val
               ></umb-property>
+            `,
+          )}
+          ${when(
+            this._activeTab == "extension" && this.#extension,
+            () => html`
+              ${repeat(
+                this.#extension!.properties,
+                (item) => item.alias,
+                (item) => html`
+                  <sf-field-config-property
+                    .field=${{
+                      ...item,
+                      alias: "extension-" + item.alias,
+                      value: this.#getExtensionValues()[item.alias],
+                    }}
+                    .formField=${this.field}
+                    @change=${this.#onExtensionEditorChange}
+                  ></sf-field-config-property>
+                `,
+              )}
             `,
           )}
           ${when(

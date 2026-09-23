@@ -1,5 +1,7 @@
+using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Registry;
 using SproutForms.Site.Code;
+using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using System.Security.Cryptography;
 
 WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
@@ -17,7 +19,10 @@ if (builder.Environment.IsEnvironment("AiTest"))
         it.Add<AiTestFailingWorkflowForm>();
         it.Add<AiTestWorkflowOrderForm>();
         it.Add<AiTestUnknownOutcomeForm>();
+        it.Add<AiTestFormTypeForm>();
     });
+    builder.Services.AddSingleton<IFormDefinitionType, AiTestQuizFormType>();
+    builder.Services.AddSingleton<IFormDefinitionTypeDescriptor, AiTestQuizFormTypeDescriptor>();
 }
 
 builder.CreateUmbracoBuilder()

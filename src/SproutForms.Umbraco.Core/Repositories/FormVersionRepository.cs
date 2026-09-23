@@ -9,6 +9,7 @@ using SproutForms.Core.JsonConverters;
 using System.Linq;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Models.Flows;
+using SproutForms.Core.Models.FormTypes;
 using Umbraco.Cms.Core.Cache;
 using SproutForms.Umbraco.Core.Caching;
 using SproutForms.Core.Services;
@@ -21,6 +22,7 @@ namespace SproutForms.Umbraco.Core.Repositories
         private readonly IEnumerable<IFormFieldType> _fieldTypes;
         private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
         private readonly IEnumerable<IFormWorkflowType> _workflowTypes;
+        private readonly IEnumerable<IFormDefinitionType> _formTypes;
         private readonly WorkflowTemplateService? _templateService;
 
         private readonly Caching.IRepositoryCachePolicy<FormVersion, Guid> _cachePolicy;
@@ -29,6 +31,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             IEnumerable<IFormFieldType> fieldTypes,
             IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
             IEnumerable<IFormWorkflowType> workflowTypes,
+            IEnumerable<IFormDefinitionType> formTypes,
             IAppPolicyCache cache,
             WorkflowTemplateService? templateService = null)
         {
@@ -36,6 +39,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             _fieldTypes = fieldTypes;
             _outcomeTypes = outcomeTypes;
             _workflowTypes = workflowTypes;
+            _formTypes = formTypes;
             _templateService = templateService;
 
             _cachePolicy = new Caching.DefaultRepositoryCachePolicy<FormVersion, Guid>(cache, new RepositoryPolicyOptions<FormVersion, Guid>(it => it.Id));
@@ -57,9 +61,10 @@ namespace SproutForms.Umbraco.Core.Repositories
             }
 
             var options = new JsonSerializerOptions();
-            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes));
+            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes, _formTypes));
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
+            options.Converters.Add(new FormDefinitionTypeReferenceJsonConverter(_formTypes));
 
             scope.Database.Insert(new FormVersionEntity
             {
@@ -113,9 +118,10 @@ namespace SproutForms.Umbraco.Core.Repositories
                 return [];
 
             var options = new JsonSerializerOptions();
-            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes));
+            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes, _formTypes));
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
+            options.Converters.Add(new FormDefinitionTypeReferenceJsonConverter(_formTypes));
 
             var results = entities.Select(entity => new FormVersion
             {
@@ -157,9 +163,10 @@ namespace SproutForms.Umbraco.Core.Repositories
                 return null;
 
             var options = new JsonSerializerOptions();
-            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes));
+            options.Converters.Add(new FormFieldJsonConverter(_fieldTypes, _formTypes));
             options.Converters.Add(new FormSubmitOutcomeJsonConverter(_outcomeTypes));
             options.Converters.Add(new FormWorkflowJsonConverter(_workflowTypes));
+            options.Converters.Add(new FormDefinitionTypeReferenceJsonConverter(_formTypes));
 
             var version = new FormVersion
             {

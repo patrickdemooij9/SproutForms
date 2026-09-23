@@ -1,4 +1,5 @@
 ﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models.FormTypes;
 using System.Text.Json;
 
 namespace SproutForms.Core.Builders
@@ -29,6 +30,20 @@ namespace SproutForms.Core.Builders
         {
             configurate(_config);
             _field.Configuration = _config;
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the settings the form's type adds to this field's type, such as the correct answer in a quiz.
+        /// </summary>
+        public FieldBuilder<TConfig, TValue> Extend(object settings)
+        {
+            // FormBuilder.Build fills in the form type, which can be set after the fields
+            _field.Extension = new FormFieldExtensionValue
+            {
+                FormTypeAlias = string.Empty,
+                Settings = settings
+            };
             return this;
         }
 

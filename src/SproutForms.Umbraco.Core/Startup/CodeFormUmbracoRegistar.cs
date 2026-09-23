@@ -3,6 +3,7 @@ using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Registry;
 using SproutForms.Core.Repositories;
+using SproutForms.Core.Services;
 using Umbraco.Cms.Core;
 using Umbraco.Cms.Core.Composing;
 using Umbraco.Cms.Core.Services;
@@ -32,11 +33,12 @@ namespace SproutForms.Umbraco.Core.Startup
             using var scope = _services.CreateScope();
             var formsRepo = scope.ServiceProvider.GetRequiredService<IFormRepository>();
             var versionsRepo = scope.ServiceProvider.GetRequiredService<IFormVersionRepository>();
+            var typeValidator = scope.ServiceProvider.GetRequiredService<FormDefinitionTypeValidator>();
 
             foreach (var factory in _registry.Factories)
             {
                 var form = factory(scope.ServiceProvider);
-                await RegisterAsync(form, formsRepo, versionsRepo);
+                await RegisterAsync(form, formsRepo, versionsRepo, typeValidator);
             }
         }
 
@@ -48,9 +50,14 @@ namespace SproutForms.Umbraco.Core.Startup
         private async Task RegisterAsync(
             ICodeFirstForm codeForm,
             IFormRepository formsRepo,
-            IFormVersionRepository versionsRepo)
+            IFormVersionRepository versionsRepo,
+            FormDefinitionTypeValidator typeValidator)
         {
             var definition = codeForm.Build();
+            var typeErrors = typeValidator.Validate(definition);
+            if (typeErrors.Count > 0)
+                throw new InvalidOperationException($"Code-first form '{codeForm.Alias}' is invalid: {string.Join(" ", typeErrors)}");
+
             var hash = FormDefinitionHasher.Hash(definition);
 
             var form = formsRepo.GetByAlias(codeForm.Alias);
@@ -87,11 +94,18 @@ namespace SproutForms.Umbraco.Core.Startup
             if (latest!.DefinitionHash == hash)
                 return;
 
-            latest.Id = Guid.NewGuid();
-            latest.Version++;
-            latest.Definition = definition;
-            latest.DefinitionHash = hash;
-            versionsRepo.Add(latest);
+            // A new instance, because the latest version is the repository's cached one
+            versionsRepo.Add(new FormVersion
+            {
+                Id = Guid.NewGuid(),
+                FormId = form.Id,
+                Version = latest.Version + 1,
+                Status = FormStatus.Published,
+                Definition = definition,
+                DefinitionHash = hash,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = "System"
+            });
         }
     }
 }

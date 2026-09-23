@@ -16,6 +16,9 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public Dictionary<string, object?> Configuration { get; set; }
         public FieldConditions? Conditions { get; set; }
 
+        // The settings the form's type adds to this field's type, when it extends it
+        public Dictionary<string, object?>? Extension { get; set; }
+
         public FormFieldBackofficeModel(FormField field)
         {
             Alias = field.Alias;

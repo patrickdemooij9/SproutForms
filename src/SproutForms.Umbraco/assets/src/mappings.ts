@@ -15,6 +15,9 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
     version: model.version,
     source: model.source,
     definition: {
+      type: {
+        ...model.definition.type,
+      },
       rows: model.definition.rows.map((row) => ({
         id: crypto.randomUUID(),
         columns: row.columns.map((col) => ({
@@ -44,6 +47,9 @@ export function mapToPost(model: FormDto): FormBackofficeModel {
     version: model.version,
     source: model.source,
     definition: {
+      type: {
+        ...model.definition.type,
+      },
       rows: model.definition.rows.map((row) => ({
         columns: row.columns.map((col) => ({
           width: col.width,

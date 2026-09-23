@@ -1,15 +1,18 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Files;
 using SproutForms.Core.Models.Flows;
+using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Repositories;
 using SproutForms.Core.Services;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
+using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using SproutForms.Umbraco.Core.Services;
@@ -46,10 +49,16 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IWorkflowTemplateRepository _templateRepository;
         private readonly IWorkflowRunner _workflowRunner;
         private readonly FormDeletionService _formDeletionService;
+        private readonly FormDefinitionTypeValidator _formDefinitionTypeValidator;
+        private readonly IFormDefinitionType[] _formDefinitionTypes;
+        private readonly IEnumerable<IFormDefinitionTypeDescriptor> _formDefinitionTypeDescriptors;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors)
         {
+            _formDefinitionTypeValidator = formDefinitionTypeValidator;
+            _formDefinitionTypes = formDefinitionTypes.ToArray();
+            _formDefinitionTypeDescriptors = formDefinitionTypeDescriptors;
             _workflowRunner = workflowRunner;
             _formDeletionService = formDeletionService;
             _formFieldTypes = formFieldTypes.ToArray();
@@ -97,6 +106,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             var latestVersion = _formVersionRepository.GetLatest(id);
             if (latestVersion is null) return NotFound();
 
+            var formTypeDescriptor = GetViewableDescriptor(latestVersion.Definition.Type.TypeAlias);
             var outcomeAlias = latestVersion.Definition.SubmitOutcome.OutcomeTypeAlias;
             var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == outcomeAlias, "submit outcome", outcomeAlias);
             var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == outcomeAlias, "submit outcome", outcomeAlias);
@@ -109,6 +119,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Source = (int)form.Source,
                 Definition = new FormDefinitionBackofficeModel
                 {
+                    Type = Map(latestVersion.Definition.Type),
                     Outcome = new FormOutcomeBackofficeModel
                     {
                         TypeAlias = outcomeType.Alias,
@@ -116,7 +127,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                         Configuration = outcomeDescriptor.FromConfig(latestVersion.Definition.SubmitOutcome.Configuration).ToDictionary(it => it.Alias, it => it.Value)
                     },
                     Rows = [.. latestVersion.Definition.Rows.Select(row => new FormRowBackofficeModel(row))],
-                    Fields = [.. latestVersion.Definition.Fields.Select(field => Map(field))],
+                    Fields = [.. latestVersion.Definition.Fields.Select(field => Map(field, formTypeDescriptor))],
                     Workflows = latestVersion.Definition.Workflows.Select(flow =>
                     {
                         var flowDescriptor = GetRegistered(_flowDescriptors, f => f.FlowTypeAlias == flow.WorkflowTypeAlias, "workflow type", flow.WorkflowTypeAlias);
@@ -136,6 +147,7 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         [HttpPost("form")]
         [ProducesResponseType(typeof(FormBackofficeModel), 200)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
         public IActionResult SaveForm([FromBody]FormBackofficeModel model)
         {
             if (model.Id.HasValue)
@@ -158,21 +170,27 @@ namespace SproutForms.Umbraco.Core.Controllers
                 throw new InvalidOperationException($"Duplicated field aliasses: {string.Join(',', duplicateFieldAliasses)}");
             }
 
-            var form = new Form
+            var latestVersion = model.Id.HasValue ? _formVersionRepository.GetLatest(model.Id.Value) : null;
+            var formTypeAlias = model.Definition.Type.TypeAlias;
+            var formType = GetRegistered(_formDefinitionTypes, it => it.Alias == formTypeAlias, "form type", formTypeAlias);
+            var formTypeDescriptor = GetRegistered(_formDefinitionTypeDescriptors, it => it.FormTypeAlias == formTypeAlias, "form type", formTypeAlias);
+            if (latestVersion != null && latestVersion.Definition.Type.TypeAlias != formTypeAlias)
             {
-                Id = model.Id ?? Guid.Empty,
-                FolderId = model.FolderId,
-                Name = model.Name,
-                Alias = alias,
-                Source = FormSource.UI
-            };
-            form.Id = _formRepository.Save(form);
-
-            var latestVersion = _formVersionRepository.GetLatest(form.Id);
+                return BadRequest(new ProblemDetails
+                {
+                    Type = "Error",
+                    Title = "The type of an existing form can't be changed."
+                });
+            }
             var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
             var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
             var newDefinition = new FormDefinition
             {
+                Type = new FormDefinitionTypeReference
+                {
+                    TypeAlias = formType.Alias,
+                    Settings = formTypeDescriptor.ToConfig(model.Definition.Type.Settings)
+                },
                 Rows = model.Definition.Rows.Select(r => new FormRow
                 {
                     Columns = r.Columns.Select(c => new FormColumn
@@ -181,7 +199,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                         Width = c.Width
                     }).ToList()
                 }).ToList(),
-                Fields = model.Definition.Fields.Select(Map).ToList(),
+                Fields = model.Definition.Fields.Select(field => Map(field, formType, formTypeDescriptor)).ToList(),
                 Workflows = model.Definition.Workflows.Select(it =>
                 {
                     GetRegistered(_workflowTypes, w => w.Alias == it.TypeAlias, "workflow type", it.TypeAlias);
@@ -201,6 +219,31 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Configuration = outcomeDescriptor.ToConfig(model.Definition.Outcome.Configuration)
                 }
             };
+            var typeErrors = _formDefinitionTypeValidator.Validate(newDefinition);
+            if (typeErrors.Count > 0)
+            {
+                // The backoffice shows the title and these errors in its error notification
+                return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["formType"] = [.. typeErrors]
+                })
+                {
+                    // The backoffice only recognises problem details that have a type
+                    Type = "Error",
+                    Title = $"The form doesn't fit form type '{formTypeDescriptor.DisplayName}'."
+                });
+            }
+
+            var form = new Form
+            {
+                Id = model.Id ?? Guid.Empty,
+                FolderId = model.FolderId,
+                Name = model.Name,
+                Alias = alias,
+                Source = FormSource.UI
+            };
+            form.Id = _formRepository.Save(form);
+
             var hash = FormDefinitionHasher.Hash(newDefinition);
             _formVersionRepository.Add(new FormVersion
             {
@@ -235,6 +278,38 @@ namespace SproutForms.Umbraco.Core.Controllers
                 });
             }
             return Ok(formFieldTypes);
+        }
+
+        [HttpGet("formTypes")]
+        [ProducesResponseType(typeof(FormDefinitionTypeBackofficeModel[]), 200)]
+        public IActionResult GetFormTypes()
+        {
+            var formTypes = new List<FormDefinitionTypeBackofficeModel>();
+            foreach (var formType in _formDefinitionTypes)
+            {
+                var descriptor = _formDefinitionTypeDescriptors.FirstOrDefault(it => it.FormTypeAlias == formType.Alias);
+                if (descriptor is null) continue;
+
+                formTypes.Add(new FormDefinitionTypeBackofficeModel
+                {
+                    Alias = formType.Alias,
+                    DisplayName = descriptor.DisplayName,
+                    Description = descriptor.Description,
+                    Properties = descriptor.FromConfig(formType.GetDefaultSettings()),
+                    AllowedFieldTypeAliases = [.. _formFieldTypes.Where(it => FormDefinitionTypeValidator.IsAllowed(formType, it)).Select(it => it.Alias)],
+                    AllowedOutcomeTypeAliases = [.. _outcomeTypes.Where(it => FormDefinitionTypeValidator.IsAllowed(formType, it)).Select(it => it.Alias)],
+                    FieldExtensions = [.. formType.FieldExtensions.Select(extension =>
+                    {
+                        var extensionDescriptor = descriptor.FieldExtensions.FirstOrDefault(it => it.FieldTypeAlias == extension.FieldTypeAlias);
+                        return extensionDescriptor is null ? null : new FormFieldExtensionBackofficeModel
+                        {
+                            FieldTypeAlias = extension.FieldTypeAlias,
+                            Properties = extensionDescriptor.FromConfig(extension.GetDefaultSettings())
+                        };
+                    }).WhereNotNull()]
+                });
+            }
+            return Ok(formTypes);
         }
 
         [HttpGet("outcomeTypes")]
@@ -543,16 +618,41 @@ namespace SproutForms.Umbraco.Core.Controllers
                 ?? throw new InvalidOperationException($"The form uses {kind} '{alias}', which is not registered. Register it again, or remove it from the form.");
         }
 
-        private FormFieldBackofficeModel Map(FormField field)
+        // A code-first form can use a form type without a descriptor, or one that is no longer registered; it can still be viewed
+        private IFormDefinitionTypeDescriptor? GetViewableDescriptor(string formTypeAlias)
+        {
+            var isRegistered = _formDefinitionTypes.Any(it => it.Alias == formTypeAlias);
+            return isRegistered ? _formDefinitionTypeDescriptors.FirstOrDefault(it => it.FormTypeAlias == formTypeAlias) : null;
+        }
+
+        private FormTypeSelectionBackofficeModel Map(FormDefinitionTypeReference type)
+        {
+            var descriptor = GetViewableDescriptor(type.TypeAlias);
+            return new FormTypeSelectionBackofficeModel
+            {
+                TypeAlias = type.TypeAlias,
+                DisplayName = descriptor?.DisplayName ?? type.TypeAlias,
+                Settings = descriptor?.FromConfig(type.Settings).ToDictionary(it => it.Alias, it => it.Value) ?? []
+            };
+        }
+
+        private FormFieldBackofficeModel Map(FormField field, IFormDefinitionTypeDescriptor? formTypeDescriptor)
         {
             var result = new FormFieldBackofficeModel(field);
             var descriptor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == field.FieldTypeAlias, "field type", field.FieldTypeAlias);
             result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
             result.Conditions = field.Conditions;
+
+            // Settings the form type no longer describes stay as raw JSON, and are left out
+            var extensionDescriptor = formTypeDescriptor?.FieldExtensions.FirstOrDefault(it => it.FieldTypeAlias == field.FieldTypeAlias);
+            if (field.Extension != null && extensionDescriptor != null && field.Extension.Settings is not JsonElement)
+            {
+                result.Extension = extensionDescriptor.FromConfig(field.Extension.Settings).ToDictionary(it => it.Alias, it => it.Value);
+            }
             return result;
         }
 
-        private FormField Map(FormFieldBackofficeModel model)
+        private FormField Map(FormFieldBackofficeModel model, IFormDefinitionType formType, IFormDefinitionTypeDescriptor formTypeDescriptor)
         {
             GetRegistered(_formFieldTypes, it => it.Alias == model.FieldTypeAlias, "field type", model.FieldTypeAlias);
             var fieldDescritor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == model.FieldTypeAlias, "field type", model.FieldTypeAlias);
@@ -566,6 +666,17 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Configuration = configuration,
                 Conditions = model.Conditions
             };
+
+            // Every field of an extended field type gets the extension, with default settings when none were sent
+            if (formType.FieldExtensions.Any(it => it.FieldTypeAlias == model.FieldTypeAlias))
+            {
+                var extensionDescriptor = GetRegistered(formTypeDescriptor.FieldExtensions, it => it.FieldTypeAlias == model.FieldTypeAlias, "field extension", $"{formType.Alias}/{model.FieldTypeAlias}");
+                result.Extension = new FormFieldExtensionValue
+                {
+                    FormTypeAlias = formType.Alias,
+                    Settings = extensionDescriptor.ToConfig(model.Extension ?? [])
+                };
+            }
             return result;
         }
     }
