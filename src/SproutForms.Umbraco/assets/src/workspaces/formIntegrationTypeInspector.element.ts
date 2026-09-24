@@ -127,6 +127,7 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
                   label="Alias"
                   description="Alias of the field"
                   property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+                  .appearance=${{ labelOnTop: true }}
                   val
                 ></umb-property>
               `,
@@ -139,18 +140,20 @@ export default class FormIntegrationTypeInspectorElement extends UmbElementMixin
 
   static styles = css`
     .content {
-      padding: 18px 12px;
+      padding: var(--uui-size-space-5);
     }
 
     .tab-group {
-      border-bottom: 1px solid #ccc;
+      --uui-tab-divider: var(--uui-color-border);
+      padding: 0 var(--uui-size-space-3);
+      border-bottom: 1px solid var(--uui-color-border);
     }
 
     .lock-icon {
       display: inline-flex;
       align-items: center;
       margin-left: 4px;
-      color: #f59e0b;
+      color: var(--uui-color-warning-standalone);
     }
 
     .lock-icon uui-icon {

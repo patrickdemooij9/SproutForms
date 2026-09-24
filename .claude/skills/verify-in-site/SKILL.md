@@ -8,6 +8,7 @@ description: Run SproutForms in a throwaway Umbraco site and verify a change end
 The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 
 - **Database:** a throwaway SQLite file at `src/SproutForms.Site/umbraco/Data/AiTest/`, installed unattended on first start. The admin password is random per start, so the backoffice is out of scope; never try to sign in.
+- **Backoffice session:** to check a backoffice change, start the `sproutforms-aitest-backoffice` launch config instead. It resets the database and installs it with the admin `aitest@sproutforms.local` / `SproutForms-AiTest-1`, served at `https://localhost:44370/umbraco` (the login needs HTTPS). The person signs in in the browser pane; never type the password yourself. Later restarts with `sproutforms-aitest` keep that database and the sign-in. After `npm run build` in `src/SproutForms.Umbraco/assets`, reload the page to get the new bundle; C# changes need a restart.
 - **Forms:** code-first forms from `src/SproutForms.Site/Code/`, registered on startup in this environment only.
   - `testFormCode` and `testFileForm` are the demo forms.
   - Regression forms, one per awkward case:

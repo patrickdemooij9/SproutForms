@@ -274,6 +274,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 {
                     Alias = formFieldType.Alias,
                     DisplayName = descriptor.DisplayName,
+                    Icon = descriptor.Icon,
                     Properties = descriptor.FromConfig(formFieldType.DefaultConfiguration)
                 });
             }

@@ -237,6 +237,7 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 label="Label"
                 description="Label of the field"
                 property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+                .appearance=${{ labelOnTop: true }}
                 val
               ></umb-property>
 
@@ -245,6 +246,7 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 label="Is required"
                 description="Determines if the field is required"
                 property-editor-ui-alias="Umb.PropertyEditorUi.Toggle"
+                .appearance=${{ labelOnTop: true }}
                 val
               ></umb-property>
 
@@ -273,6 +275,7 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 label="Alias"
                 description="Alias of the field"
                 property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+                .appearance=${{ labelOnTop: true }}
                 val
               ></umb-property>
             `,
@@ -314,11 +317,13 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
 
   static styles = css`
     .inspector-content {
-      padding: 18px 12px;
+      padding: var(--uui-size-space-5);
     }
 
     .tab-group {
-      border-bottom: 1px solid #ccc;
+      --uui-tab-divider: var(--uui-color-border);
+      padding: 0 var(--uui-size-space-3);
+      border-bottom: 1px solid var(--uui-color-border);
     }
   `;
 }

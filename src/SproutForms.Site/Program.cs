@@ -6,8 +6,14 @@ WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
 if (builder.Environment.IsEnvironment("AiTest"))
 {
-    // Throwaway admin for the unattended install; nobody signs in to this environment
-    builder.Configuration["Umbraco:CMS:Unattended:UnattendedUserPassword"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+    // Throwaway admin for the unattended install. Random unless run-site.ps1 -AdminPassword sets one for a backoffice session
+    if (string.IsNullOrEmpty(builder.Configuration["Umbraco:CMS:Unattended:UnattendedUserPassword"]))
+    {
+        builder.Configuration["Umbraco:CMS:Unattended:UnattendedUserPassword"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(24));
+    }
+
+    // Serve the backoffice bundle from SproutForms.Umbraco/wwwroot, which only happens by default in Development
+    builder.WebHost.UseStaticWebAssets();
     builder.Services.AddCodeFirstForms(it =>
     {
         it.Add<TestFormCode>();
