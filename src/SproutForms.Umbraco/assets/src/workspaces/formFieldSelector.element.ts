@@ -38,12 +38,16 @@ export class FormFieldSelector extends UmbElementMixin(LitElement) {
 
     render() {
         return html`
-        ${repeat(this.#getAllowedFieldTypes(), fieldType => fieldType.alias, fieldType => html`
-            <button
-                @click=${() => this.onAddField(fieldType)}>
-                ${fieldType.displayName}
-            </button>`
-        )}`
+        <div class="grid">
+            ${repeat(this.#getAllowedFieldTypes(), fieldType => fieldType.alias, fieldType => html`
+                <button
+                    class="tile"
+                    @click=${() => this.onAddField(fieldType)}>
+                    <umb-icon name=${fieldType.icon}></umb-icon>
+                    <span>${fieldType.displayName}</span>
+                </button>`
+            )}
+        </div>`
     }
 
     onAddField(fieldType: FormFieldTypeDto) {
@@ -56,18 +60,39 @@ export class FormFieldSelector extends UmbElementMixin(LitElement) {
 
     static styles = 
         css`
-        button {
-            display: block;
-            width: 100%;
-            margin-bottom: 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: transparent;
-            padding: 8px 12px;
-            cursor: pointer;
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: var(--uui-size-space-3);
+        }
 
-            &:hover {
-                background-color: #e5e7eb;
+        .tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: var(--uui-size-space-2);
+            min-height: 84px;
+            padding: var(--uui-size-space-3);
+            font: inherit;
+            color: var(--uui-color-text);
+            background-color: var(--uui-color-surface);
+            border: 1px solid var(--uui-color-border);
+            border-radius: calc(var(--uui-border-radius) * 2);
+            cursor: pointer;
+            transition: border-color 120ms, box-shadow 120ms, color 120ms;
+
+            umb-icon {
+                font-size: 1.5em;
+                color: var(--uui-color-interactive);
+            }
+
+            &:hover,
+            &:focus-visible {
+                border-color: var(--uui-color-interactive-emphasis);
+                box-shadow: var(--uui-shadow-depth-1);
+                color: var(--uui-color-interactive-emphasis);
+                outline: none;
             }
         }`
     

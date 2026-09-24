@@ -11,8 +11,6 @@ import {
   UmbPropertyValueData,
 } from "@umbraco-cms/backoffice/property";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
-import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
-import { UUIRadioElement } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
@@ -122,9 +120,9 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
     this.context?.updateForm(updateForm);
   }
 
-  #onOutcomeChange(e: UmbChangeEvent) {
-    const value = (e.target as UUIRadioElement).value;
-    const outcome = this.outcomes.find((item) => item.alias == value);
+  #selectOutcome(alias: string) {
+    if (alias === this.form?.definition.outcome.typeAlias) return;
+    const outcome = this.outcomes.find((item) => item.alias == alias);
     if (!outcome) {
       return;
     }
@@ -164,33 +162,75 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
     if (this.formTypes.length < 2 && type.typeAlias === "standard") return nothing;
 
     return html`
-      <umb-property-layout
-        label="Form type"
-        description="The kind of form this is. It is chosen when the form is created, and can't be changed."
-      >
-        <div slot="editor" class="option">
-          <h3>${type.displayName}</h3>
-          ${this.formType
-            ? html`<p class="option-description">${this.formType.description}</p>`
-            : nothing}
+      <uui-box>
+        <div slot="headline" class="headline">
+          ${type.displayName}
+          <uui-tag look="secondary">Form type</uui-tag>
+        </div>
+        <p class="box-description">
+          ${this.formType?.description ?? ""}
+          The type is chosen when the form is created, and can't be changed.
+        </p>
+        ${repeat(
+          this.formType?.properties ?? [],
+          (prop) => prop.alias,
+          (prop) => html`
+            <umb-property
+              alias=${"type-" + prop.alias}
+              label=${prop.displayName}
+              description=""
+              property-editor-ui-alias=${prop.propertyEditor}
+              val
+            ></umb-property>
+          `
+        )}
+      </uui-box>
+    `;
+  }
+
+  #renderOutcome() {
+    const selectedAlias = this.form?.definition.outcome.typeAlias;
+    const selected = this.outcomes.find((item) => item.alias === selectedAlias);
+
+    return html`
+      <uui-box headline="Submit outcome">
+        <p class="box-description">What happens for the visitor after they submit the form.</p>
+        <div class="option-container" role="radiogroup" aria-label="Submit outcome">
           ${repeat(
-            this.formType?.properties ?? [],
-            (prop) => prop.alias,
-            (prop) => html`
-              <umb-property
-                alias=${"type-" + prop.alias}
-                label=${prop.displayName}
-                description=""
-                property-editor-ui-alias=${prop.propertyEditor}
-                .appearance=${{
-                  labelOnTop: true,
-                }}
-                val
-              ></umb-property>
-            `
+            this.#getAvailableOutcomes(),
+            (item) => item.alias,
+            (item) => {
+              const isSelected = item.alias === selectedAlias;
+              return html`
+                <button
+                  class="option ${isSelected ? "selected" : ""}"
+                  role="radio"
+                  aria-checked=${isSelected}
+                  @click=${() => this.#selectOutcome(item.alias)}
+                >
+                  <span class="option-check">
+                    ${isSelected ? html`<uui-icon name="icon-check"></uui-icon>` : nothing}
+                  </span>
+                  <span>${item.displayName}</span>
+                </button>
+              `;
+            }
           )}
         </div>
-      </umb-property-layout>
+        ${repeat(
+          selected?.properties ?? [],
+          (prop) => prop.alias,
+          (prop) => html`
+            <umb-property
+              alias=${"outcome-" + prop.alias}
+              label=${prop.displayName}
+              description=""
+              property-editor-ui-alias=${prop.propertyEditor}
+              val
+            ></umb-property>
+          `
+        )}
+      </uui-box>
     `;
   }
 
@@ -201,101 +241,101 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
           .value=${this._values!}
           @change=${this.#onPropertyDataChange}
         >
-          <umb-property
-            alias="alias"
-            label="Alias"
-            description="The generated alias for this form. This is used for programmatic implementations."
-            property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
-            val
-          ></umb-property>
+          <uui-box headline="General">
+            <umb-property
+              alias="alias"
+              label="Alias"
+              description="The generated alias for this form. This is used for programmatic implementations."
+              property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+              val
+            ></umb-property>
+          </uui-box>
 
           ${this.#renderFormType()}
-
-          <umb-property-layout
-            label="Submit outcome"
-            description="What should happen to the client after they submit the form?"
-          >
-            <div slot="editor" class="option-container">
-              ${repeat(
-                this.#getAvailableOutcomes(),
-                (item) => item.alias,
-                (item) => html`
-                  <div class="option">
-                    <div class="option-header">
-                      <h3>${item.displayName}</h3>
-                      <uui-radio
-                        .value=${item.alias}
-                        .checked=${this.form?.definition.outcome.typeAlias ===
-                        item.alias}
-                        @change=${this.#onOutcomeChange}
-                      ></uui-radio>
-                    </div>
-                    <div>
-                      ${repeat(
-                        item.properties,
-                        (prop) => prop.alias,
-                        (prop) => html`
-                          <umb-property
-                            alias=${"outcome-" + prop.alias}
-                            label=${prop.displayName}
-                            description=""
-                            .readonly=${this.form?.definition.outcome
-                              .typeAlias !== item.alias}
-                            property-editor-ui-alias=${prop.propertyEditor}
-                            .appearance=${{
-                              labelOnTop: true,
-                            }}
-                            val
-                          ></umb-property>
-                        `
-                      )}
-                    </div>
-                  </div>
-                `
-              )}
-            </div>
-          </umb-property-layout>
+          ${this.#renderOutcome()}
         </umb-property-dataset>
       </div>
     `;
   }
 
   static styles = css`
+    :host {
+      display: block;
+      overflow-y: auto;
+      background-color: var(--uui-color-background);
+    }
+
     .settings {
-      padding: 0 16px;
-      background-color: white;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--uui-size-layout-1);
+    }
+
+    umb-property-dataset {
+      display: flex;
+      flex-direction: column;
+      gap: var(--uui-size-layout-1);
+    }
+
+    .headline {
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+    }
+
+    .box-description {
+      margin: 0 0 var(--uui-size-space-5);
+      color: var(--uui-color-text-alt);
     }
 
     .option-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: var(--uui-size-space-3);
+      margin-bottom: var(--uui-size-space-5);
     }
 
     .option {
-      padding: 16px 24px;
-      border: 1px solid #ccc;
-      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+      padding: var(--uui-size-space-4);
+      font: inherit;
+      font-weight: 700;
+      text-align: left;
+      color: var(--uui-color-text);
+      background-color: var(--uui-color-surface);
+      border: 1px solid var(--uui-color-border);
+      border-radius: calc(var(--uui-border-radius) * 2);
+      cursor: pointer;
+      transition: border-color 120ms, box-shadow 120ms;
 
-      .option-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 8px;
-
-        h3 {
-          margin: 0;
-        }
+      &:hover {
+        border-color: var(--uui-color-border-emphasis);
       }
 
-      > h3 {
-        margin: 0 0 8px;
+      &.selected {
+        border-color: var(--uui-color-selected);
+        box-shadow: 0 0 0 1px var(--uui-color-selected);
       }
+    }
 
-      .option-description {
-        margin: 0 0 8px;
-        color: var(--uui-color-text-alt);
-      }
+    .option-check {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1px solid var(--uui-color-border-emphasis);
+      font-size: 12px;
+    }
+
+    .option.selected .option-check {
+      border-color: var(--uui-color-selected);
+      background-color: var(--uui-color-selected);
+      color: var(--uui-color-selected-contrast);
     }
   `;
 }

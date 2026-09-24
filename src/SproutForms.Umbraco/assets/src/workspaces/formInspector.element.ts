@@ -88,32 +88,68 @@ export class FormInspector extends UmbElementMixin(LitElement) {
   }
 
   render() {
+    const fieldType = this.selectedField
+      ? this.getFieldType(this.selectedField.fieldTypeAlias)
+      : undefined;
+
     return html`
       <div class="inspector">
         ${
-          this.selectedState.field
+          this.selectedState.field && this.selectedField
             ? html`
-                <div class="fields">
-                  <sf-inspector-field-type
-                    .field=${this.selectedField!}
-                    .fieldType=${this.getFieldType(this.selectedField!.fieldTypeAlias)!}
-                    .fields=${this.definition.fields}
-                    .formType=${this.formType}
-                    @field-change=${this.#handleFieldUpdate}>
-
-                  </sf-inspector-field-type>
+                <div class="panel-header">
+                  <span class="panel-icon">
+                    <umb-icon name=${fieldType?.icon ?? "icon-document"}></umb-icon>
+                  </span>
+                  <div class="panel-title">
+                    <h3>${this.selectedField.label}</h3>
+                    <span>${fieldType?.displayName ?? this.selectedField.fieldTypeAlias}</span>
+                  </div>
+                  <uui-button
+                    compact
+                    label="Close"
+                    title="Back to the field list"
+                    @click=${this.#deselect}
+                  >
+                    <uui-icon name="icon-wrong"></uui-icon>
+                  </uui-button>
+                </div>
+                <sf-inspector-field-type
+                  .field=${this.selectedField}
+                  .fieldType=${fieldType!}
+                  .fields=${this.definition.fields}
+                  .formType=${this.formType}
+                  @field-change=${this.#handleFieldUpdate}>
+                </sf-inspector-field-type>
+              `
+            : html`
+                <div class="panel-header">
+                  <div class="panel-title">
+                    <h3>Add a field</h3>
+                    <span>${this.selectedState.row
+                      ? "It is added to the selected row"
+                      : "It is added as a new row"}</span>
+                  </div>
+                </div>
+                <div class="inspector-content">
+                  <form-field-selector
+                    @add-field=${(e: any) => this.onAddField(e.detail)}
+                  ></form-field-selector>
                 </div>
               `
-            : html`<div class="inspector-content">
-                <h3>Fields</h3>
-                <form-field-selector
-                  @add-field=${(e: any) => this.onAddField(e.detail)}
-                ></form-field-selector>
-              </div>`
         }
-          </div>
       </div>
     `;
+  }
+
+  #deselect() {
+    this.dispatchEvent(
+      new CustomEvent("select-field", {
+        detail: { row: undefined, column: undefined, field: undefined },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private onAddField(fieldType: FormFieldTypeDto) {
@@ -139,37 +175,87 @@ export class FormInspector extends UmbElementMixin(LitElement) {
         newField.extension![prop.alias] = prop.value ?? null;
       });
     }
-    if (this.selectedState.column) {
-      this.selectedState.column!.fieldId = newField.id;
+    // The rows in the workspace state are frozen, so place the field in a copy
+    const rows = structuredClone(this.definition.rows);
+    let row = rows.find((it) => it.id === this.selectedState.row?.id);
+    let column = row?.columns.find((it) => it.id === this.selectedState.column?.id);
+    if (column) {
+      column.fieldId = newField.id;
     } else {
-      let row = this.selectedState.row;
       if (!row) {
         row = { id: crypto.randomUUID(), columns: [] };
-        newDefinition.rows = [...newDefinition.rows, row];
+        rows.push(row);
       }
       const rowSize = row.columns.reduce((a, b) => a + b.width, 0);
-      const newColumn = {
+      column = {
         id: crypto.randomUUID(),
         width: 12 - rowSize,
         fieldId: newField.id,
       };
-      row.columns = [...row.columns, newColumn];
-      this.selectedState.column = newColumn;
+      row.columns.push(column);
     }
-    this.selectedState.field = newField.id;
+    newDefinition.rows = rows;
     newDefinition.fields = [...newDefinition.fields, newField];
     this.context?.updateForm({ definition: newDefinition });
+
+    // Select the new field, using the row and column objects the canvas now renders
+    const newRow = this.definition.rows.find((it) => it.id === row!.id);
+    this.dispatchEvent(
+      new CustomEvent("select-field", {
+        detail: {
+          row: newRow,
+          column: newRow?.columns.find((it) => it.id === column!.id),
+          field: newField,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   static styles = css`
-    .fields {
+    .panel-header {
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+      padding: var(--uui-size-space-4) var(--uui-size-space-5);
+      border-bottom: 1px solid var(--uui-color-border);
+    }
+
+    .panel-icon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: var(--uui-border-radius);
+      background: var(--uui-color-surface-alt);
+      color: var(--uui-color-interactive);
+      font-size: 1.1em;
+    }
+
+    .panel-title {
+      display: flex;
       flex-direction: column;
+      flex: 1;
+      min-width: 0;
+
+      h3 {
+        margin: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      span {
+        font-size: var(--uui-type-small-size);
+        color: var(--uui-color-text-alt);
+      }
     }
 
     .inspector-content {
-      padding: 18px 12px;
+      padding: var(--uui-size-space-5);
     }
   `;
 }

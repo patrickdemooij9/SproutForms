@@ -29,7 +29,10 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
         >
         </form-canvas>
 
-        <form-inspector .selectedState=${this.selectedState}> </form-inspector>
+        <form-inspector
+          .selectedState=${this.selectedState}
+          @select-field=${this.onSelectField}
+        ></form-inspector>
       </div>
     `;
   }
@@ -49,40 +52,26 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
   }
 
   static styles = css`
+    :host {
+      display: block;
+      height: 100%;
+    }
+
     .layout {
       display: grid;
-      grid-template-columns: 2fr 1fr;
+      grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
       height: 100%;
-
-      position: relative;
     }
 
     form-canvas {
       overflow-y: auto;
-      background-color: #f3f4f6;
+      background-color: var(--uui-color-background);
     }
 
     form-inspector {
       overflow-y: auto;
-      border-left: 1px solid #ccc;
-      background-color: white;
-    }
-
-    .overlay {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      background-color: rgba(0, 0, 0, 0.3);
-
-      display: flex;
-      justify-content: center;
-      align-items: center;
-
-      p {
-        padding: 16px 24px;
-        background-color: white;
-        border-radius: 4px;
-      }
+      border-left: 1px solid var(--uui-color-border);
+      background-color: var(--uui-color-surface);
     }
   `;
 }

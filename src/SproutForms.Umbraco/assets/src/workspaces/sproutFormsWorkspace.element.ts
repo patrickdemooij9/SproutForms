@@ -3,6 +3,8 @@ import {
   css,
   customElement,
   html,
+  nothing,
+  repeat,
   state,
   when,
 } from "@umbraco-cms/backoffice/external/lit";
@@ -23,6 +25,8 @@ enum TabState {
   Integrations,
   Submissions,
 }
+
+type Tab = { state: TabState; label: string; icon: string };
 
 @customElement("sprout-forms-workspace")
 export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
@@ -54,175 +58,171 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     await this.context?.save();
   }
 
+  // Submissions only exist once the form has been saved
+  #getTabs(): Array<Tab> {
+    const tabs: Array<Tab> = [
+      { state: TabState.Editor, label: "Build", icon: "icon-layout" },
+      { state: TabState.Settings, label: "Settings", icon: "icon-settings" },
+      { state: TabState.Integrations, label: "Integrations", icon: "icon-nodes" },
+    ];
+    if (this.form.id) {
+      tabs.push({ state: TabState.Submissions, label: "Submissions", icon: "icon-inbox" });
+    }
+    return tabs;
+  }
+
+  get #isReadOnly() {
+    return this.form.source === SOURCE_CODE && this.tabState !== TabState.Submissions;
+  }
+
   render() {
     return html`
-      <div class="workspace">
-        <div class="header">
+      <umb-body-layout main-no-padding>
+        <div slot="header" class="header">
           <uui-input
+            id="nameInput"
+            label="Name of the form"
             placeholder="Name of the form"
             .value=${this.form.name}
             @change=${(event: UUIInputEvent) =>
               this.updateName(event.target.value as string)}
             .readonly=${this.form.source == SOURCE_CODE}
           ></uui-input>
-          <div class="navigation">
-            <div
-              class="${this.tabState == TabState.Editor ? "selected" : ""}"
-              @click=${() => (this.tabState = TabState.Editor)}
-            >
-              Build
-            </div>
-            <div
-              class="${this.tabState == TabState.Settings ? "selected" : ""}"
-              @click=${() => (this.tabState = TabState.Settings)}
-            >
-              Settings
-            </div>
-            <div
-              class="${this.tabState == TabState.Integrations
-                ? "selected"
-                : ""}"
-              @click=${() => (this.tabState = TabState.Integrations)}
-            >
-              Integrations
-            </div>
-            ${when(
-              this.form.id,
-              () => html`
-                <div
-                  class="${this.tabState == TabState.Submissions
-                    ? "selected"
-                    : ""}"
-                  @click=${() => (this.tabState = TabState.Submissions)}
-                >
-                  Submissions
-                </div>
-              `
-            )}
-          </div>
-          <div></div>
+          ${this.form.definition.type.typeAlias !== "standard"
+            ? html`<uui-tag look="secondary">${this.form.definition.type.displayName}</uui-tag>`
+            : nothing}
         </div>
+
+        <uui-tab-group slot="navigation">
+          ${repeat(
+            this.#getTabs(),
+            (tab) => tab.state,
+            (tab) => html`
+              <uui-tab
+                .label=${tab.label}
+                ?active=${this.tabState === tab.state}
+                @click=${() => (this.tabState = tab.state)}
+              >
+                <umb-icon slot="icon" name=${tab.icon}></umb-icon>
+                ${tab.label}
+              </uui-tab>
+            `,
+          )}
+        </uui-tab-group>
+
         <div class="content">
           ${when(
-          this.tabState == TabState.Editor,
-          () => html`<form-editor></form-editor>`
-        )}
-        ${when(
-          this.tabState == TabState.Settings,
-          () => html`<form-settings></form-settings>`
-        )}
-        ${when(
-          this.tabState == TabState.Integrations,
-          () => html`<form-integrations></form-integrations>`
-        )}
-        ${when(
-          this.tabState == TabState.Submissions,
-          () => html`<form-submissions></form-submissions>`
-        )}
-        ${when(
-          this.form.source === SOURCE_CODE && this.tabState !== TabState.Submissions,
-          () => html`
-            <div class="overlay">
-              <p>Code forms cannot be edited in the backoffice.</p>
-            </div>
-          `
-        )}
-        </div>
-        <div class="footer">
-          <div>Version: ${this.form.version}</div>
-          <div>
-            <uui-button
-              id="save"
-              label="Submit"
-              look="primary"
-              color="positive"
-              @click=${() => this.save()}
-              .disabled=${this.form.source === SOURCE_CODE}
-            >
-              Save
-            </uui-button>
+            this.#isReadOnly,
+            () => html`
+              <div class="read-only-notice">
+                <umb-icon name="icon-lock"></umb-icon>
+                This form is defined in code, so it can't be edited in the backoffice.
+              </div>
+            `,
+          )}
+          <div class="view" ?inert=${this.#isReadOnly}>
+            ${when(
+              this.tabState == TabState.Editor,
+              () => html`<form-editor></form-editor>`,
+            )}
+            ${when(
+              this.tabState == TabState.Settings,
+              () => html`<form-settings></form-settings>`,
+            )}
+            ${when(
+              this.tabState == TabState.Integrations,
+              () => html`<form-integrations></form-integrations>`,
+            )}
+            ${when(
+              this.tabState == TabState.Submissions,
+              () => html`<form-submissions></form-submissions>`,
+            )}
           </div>
         </div>
-      </div>
+
+        <div slot="footer-info" class="footer-info">
+          ${when(
+            this.form.source === SOURCE_CODE,
+            () => html`<uui-tag look="outline">Code</uui-tag>`,
+          )}
+          <span>Version ${this.form.version}</span>
+        </div>
+        <uui-button
+          slot="actions"
+          id="save"
+          label="Save"
+          look="primary"
+          color="positive"
+          @click=${() => this.save()}
+          .disabled=${this.form.source === SOURCE_CODE}
+        ></uui-button>
+      </umb-body-layout>
     `;
   }
 
   static styles = css`
-    .workspace {
+    :host {
+      display: block;
       height: 100%;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .content,
-    form-editor,
-    form-settings,
-    form-integrations,
-    form-submissions {
-      flex-grow: 1;
-      overflow-y: auto;
-      background-color: white;
     }
 
     .header {
       display: flex;
-      justify-content: space-between;
-      flex-shrink: 0;
       align-items: center;
+      gap: var(--uui-size-space-4);
       width: 100%;
-      background-color: white;
-      border-bottom: 1px solid #ccc;
-      height: 54px;
-      padding: 0 16px;
-
-      > * {
-        flex: 1;
-      }
     }
 
-    .navigation {
-      display: flex;
-      justify-content: center;
-      gap: 16px;
-      cursor: pointer;
+    #nameInput {
+      flex: 1 1 auto;
+    }
 
-      .selected {
-        font-weight: 700;
-        border-bottom: 1px solid #ccc;
-      }
+    uui-tab-group {
+      --uui-tab-divider: var(--uui-color-border);
+      border-left: 1px solid var(--uui-color-border);
+      border-right: 1px solid var(--uui-color-border);
     }
 
     .content {
-      position: relative;
-    }
-
-    .footer {
       display: flex;
-      flex-shrink: 0;
-      justify-content: space-between;
-      align-items: center;
-      background-color: white;
-      border-top: 1px solid #ccc;
-      height: 54px;
-      padding: 0 16px;
-    }
-
-    .overlay {
-      position: absolute;
-      top: 0;
-      width: 100%;
+      flex-direction: column;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.3);
+    }
 
+    .view {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .view[inert] {
+      opacity: 0.75;
+    }
+
+    form-editor,
+    form-settings,
+    form-integrations,
+    form-submissions {
+      display: block;
+      height: 100%;
+    }
+
+    .read-only-notice {
       display: flex;
-      justify-content: center;
       align-items: center;
+      gap: var(--uui-size-space-3);
+      flex-shrink: 0;
+      padding: var(--uui-size-space-3) var(--uui-size-layout-1);
+      background-color: var(--uui-color-warning);
+      color: var(--uui-color-warning-contrast);
+      border-bottom: 1px solid var(--uui-color-warning-standalone);
+    }
 
-      p {
-        padding: 16px 24px;
-        background-color: white;
-        border-radius: 4px;
-      }
+    .footer-info {
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+      padding-left: var(--uui-size-layout-1);
+      color: var(--uui-color-text-alt);
     }
   `;
 }

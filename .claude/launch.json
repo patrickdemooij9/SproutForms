@@ -6,6 +6,13 @@
       "runtimeExecutable": "pwsh",
       "runtimeArgs": ["-NoProfile", "-File", "scripts/ai-test/run-site.ps1"],
       "port": 62970
+    },
+    {
+      "name": "sproutforms-aitest-backoffice",
+      "runtimeExecutable": "pwsh",
+      "runtimeArgs": ["-NoProfile", "-File", "scripts/ai-test/run-site.ps1", "-Reset", "-AdminPassword", "SproutForms-AiTest-1"],
+      "port": 44370,
+      "url": "https://localhost:44370"
     }
   ]
 }

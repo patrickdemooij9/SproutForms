@@ -85,7 +85,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             entity.UpdatedAt = DateTime.UtcNow;
 
             scope.Database.Save(entity);
-            return template.Id;
+            return entity.Id;
         }
 
         public void Delete(Guid id)

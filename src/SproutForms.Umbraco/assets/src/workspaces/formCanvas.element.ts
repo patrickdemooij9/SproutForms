@@ -4,14 +4,16 @@ import {
   customElement,
   html,
   LitElement,
+  nothing,
   property,
   state,
   when,
 } from "@umbraco-cms/backoffice/external/lit";
-import { FormColumnDto, FormDefinitionDto, FormFieldDto, FormRowDto, SelectedResizeState, SelectedState } from "../models";
+import { FormColumnDto, FormDefinitionDto, FormFieldDto, FormFieldTypeDto, FormRowDto, SelectedResizeState, SelectedState } from "../models";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
+import { SproutFormsSource } from "../repositories/sproutFormsSource";
 
 @customElement("form-canvas")
 export class FormCanvas extends UmbElementMixin(LitElement) {
@@ -22,6 +24,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
 
   @state()
   definition!: FormDefinitionDto;
+
+  @state()
+  private fieldTypes: FormFieldTypeDto[] = [];
 
   @state()
   private resizeState?: SelectedResizeState;
@@ -41,9 +46,16 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         this.definition = form.definition;
       });
     });
+
+    new SproutFormsSource(this).getFieldTypes().then((resp) => {
+      this.fieldTypes = resp.data;
+    });
   }
 
   render() {
+    const hasFields = this.definition.rows.some((row) => row.columns.length > 0);
+    const isNewRowSelected = !this.selectedState.row && !this.selectedState.column;
+
     return html`
       <div class="canvas">
         ${this.definition.rows.map((row) => {
@@ -53,35 +65,37 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
               (this.resizeState?.column == b ? this.resizeState.size : b.width),
             0
           );
+          const isRowSlotSelected = this.selectedState.row == row && !this.selectedState.column;
           return html`
             <div class="row">
               ${row.columns.map((column) => this.renderColumn(row, column))}
               ${when(
                 rowSize < 12,
-                () => html`<div
-                  class="column empty"
+                () => html`<button
+                  class="drop-zone ${isRowSlotSelected ? "selected" : ""}"
                   style="flex:${12 - rowSize}"
+                  title="Add a field to this row"
                   @click=${() => this.selectField(row, undefined, undefined)}
                   @dragover=${this.onDragOver}
                   @drop=${(event: DragEvent) => this.onDropOnEmpty(event, row)}
                 >
-                  (Empty)
-                </div> `
+                  <uui-icon name="icon-add"></uui-icon>
+                </button>`
               )}
             </div>
           `;
         })}
-        <div class="row">
-          <div
-            class="column empty"
-            style="flex:12"
-            @click=${() => this.selectField(undefined, undefined, undefined)}
-            @dragover=${this.onDragOver}
-            @drop=${(event: DragEvent) => this.onDropOnEmpty(event, undefined)}
-          >
-            (Empty)
-          </div>
-        </div>
+        <button
+          class="drop-zone new-row ${isNewRowSelected ? "selected" : ""}"
+          @click=${() => this.selectField(undefined, undefined, undefined)}
+          @dragover=${this.onDragOver}
+          @drop=${(event: DragEvent) => this.onDropOnEmpty(event, undefined)}
+        >
+          <uui-icon name="icon-add"></uui-icon>
+          ${hasFields
+            ? "Add a row"
+            : "Pick a field from the panel to start building your form"}
+        </button>
       </div>
     `;
   }
@@ -97,35 +111,55 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       return;
     }
 
+    const fieldType = this.fieldTypes.find((it) => it.alias === field.fieldTypeAlias);
+    const isResizingThis = this.resizeState?.column == column;
+    const width = isResizingThis ? this.resizeState!.size : column.width;
+
     return html`
-      <div
-        class="column-outer"
-        style="flex:${this.resizeState?.column == column
-          ? this.resizeState.size
-          : column.width}"
-      >
+      <div class="column-outer" style="flex:${width}">
         <div
-          class="column ${this.selectedState.column == column
+          class="field ${this.selectedState.column == column
             ? "selected"
-            : ""} ${this.draggedFieldId && this.draggedFieldId !== field.id ? 'drag-over' : ''}"
+            : ""} ${this.draggedFieldId && this.draggedFieldId !== field.id ? 'drag-over' : ''} ${this.draggedFieldId === field.id ? 'dragging' : ''}"
           draggable="${this.isResizing ? 'false' : 'true'}"
           @dragstart=${(event: DragEvent) => this.onDragStart(event, field.id!)}
+          @dragend=${this.onDragEnd}
           @dragover=${this.onDragOver}
           @drop=${(event: DragEvent) => this.onDrop(event, row, column)}
           @click=${() => this.selectField(row, column, field)}
         >
-          <span class="field-label">${field.label}</span>
+          <uui-icon class="grip" name="icon-grip"></uui-icon>
+          <span class="field-icon">
+            <umb-icon name=${fieldType?.icon ?? "icon-document"}></umb-icon>
+          </span>
+          <span class="field-text">
+            <span class="field-label">
+              ${field.label}
+              ${field.required ? html`<span class="required" title="Required">*</span>` : nothing}
+            </span>
+            <span class="field-type">${fieldType?.displayName ?? field.fieldTypeAlias}</span>
+          </span>
+          ${when(
+            field.conditions?.visibility || field.conditions?.required,
+            () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has conditions"></uui-icon>`,
+          )}
+          ${when(
+            isResizingThis,
+            () => html`<span class="width-badge">${width}/12</span>`,
+          )}
           <button
             class="delete-btn"
             @click=${(event: MouseEvent) => this.deleteField(event, field.id!)}
             title="Delete field"
+            aria-label="Delete field"
           >
-            <uui-icon name="icon-delete"></uui-icon>
+            <uui-icon name="icon-trash"></uui-icon>
           </button>
         </div>
         <div
-          class="field-resizer"
+          class="field-resizer ${isResizingThis ? "active" : ""}"
           draggable="false"
+          title="Drag to resize"
           @mousedown=${(event: MouseEvent) =>
             this.startResize(event, row, column)}
         ></div>
@@ -145,7 +179,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   ) {
     event.preventDefault();
     event.stopPropagation();
-    
+
     const startX = event.clientX;
     const columnElemn = (event.target as HTMLElement)
       .previousElementSibling as HTMLElement;
@@ -176,6 +210,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       document.removeEventListener("mouseup", onMouseUp);
 
       this.context?.setColumnSize(row, column, this.resizeState!.size);
+      this.resizeState = undefined;
       this.isResizing = false;
     };
 
@@ -205,6 +240,11 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     }
   }
 
+  // A drag that is cancelled never reaches a drop target
+  private onDragEnd() {
+    this.draggedFieldId = undefined;
+  }
+
   private onDragOver(event: DragEvent) {
     event.preventDefault();
     if (event.dataTransfer) {
@@ -229,76 +269,213 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   static styles = css`
-    .canvas {
-      padding: 16px;
-      background: #f3f4f6;
+    :host {
+      display: block;
     }
+
+    .canvas {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: var(--uui-size-layout-1);
+      display: flex;
+      flex-direction: column;
+      gap: var(--uui-size-space-3);
+    }
+
     .row {
       display: flex;
-      gap: 8px;
-      margin-bottom: 8px;
+      gap: var(--uui-size-space-3);
     }
+
     .column-outer {
       position: relative;
+      min-width: 0;
     }
-    .column {
+
+    .field {
       display: flex;
-      border: 1px solid #ccc;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+      min-height: 56px;
+      box-sizing: border-box;
+      padding: var(--uui-size-space-3) var(--uui-size-space-4);
+      padding-left: var(--uui-size-space-2);
       background: var(--uui-color-surface);
-      border-radius: 4px;
-      padding: 12px;
+      border: 1px solid var(--uui-color-border);
+      border-radius: calc(var(--uui-border-radius) * 2);
+      box-shadow: var(--uui-shadow-depth-1);
       cursor: pointer;
       user-select: none;
+      transition: border-color 120ms, box-shadow 120ms;
 
       &:hover {
-        background-color: #e5e7eb;
+        border-color: var(--uui-color-border-emphasis);
       }
 
-      &.empty {
-        border: 1px dashed #ccc;
-        display: flex;
-        justify-content: center;
-        color: #ccc;
+      &.selected {
+        border-color: var(--uui-color-selected);
+        box-shadow: 0 0 0 1px var(--uui-color-selected);
+      }
+
+      &.dragging {
+        opacity: 0.5;
       }
 
       &.drag-over {
-        border: 2px dashed #0078d4;
-        background-color: #e6f2fa;
+        border-style: dashed;
+        border-color: var(--uui-color-interactive-emphasis);
       }
     }
-    .selected {
-      border: 1px solid #ccc;
-      background-color: #e5e7eb;
+
+    .grip {
+      color: var(--uui-color-disabled-contrast);
+      cursor: grab;
+      flex-shrink: 0;
     }
-    .field-label {
-      flex: 1;
-    }
-    .delete-btn {
-      opacity: 0;
-      background: none;
-      border: none;
-      cursor: pointer;
-      padding: 4px;
+
+    .field-icon {
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #666;
-      transition: opacity 0.2s, color 0.2s;
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: var(--uui-border-radius);
+      background: var(--uui-color-surface-alt);
+      color: var(--uui-color-interactive);
+    }
+
+    .field-text {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .field-label,
+    .field-type {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .field-label {
+      font-weight: 700;
+    }
+
+    .required {
+      color: var(--uui-color-danger);
+    }
+
+    .field-type {
+      font-size: var(--uui-type-small-size);
+      color: var(--uui-color-text-alt);
+    }
+
+    .badge-icon {
+      flex-shrink: 0;
+      color: var(--uui-color-text-alt);
+    }
+
+    .width-badge {
+      flex-shrink: 0;
+      padding: 0 var(--uui-size-space-2);
+      border-radius: var(--uui-border-radius);
+      background: var(--uui-color-selected);
+      color: var(--uui-color-selected-contrast);
+      font-size: var(--uui-type-small-size);
+      font-weight: 700;
+    }
+
+    .delete-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      padding: var(--uui-size-space-2);
+      background: none;
+      border: none;
+      border-radius: var(--uui-border-radius);
+      color: var(--uui-color-text-alt);
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 120ms, color 120ms, background-color 120ms;
 
       &:hover {
-        color: #d32f2f;
+        color: var(--uui-color-danger);
+        background-color: var(--uui-color-surface-emphasis);
+      }
+
+      &:focus-visible {
+        opacity: 1;
       }
     }
-    .column:hover .delete-btn {
+
+    .field:hover .delete-btn,
+    .field.selected .delete-btn {
       opacity: 1;
     }
+
+    .drop-zone {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--uui-size-space-2);
+      min-width: 0;
+      min-height: 56px;
+      box-sizing: border-box;
+      padding: var(--uui-size-space-3);
+      font: inherit;
+      color: var(--uui-color-text-alt);
+      background: transparent;
+      border: 1px dashed var(--uui-color-border-emphasis);
+      border-radius: calc(var(--uui-border-radius) * 2);
+      cursor: pointer;
+      transition: border-color 120ms, color 120ms, background-color 120ms;
+
+      &:hover,
+      &.selected {
+        color: var(--uui-color-interactive-emphasis);
+        border-color: var(--uui-color-interactive-emphasis);
+        background-color: var(--uui-color-surface);
+      }
+
+      &.selected {
+        border-style: solid;
+      }
+
+      &.new-row {
+        width: 100%;
+      }
+    }
+
     .field-resizer {
-      width: 10px;
-      height: 100%;
       position: absolute;
-      right: -5px;
-      top: 0px;
+      top: 50%;
+      right: calc(var(--uui-size-space-3) / -2 - 3px);
+      width: 6px;
+      height: 24px;
+      transform: translateY(-50%);
+      border-radius: 3px;
+      background: var(--uui-color-border-emphasis);
       cursor: col-resize;
+      opacity: 0;
+      transition: opacity 120ms;
+
+      &::before {
+        content: "";
+        position: absolute;
+        inset: -16px -6px;
+      }
+
+      &.active {
+        opacity: 1;
+        background: var(--uui-color-selected);
+      }
+    }
+
+    .column-outer:hover .field-resizer {
+      opacity: 1;
     }
   `;
 }
