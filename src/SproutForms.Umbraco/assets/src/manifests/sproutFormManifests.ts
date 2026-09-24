@@ -20,11 +20,13 @@ import FormSubmissionCollectionElement from "../collections/formSubmissionCollec
 import SproutFormSubmissionsListContext from "../workspaces/sproutFormSubmissionsContext";
 import { ManifestModal } from "@umbraco-cms/backoffice/modal";
 import CreateFormAction from "../actions/CreateFormAction";
+import { FORM_TYPE_PICKER_MODAL_ALIAS } from "../modals/formTypePickerModal.alias";
 import DeleteFormAction from "../actions/deleteFormAction";
 import { SubmissionFieldManifest } from "./submissionFieldManifest";
 import FileSubmissionFieldElement from "../workspaces/submissionEditors/fileSubmissionField.element";
 import { FormFieldConfigManifest } from "./formFieldConfigManifest";
 import KeyValuePairProperty from "../workspaces/fieldEditors/keyValuePairProperty.element";
+import FieldOptionPickerProperty from "../workspaces/fieldEditors/fieldOptionPickerProperty.element";
 import { ManifestPropertyEditorUi } from "@umbraco-cms/backoffice/property-editor";
 import FormPickerElement from "../propertyEditors/formPickerElement";
 import TokenAutocompleteTextareaElement from "../propertyEditors/tokenAutocompleteTextarea.element";
@@ -231,6 +233,13 @@ const FormSubmissionInfoModal: ManifestModal = {
   js: () => import("../modals/formSubmissionInfoModal.element"),
 };
 
+const FormTypePickerModal: ManifestModal = {
+  type: "modal",
+  alias: FORM_TYPE_PICKER_MODAL_ALIAS,
+  name: "SproutForms Form Type Picker Modal",
+  js: () => import("../modals/formTypePickerModal.element"),
+};
+
 const FileFieldSubmissionField: SubmissionFieldManifest = {
   type: "submissionField",
   alias: "sproutForms.submissionField.file",
@@ -245,6 +254,14 @@ const KeyValuePairFieldConfigProperty: FormFieldConfigManifest = {
   name: "Key Value Pair Field Config Property",
   element: KeyValuePairProperty,
   propertyTypeAlias: "SproutForms.KeyValuePair",
+};
+
+const FieldOptionPickerFieldConfigProperty: FormFieldConfigManifest = {
+  type: "formFieldConfig",
+  alias: "sproutForms.fieldConfig.fieldOptionPicker",
+  name: "Field Option Picker Field Config Property",
+  element: FieldOptionPickerProperty,
+  propertyTypeAlias: "SproutForms.FieldOptionPicker",
 };
 
 const FormsPickerPropertyEditor: ManifestPropertyEditorUi = {
@@ -288,8 +305,10 @@ export const SproutFormManifests = [
   FormSubmissionsCollectionManifest,
   FormSubmissionsCollectionViewManifest,
   FormSubmissionInfoModal,
+  FormTypePickerModal,
   FileFieldSubmissionField,
   KeyValuePairFieldConfigProperty,
+  FieldOptionPickerFieldConfigProperty,
   FormsPickerPropertyEditor,
   TokenAutocompleteTextareaPropertyEditor
 ];

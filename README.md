@@ -57,3 +57,156 @@ And supports the following flows:
 - Send email
 
 Data is automatically stored in the database and can be viewed as such in the backoffice. You also have the option to either show a message or redirect the user to a different page.
+
+# Extending: form types
+
+A **form type** decides what kind of form something is: a standard form, a quiz, a poll, a product finder, or your own. Editors choose it when they create a form, and it can't be changed afterwards. A form type can:
+
+- allow only some field types and submit outcomes (a poll only has radio buttons),
+- add settings to the whole form (a quiz's pass mark),
+- add settings to every field of a field type (a quiz question's correct answer and points), shown on a tab of that field named after the form type,
+- process each submission before it is saved, to store results with it (a score) or to reject it,
+- come with outcomes that show those results to the visitor.
+
+Working examples of a quiz, a poll and a product finder are in [`src/SproutForms.Site/Examples`](src/SproutForms.Site/Examples). Each one is a form type, a backoffice descriptor, an outcome, and a code-first example form; [`form-type-examples.js`](src/SproutForms.Site/wwwroot/examples/form-type-examples.js) holds their front-end handlers. The steps below build the quiz.
+
+## 1. The form type
+
+```csharp
+public class QuizFormType : FormDefinitionTypeBase<QuizSettings>
+{
+    public override string Alias => "quiz";
+
+    public QuizFormType()
+    {
+        // Every radio button field in a quiz gets these settings
+        ExtendField<QuizAnswerSettings>("radio");
+    }
+
+    public override bool AllowsFieldType(IFormFieldType fieldType) => fieldType is not FileFieldType;
+
+    // Runs after field validation, before the submission is saved
+    public override Task<FormTypeSubmissionResult> ProcessSubmissionAsync(FormTypeSubmissionContext context, CancellationToken cancellationToken)
+    {
+        var settings = GetSettings(context.Definition);
+        var score = 0;
+        foreach (var field in context.Definition.Fields.Where(it => it.Extension != null))
+        {
+            var answer = GetFieldSettings<QuizAnswerSettings>(field);
+            if (context.Values.TryGetValue(field.Alias, out var value) && value.GetString() == answer.CorrectAnswer)
+                score += answer.Points;
+        }
+
+        // Stored with the submission as FormSubmission.Results.
+        // Use FormTypeSubmissionResult.Reject(fieldAlias, message) to refuse the submission instead.
+        return Task.FromResult(FormTypeSubmissionResult.WithResults(new Dictionary<string, object?>
+        {
+            ["score"] = score,
+            ["passed"] = score >= settings.PassMark
+        }));
+    }
+}
+
+public class QuizSettings { public int PassMark { get; set; } }
+public class QuizAnswerSettings { public string CorrectAnswer { get; set; } = ""; public int Points { get; set; } = 1; }
+```
+
+The settings classes are plain classes; they are saved with each version of the form.
+
+## 2. The backoffice descriptor
+
+The descriptor names the type in the "Create a form" dialog and maps its settings to property editors, the same way field, workflow and outcome descriptors do.
+
+```csharp
+public class QuizFormTypeDescriptor : BaseFormDefinitionTypeDescriptor<QuizSettings>
+{
+    public override string FormTypeAlias => "quiz";
+    public override string DisplayName => "Quiz";
+    public override string Description => "Questions with a correct answer and points.";
+
+    public QuizFormTypeDescriptor()
+    {
+        DefineMap(it => it.PassMark, "passMark", "Pass mark", "Umb.PropertyEditorUi.Integer");
+
+        ExtendField<QuizAnswerSettings>("radio", field => field
+            // A dropdown of the question's own options
+            .Map(it => it.CorrectAnswer, "correctAnswer", "Correct answer", "SproutForms.FieldOptionPicker")
+            .Map(it => it.Points, "points", "Points", "Umb.PropertyEditorUi.Integer"));
+    }
+}
+```
+
+A type without a descriptor still works for code-first forms, but editors can't choose it.
+
+## 3. An outcome that shows the result
+
+An outcome gets the saved submission, including the results, and returns data for the browser. `url` redirects and `message` is shown, also without JavaScript; anything else is for your own front-end handler.
+
+```csharp
+public class QuizResultOutcomeType : IFormSubmitOutcomeType, IRestrictedToFormTypes
+{
+    public string Alias => "quizResult";
+    public Type ConfigurationType => typeof(QuizResultOutcomeConfig);
+    public object GetDefaultConfiguration() => new QuizResultOutcomeConfig();
+
+    // Only quizzes have a score, so only quizzes can pick this outcome
+    public IReadOnlyCollection<string> FormTypeAliases => ["quiz"];
+
+    public Task<OutcomeResult> HandleAsync(FormSubmitOutcomeContext context, CancellationToken cancellationToken)
+    {
+        var score = context.Submission.Results["score"].GetInt32();
+        return Task.FromResult(new OutcomeResult
+        {
+            Data = new Dictionary<string, object?> { ["score"] = score, ["message"] = $"You scored {score}." }
+        });
+    }
+}
+```
+
+Give it a descriptor (`BaseOutcomeDescriptor<QuizResultOutcomeConfig>`) so editors can choose it. `message` is inserted as HTML, so never put submitted values in it.
+
+Register a handler for the outcome's alias after `forms.js` is loaded:
+
+```js
+window.SproutForms.outcomeHandlers.register("quizResult", (form, data) => {
+    const result = document.createElement("div");
+    result.className = "form-success";
+    result.textContent = `You scored ${data.score}`;
+    form.replaceChildren(result);
+});
+```
+
+## 4. Register it
+
+```csharp
+public class QuizComposer : IComposer
+{
+    public void Compose(IUmbracoBuilder builder)
+    {
+        builder.Services.AddSingleton<IFormDefinitionType, QuizFormType>();
+        builder.Services.AddSingleton<IFormDefinitionTypeDescriptor, QuizFormTypeDescriptor>();
+        builder.Services.AddSingleton<IFormSubmitOutcomeType, QuizResultOutcomeType>();
+        builder.Services.AddSingleton<IOutcomeDescriptor, QuizResultOutcomeDescriptor>();
+    }
+}
+```
+
+## 5. In code
+
+Code-first forms choose the type and set each field's extension settings:
+
+```csharp
+new FormBuilder("coffeeQuiz", "Coffee quiz")
+    .OfType("quiz", new QuizSettings { PassMark = 2 })
+    .Row(row => row.Col(12, col => col
+        .Radio("strongest", "Which has the most caffeine per ml?")
+            .Set(c => c.Options = [new() { Label = "Espresso", Value = "espresso" }, new() { Label = "Filter", Value = "filter" }])
+            .Extend(new QuizAnswerSettings { CorrectAnswer = "espresso", Points = 2 })
+            .Done()))
+    .SetOutcome("quizResult", new QuizResultOutcomeConfig())
+    .Build();
+```
+
+`WorkflowBuilder.Add(alias, workflowTypeAlias, configuration)` adds your own workflow types the same way. Workflows get the submission too, so a workflow can email the score.
+
+Forms are checked against their type when a code-first form is registered (an invalid form stops the site from starting, with the reason) and when an editor saves one.

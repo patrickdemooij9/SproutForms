@@ -29,7 +29,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 IpAddress = submission.IpAddress,
                 SubmittedAt = submission.SubmittedAt,
                 ValuesJson = JsonSerializer.Serialize(submission.Values),
-                PageUrl = submission.PageUrl
+                PageUrl = submission.PageUrl,
+                ResultsJson = submission.Results.Count == 0 ? null : JsonSerializer.Serialize(submission.Results)
             });
         }
 
@@ -63,8 +64,17 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Values = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(entity.ValuesJson),
                 IpAddress = entity.IpAddress,
                 SubmittedAt = entity.SubmittedAt,
-                PageUrl = entity.PageUrl
+                PageUrl = entity.PageUrl,
+                Results = DeserializeResults(entity.ResultsJson)
             };
+        }
+
+        // Submissions saved before form types, or whose type computed nothing, have no results
+        private static IReadOnlyDictionary<string, JsonElement> DeserializeResults(string? resultsJson)
+        {
+            return resultsJson is null
+                ? new Dictionary<string, JsonElement>()
+                : JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(resultsJson)!;
         }
 
         public IReadOnlyList<FormSubmission> GetByForm(Guid formId, int skip, int take, out int totalCount)
@@ -88,7 +98,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                     Values = JsonSerializer.Deserialize<IReadOnlyDictionary<string, JsonElement>>(entity.ValuesJson),
                     IpAddress = entity.IpAddress,
                     SubmittedAt = entity.SubmittedAt,
-                    PageUrl = entity.PageUrl
+                    PageUrl = entity.PageUrl,
+                    Results = DeserializeResults(entity.ResultsJson)
                 });
             }
             return submissions;

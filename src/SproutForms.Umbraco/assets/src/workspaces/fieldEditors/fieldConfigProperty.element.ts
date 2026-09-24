@@ -17,6 +17,7 @@ import {
   IFormFieldConfigElement,
 } from "../../manifests/formFieldConfigManifest";
 import { UmbChangeEvent } from "@umbraco-cms/backoffice/event";
+import { FormFieldDto } from "../../models";
 
 @customElement("sf-field-config-property")
 export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
@@ -32,6 +33,18 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
     return this._field;
   }
   private _field?: FormPropertyBackofficeModel;
+
+  @property({ type: Object })
+  public set formField(value: FormFieldDto | undefined) {
+    this._formField = value;
+    if (this.Element) {
+      this.Element.formField = value;
+    }
+  }
+  public get formField() {
+    return this._formField;
+  }
+  private _formField?: FormFieldDto;
 
   @state()
   public Element?: IFormFieldConfigElement;
@@ -74,6 +87,7 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
     if (el) {
       this.Element = el;
       this.Element.field = this._field!;
+      this.Element.formField = this._formField;
 
       this.Element.addEventListener("change", () => {
         this.dispatchEvent(new UmbChangeEvent());

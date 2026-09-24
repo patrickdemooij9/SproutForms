@@ -115,8 +115,20 @@ namespace SproutForms.Core.Controllers
             }
             else
             {
-                outcomeResult = outcomeType.Handle(formVersion.Definition.SubmitOutcome.Configuration);
-                outcomeResult.OutcomeTypeAlias = outcomeType.Alias;
+                try
+                {
+                    outcomeResult = await outcomeType.HandleAsync(new FormSubmitOutcomeContext
+                    {
+                        Configuration = formVersion.Definition.SubmitOutcome.Configuration,
+                        Submission = result.Submission!,
+                        Version = formVersion
+                    }, HttpContext.RequestAborted);
+                    outcomeResult.OutcomeTypeAlias = outcomeType.Alias;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Submit outcome type {OutcomeTypeAlias} of form {FormId} failed for submission {SubmissionId}", outcomeType.Alias, formVersion.FormId, result.Submission!.Id);
+                }
             }
 
             if (IsAjaxRequest(Request))

@@ -58,6 +58,10 @@ export class SproutFormsSource {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFieldTypes())
   }
 
+  async getFormTypes() {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFormTypes());
+  }
+
   async getOutcomes() {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsOutcomeTypes());
   }

@@ -7,6 +7,7 @@ using SproutForms.Core.Models.Conditions;
 using SproutForms.Core.Models.Files;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.Flows.Email;
+using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Models.SubmissionGuard;
 using SproutForms.Core.Registry;
@@ -15,6 +16,7 @@ using SproutForms.Core.Services;
 using SproutForms.Core.Storage;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
 using SproutForms.Umbraco.Core.Descriptors.Flows;
+using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Umbraco.Core.Implementations;
@@ -53,6 +55,10 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<FormDeletionService>();
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
+
+            builder.Services.AddSingleton<IFormDefinitionType, StandardFormDefinitionType>();
+            builder.Services.AddSingleton<IFormDefinitionTypeDescriptor, StandardFormDefinitionTypeDescriptor>();
+            builder.Services.AddSingleton<FormDefinitionTypeValidator>();
 
             builder.Services.AddSingleton<IFormFieldType, TextFieldFormFieldType>();
             builder.Services.AddSingleton<IFormFieldType, EmailFieldType>();

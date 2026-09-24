@@ -82,10 +82,21 @@ export type FormColumnBackofficeModel = {
 };
 
 export type FormDefinitionBackofficeModel = {
+    type: FormTypeSelectionBackofficeModel;
     rows: Array<FormRowBackofficeModel>;
     fields: Array<FormFieldBackofficeModel>;
     outcome: FormOutcomeBackofficeModel;
     workflows: Array<FormWorkflowBackofficeModel>;
+};
+
+export type FormDefinitionTypeBackofficeModel = {
+    alias: string;
+    displayName: string;
+    description: string;
+    properties: Array<FormPropertyBackofficeModel>;
+    allowedFieldTypeAliases: Array<string>;
+    allowedOutcomeTypeAliases: Array<string>;
+    fieldExtensions: Array<FormFieldExtensionBackofficeModel>;
 };
 
 export type FormFieldBackofficeModel = {
@@ -97,6 +108,14 @@ export type FormFieldBackofficeModel = {
         [key: string]: unknown;
     };
     conditions?: FieldConditions | null;
+    extension?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+export type FormFieldExtensionBackofficeModel = {
+    fieldTypeAlias: string;
+    properties: Array<FormPropertyBackofficeModel>;
 };
 
 export type FormFieldTypeBackofficeModel = {
@@ -139,6 +158,7 @@ export type FormPropertyBackofficeModel = {
     alias: string;
     displayName: string;
     propertyEditor: string;
+    propertyName: string;
     value?: unknown;
 };
 
@@ -173,6 +193,14 @@ export type FormTreeItemModel = {
     itemType: TreeItemType;
     source?: number | null;
     totalSubmissions?: number | null;
+};
+
+export type FormTypeSelectionBackofficeModel = {
+    typeAlias: string;
+    displayName: string;
+    settings: {
+        [key: string]: unknown;
+    };
 };
 
 export type FormWorkflowBackofficeModel = {
@@ -239,6 +267,20 @@ export enum TreeItemType {
     FOLDER = 'Folder',
     FORM = 'Form'
 }
+
+export type ValidationProblemDetails = {
+    type?: string | null;
+    title?: string | null;
+    status?: number | null;
+    detail?: string | null;
+    instance?: string | null;
+    errors: {
+        [key: string]: Array<string>;
+    };
+    [key: string]: unknown | string | null | string | null | number | null | string | null | string | null | {
+        [key: string]: Array<string>;
+    } | undefined;
+};
 
 export enum WorkflowExecutionStatus {
     PENDING = 'Pending',
@@ -403,6 +445,15 @@ export type PostUmbracoSproutFormsFormData = {
     url: '/umbraco/sproutForms/form';
 };
 
+export type PostUmbracoSproutFormsFormErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+};
+
+export type PostUmbracoSproutFormsFormError = PostUmbracoSproutFormsFormErrors[keyof PostUmbracoSproutFormsFormErrors];
+
 export type PostUmbracoSproutFormsFormResponses = {
     /**
      * OK
@@ -430,6 +481,22 @@ export type GetUmbracoSproutFormsFormsResponses = {
 };
 
 export type GetUmbracoSproutFormsFormsResponse = GetUmbracoSproutFormsFormsResponses[keyof GetUmbracoSproutFormsFormsResponses];
+
+export type GetUmbracoSproutFormsFormTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/formTypes';
+};
+
+export type GetUmbracoSproutFormsFormTypesResponses = {
+    /**
+     * OK
+     */
+    200: Array<FormDefinitionTypeBackofficeModel>;
+};
+
+export type GetUmbracoSproutFormsFormTypesResponse = GetUmbracoSproutFormsFormTypesResponses[keyof GetUmbracoSproutFormsFormTypesResponses];
 
 export type PostUmbracoSproutFormsGenerateAliasData = {
     body?: never;
@@ -513,14 +580,12 @@ export type PostUmbracoSproutFormsSubmissionWorkflowApproveData = {
     url: '/umbraco/sproutForms/submission/workflow/approve';
 };
 
-export type PostUmbracoSproutFormsSubmissionWorkflowApproveResponses = {
+export type PostUmbracoSproutFormsSubmissionWorkflowApproveErrors = {
     /**
-     * OK
+     * Not Implemented
      */
-    200: boolean;
+    501: unknown;
 };
-
-export type PostUmbracoSproutFormsSubmissionWorkflowApproveResponse = PostUmbracoSproutFormsSubmissionWorkflowApproveResponses[keyof PostUmbracoSproutFormsSubmissionWorkflowApproveResponses];
 
 export type PostUmbracoSproutFormsSubmissionWorkflowDeclineData = {
     body?: never;
@@ -532,14 +597,12 @@ export type PostUmbracoSproutFormsSubmissionWorkflowDeclineData = {
     url: '/umbraco/sproutForms/submission/workflow/decline';
 };
 
-export type PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses = {
+export type PostUmbracoSproutFormsSubmissionWorkflowDeclineErrors = {
     /**
-     * OK
+     * Not Implemented
      */
-    200: boolean;
+    501: unknown;
 };
-
-export type PostUmbracoSproutFormsSubmissionWorkflowDeclineResponse = PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses[keyof PostUmbracoSproutFormsSubmissionWorkflowDeclineResponses];
 
 export type PostUmbracoSproutFormsSubmissionWorkflowRetryData = {
     body?: never;
@@ -549,6 +612,17 @@ export type PostUmbracoSproutFormsSubmissionWorkflowRetryData = {
         workflowAlias?: string;
     };
     url: '/umbraco/sproutForms/submission/workflow/retry';
+};
+
+export type PostUmbracoSproutFormsSubmissionWorkflowRetryErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+    /**
+     * Conflict
+     */
+    409: unknown;
 };
 
 export type PostUmbracoSproutFormsSubmissionWorkflowRetryResponses = {

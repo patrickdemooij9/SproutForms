@@ -43,8 +43,11 @@ namespace SproutForms.Core.Builders
             return Add(alias, "customPost", builder.Build());
         }
 
-        // Workflows run in the order they are added: each one waits until every workflow with a lower order has succeeded
-        private WorkflowBuilder Add(string alias, string workflowTypeAlias, object configuration)
+        /// <summary>
+        /// Adds a workflow of any registered workflow type, such as your own.
+        /// Workflows run in the order they are added: each one waits until every workflow with a lower order has succeeded.
+        /// </summary>
+        public WorkflowBuilder Add(string alias, string workflowTypeAlias, object configuration)
         {
             _workflows.Add(new FormWorkflow
             {

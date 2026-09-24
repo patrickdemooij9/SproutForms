@@ -15,6 +15,7 @@ namespace SproutForms.Umbraco.Core.Startup.Migrations
             To<FormsUserGroupMigration>("v3");
             To<AddReferrerUrlToSubmissionsMigration>("v4");
             To<AddWorkflowTemplatesMigration>("v5");
+            To<AddSubmissionResultsMigration>("v6");
         }
     }
 }

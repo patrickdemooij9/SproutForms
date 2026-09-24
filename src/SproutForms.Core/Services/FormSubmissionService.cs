@@ -6,6 +6,7 @@ using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Conditions;
 using SproutForms.Core.Models.Files;
+using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Repositories;
 using System.Text.Json;
 
@@ -15,6 +16,7 @@ namespace SproutForms.Core.Services
     {
         private readonly IFormSubmissionRepository _submissions;
         private readonly IFormFieldType[] _fieldTypes;
+        private readonly IFormDefinitionType[] _formTypes;
         private readonly IConditionEvaluator _conditionEvaluator;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IFormFileStorageProvider[] _formFileStorageProviders;
@@ -26,6 +28,7 @@ namespace SproutForms.Core.Services
         public FormSubmissionService(
             IFormSubmissionRepository submissions,
             IEnumerable<IFormFieldType> fieldTypes,
+            IEnumerable<IFormDefinitionType> formTypes,
             IConditionEvaluator conditionEvaluator,
             IWorkflowExecutionRepository workflowExecutionRepository,
             IEnumerable<IFormFileStorageProvider> formFileStorageProviders,
@@ -36,6 +39,7 @@ namespace SproutForms.Core.Services
         {
             _submissions = submissions;
             _fieldTypes = fieldTypes.ToArray();
+            _formTypes = formTypes.ToArray();
             _conditionEvaluator = conditionEvaluator;
             _workflowExecutionRepository = workflowExecutionRepository;
             _formFileStorageProviders = [..formFileStorageProviders];
@@ -69,6 +73,17 @@ namespace SproutForms.Core.Services
                     };
                 }
 
+                var typeResult = await ProcessWithFormTypeAsync(formVersion, values);
+                if (typeResult.Errors.Count != 0)
+                {
+                    await DeleteStoredFilesAsync(storedFiles);
+                    return new FormSubmissionResult
+                    {
+                        Errors = typeResult.Errors,
+                        Values = values
+                    };
+                }
+
                 var httpContext = _httpContextAccessor.HttpContext;
                 var submission = new FormSubmission
                 {
@@ -76,6 +91,7 @@ namespace SproutForms.Core.Services
                     FormVersionId = formVersion.Id,
                     SubmittedAt = DateTime.UtcNow,
                     Values = values,
+                    Results = typeResult.Results.ToDictionary(it => it.Key, it => JsonSerializer.SerializeToElement(it.Value)),
                     PageUrl = httpContext is null ? null : SameHostUrl.GetOrNull(request.PageUrl, httpContext.Request),
                     IpAddress = _options.CurrentValue.StoreIpAddress ? httpContext?.Connection.RemoteIpAddress?.ToString() : null
                 };
@@ -90,7 +106,8 @@ namespace SproutForms.Core.Services
 
                 return new FormSubmissionResult
                 {
-                    Values = values
+                    Values = values,
+                    Submission = submission
                 };
             }
             catch
@@ -98,6 +115,24 @@ namespace SproutForms.Core.Services
                 await DeleteStoredFilesAsync(storedFiles);
                 throw;
             }
+        }
+
+        // A form whose type is no longer registered is still accepted, without the type's processing
+        private async Task<FormTypeSubmissionResult> ProcessWithFormTypeAsync(FormVersion formVersion, Dictionary<string, JsonElement> values)
+        {
+            var typeAlias = formVersion.Definition.Type.TypeAlias;
+            var formType = _formTypes.FirstOrDefault(it => it.Alias == typeAlias);
+            if (formType is null)
+            {
+                _logger.LogWarning("Form {FormId} uses form type {FormTypeAlias}, which is not registered; its submission is saved without the type's processing", formVersion.FormId, typeAlias);
+                return FormTypeSubmissionResult.None;
+            }
+
+            return await formType.ProcessSubmissionAsync(new FormTypeSubmissionContext
+            {
+                Version = formVersion,
+                Values = values
+            }, CancellationToken.None);
         }
 
         private void ValidateFields(FormVersion formVersion, Dictionary<string, JsonElement> values, Dictionary<string, List<string>> errors)

@@ -67,6 +67,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `FormsInitialMigration` - Initial schema
 - `AddFoldersMigration` - Folder support
 - `FormsUserGroupMigration` - User group setup
+- `AddSubmissionResultsMigration` - `ResultsJson` column for the results a form type computes
 
 ## Adding New Field Types
 
@@ -74,6 +75,22 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 2. Create config model in `SproutForms.Core/Flows/Configs/`
 3. Create view in `SproutForms.Umbraco.Core/Views/Forms/Fields/`
 4. Register in `SproutFormComposer.cs`
+
+## Form Definition Types
+
+A form type (`IFormDefinitionType`, in `SproutForms.Core/Models/FormTypes/`) says what kind of form a definition is, such as standard, quiz or poll. The README's "Extending: form types" section is the user guide, and `SproutForms.Site/Examples/` has a working quiz, poll and product finder. It is stored per version in `FormDefinition.Type`, together with the type's typed settings. Definitions stored before form types existed read as `standard`. A form's type is chosen when it is created and can't be changed afterwards.
+
+- Build a type on `FormDefinitionTypeBase<TSettings>`, and override `AllowsFieldType` / `AllowsOutcomeType` to exclude types.
+- A type can add settings to every field of a field type with `ExtendField<TFieldSettings>(fieldTypeAlias)` in its constructor, such as the correct answer of a quiz question. A field stores them in `FormField.Extension`.
+- A type can process a submission by overriding `ProcessSubmissionAsync`. It runs after field validation, before the submission is saved, and returns **results** to store with it (such as a quiz score, in `FormSubmission.Results`) or errors that reject it. `GetSettings` and `GetFieldSettings<T>` give the form's and a field's typed settings.
+- A submit outcome (`IFormSubmitOutcomeType.HandleAsync`) gets a `FormSubmitOutcomeContext` with its configuration, the saved submission (values and results) and the form version. An outcome that throws is logged, and the visitor gets the default confirmation, because the submission is already saved. forms.js shows a `message` as HTML, so never put submitted values in it.
+- A field or outcome type that only belongs in certain form types implements `IRestrictedToFormTypes`.
+- `FormDefinitionTypeValidator` enforces these rules. It runs when a code-first form is registered (an invalid form fails startup) and when the backoffice saves a form.
+- Code-first forms choose a type with `FormBuilder.OfType(alias, settings)`, set a field's extension settings with `FieldBuilder.Extend(settings)`, use any outcome type with `FormBuilder.SetOutcome(alias, configuration)`, and any workflow type with `WorkflowBuilder.Add(alias, workflowTypeAlias, configuration)`.
+- Register a type as `IFormDefinitionType` in a composer.
+- For the backoffice, also register an `IFormDefinitionTypeDescriptor`: build it on `BaseFormDefinitionTypeDescriptor<TSettings>`, map the form settings with `DefineMap`, and describe each field extension with `ExtendField<TFieldSettings>(fieldTypeAlias, field => field.Map(...))`. A type without a descriptor can be used by code-first forms, but editors can't choose it.
+- A field property can use the `SproutForms.FieldOptionPicker` editor, a dropdown of the edited field's own options (for field types that keep them under `options`, like radio buttons and dropdowns). Custom field editors are `formFieldConfig` extensions, and receive the field being edited as `formField`.
+- In the backoffice, Create asks for the form type when more than one type has a descriptor. The Settings tab shows the type and its settings, the Build tab only offers the field types the type allows, and an extended field gets a tab named after the form type.
 
 ## Testing
 

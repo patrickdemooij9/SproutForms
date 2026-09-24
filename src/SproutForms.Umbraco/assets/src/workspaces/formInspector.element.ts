@@ -10,7 +10,7 @@ import {
 } from "@umbraco-cms/backoffice/external/lit";
 
 import "./formFieldSelector.element";
-import { FormDefinitionDto, FormFieldDto, FormFieldTypeDto, SelectedState } from "../models";
+import { FormDefinitionDto, FormDefinitionTypeDto, FormFieldDto, FormFieldTypeDto, SelectedState } from "../models";
 import {
   UmbPropertyValueData,
 } from "@umbraco-cms/backoffice/property";
@@ -41,10 +41,17 @@ export class FormInspector extends UmbElementMixin(LitElement) {
   @state()
   private fieldTypes: FormFieldTypeDto[] = [];
 
+  @state()
+  private formType?: FormDefinitionTypeDto;
+
   constructor() {
     super();
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
       this.context = context;
+
+      this.observe(context?.formType, (formType) => {
+        this.formType = formType;
+      });
 
       context?.form.subscribe((form) => {
         this.definition = form.definition;
@@ -91,6 +98,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
                     .field=${this.selectedField!}
                     .fieldType=${this.getFieldType(this.selectedField!.fieldTypeAlias)!}
                     .fields=${this.definition.fields}
+                    .formType=${this.formType}
                     @field-change=${this.#handleFieldUpdate}>
 
                   </sf-inspector-field-type>
@@ -122,6 +130,15 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       required: false,
       configuration: configuration,
     };
+    const extension = this.formType?.fieldExtensions.find(
+      (it) => it.fieldTypeAlias === fieldType.alias,
+    );
+    if (extension) {
+      newField.extension = {};
+      extension.properties.forEach((prop) => {
+        newField.extension![prop.alias] = prop.value ?? null;
+      });
+    }
     if (this.selectedState.column) {
       this.selectedState.column!.fieldId = newField.id;
     } else {

@@ -10,10 +10,21 @@ import {
   UmbWorkspaceRouteManager,
 } from "@umbraco-cms/backoffice/workspace";
 import { SproutFormsWorkspaceElement } from "./sproutFormsWorkspace.element";
-import { UmbObjectState } from "@umbraco-cms/backoffice/observable-api";
+import {
+  mergeObservables,
+  UmbArrayState,
+  UmbObjectState,
+} from "@umbraco-cms/backoffice/observable-api";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
-import { FormColumnDto, FormDto, FormFieldDto, FormRowDto, SOURCE_UI } from "../models";
+import {
+  FormColumnDto,
+  FormDefinitionTypeDto,
+  FormDto,
+  FormFieldDto,
+  FormRowDto,
+  SOURCE_UI,
+} from "../models";
 import { mapToDto, mapToPost } from "../mappings";
 
 export default class SproutFormsWorkspaceContext
@@ -33,6 +44,11 @@ export default class SproutFormsWorkspaceContext
     version: 1,
     source: SOURCE_UI,
     definition: {
+      type: {
+        typeAlias: "standard",
+        displayName: "Standard form",
+        settings: {},
+      },
       rows: [],
       fields: [],
       workflows: [],
@@ -48,27 +64,39 @@ export default class SproutFormsWorkspaceContext
   public readonly form = this.#form.asObservable();
   public readonly formId = this.#form.value.id;
 
+  #formTypes = new UmbArrayState<FormDefinitionTypeDto>([], (it) => it.alias);
+  public readonly formTypes = this.#formTypes.asObservable();
+
+  // Undefined until the form types are loaded, and for a code-first form whose type has no descriptor
+  public readonly formType = mergeObservables(
+    [this.form, this.formTypes],
+    ([form, formTypes]) =>
+      formTypes.find((it) => it.alias === form.definition.type.typeAlias),
+  );
+
+  #formTypesLoaded: Promise<void>;
+
   constructor(host: UmbControllerBase) {
     super(host, UMB_WORKSPACE_CONTEXT.toString());
     this.provideContext(SF_FORM_DETAIL_TOKEN_CONTEXT, this);
 
+    this.#formTypesLoaded = this.source.getFormTypes().then((resp) => {
+      this.#formTypes.setValue(resp.data ?? []);
+    });
+
     this.routes.setRoutes([
       {
-        path: "create/:parent",
+        path: "create/:formType/:parent",
         component: SproutFormsWorkspaceElement,
         setup: (_component, info) => {
-          console.log("Create with parent");
-          this.updateForm({
-            folderId: info.match.params.parent
-          })
-        }
+          this.#startNewForm(info.match.params.formType, info.match.params.parent);
+        },
       },
       {
-        path: "create",
+        path: "create/:formType",
         component: SproutFormsWorkspaceElement,
-        setup: async () => {
-          //this.load();
-          console.log("create");
+        setup: (_component, info) => {
+          this.#startNewForm(info.match.params.formType);
         },
       },
       {
@@ -82,6 +110,31 @@ export default class SproutFormsWorkspaceContext
         },
       },
     ]);
+  }
+
+  // The type is chosen before the form is created, and can't be changed afterwards
+  async #startNewForm(formTypeAlias: string, folderId?: string) {
+    await this.#formTypesLoaded;
+    const formType = this.#formTypes
+      .getValue()
+      .find((it) => it.alias === formTypeAlias);
+    if (!formType) return;
+
+    const settings: Record<string, unknown> = {};
+    formType.properties.forEach((prop) => {
+      settings[prop.alias] = prop.value ?? null;
+    });
+    this.#form.update({
+      folderId: folderId,
+      definition: {
+        ...this.#form.value.definition,
+        type: {
+          typeAlias: formType.alias,
+          displayName: formType.displayName,
+          settings: settings,
+        },
+      },
+    });
   }
 
   getFormId() {
@@ -265,6 +318,9 @@ export default class SproutFormsWorkspaceContext
 
   async save() {
     const returnValue = await this.source.saveForm(mapToPost(this.#form.value));
+    // tryExecute has already shown the error, such as fields the form type doesn't allow
+    if (!returnValue.data) return;
+
     this.#form.update(mapToDto(returnValue.data));
 
     history.replaceState(

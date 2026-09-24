@@ -11,6 +11,7 @@ export interface FormDto {
 }
 
 export interface FormDefinitionDto {
+  type: FormTypeSelectionDto;
   rows: Array<FormRowDto>;
   fields: Array<FormFieldDto>;
   outcome: FormOutcomeDto;
@@ -38,6 +39,9 @@ export interface FormFieldDto {
     [key: string]: unknown;
   };
   conditions?: FieldConditions | null;
+  extension?: {
+    [key: string]: unknown;
+  } | null;
 }
 
 export interface FormWorkflowDto {
@@ -58,6 +62,37 @@ export type FormOutcomeDto = {
   configuration: {
     [key: string]: unknown;
   };
+};
+
+export type FormTypeSelectionDto = {
+  typeAlias: string;
+  displayName: string;
+  settings: {
+    [key: string]: unknown;
+  };
+};
+
+export type FormDefinitionTypeDto = {
+  alias: string;
+  displayName: string;
+  description: string;
+  properties: Array<FormPropertyDto>;
+  allowedFieldTypeAliases: Array<string>;
+  allowedOutcomeTypeAliases: Array<string>;
+  fieldExtensions: Array<FormFieldExtensionDto>;
+};
+
+export type FormFieldExtensionDto = {
+  fieldTypeAlias: string;
+  properties: Array<FormPropertyDto>;
+};
+
+export type FormTypePickerModalData = {
+  formTypes: Array<FormDefinitionTypeDto>;
+};
+
+export type FormTypePickerModalValue = {
+  formTypeAlias: string;
 };
 
 export type FormOutcomeTypeDto = {

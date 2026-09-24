@@ -1,5 +1,6 @@
 ﻿using SproutForms.Core.Models;
 using SproutForms.Core.Models.Conditions;
+using SproutForms.Core.Models.FormTypes;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,10 +9,14 @@ namespace SproutForms.Core.JsonConverters
     public class FormFieldJsonConverter : JsonConverter<FormField>
     {
         private readonly IReadOnlyDictionary<string, Type> _configTypes;
+        private readonly IReadOnlyDictionary<(string FormTypeAlias, string FieldTypeAlias), Type> _extensionSettingsTypes;
 
-        public FormFieldJsonConverter(IEnumerable<IFormFieldType> fieldTypes)
+        public FormFieldJsonConverter(IEnumerable<IFormFieldType> fieldTypes, IEnumerable<IFormDefinitionType> formTypes)
         {
             _configTypes = fieldTypes.ToDictionary(ft => ft.Alias, ft => ft.ConfigurationType);
+            _extensionSettingsTypes = formTypes
+                .SelectMany(formType => formType.FieldExtensions.Select(extension => (formType.Alias, extension)))
+                .ToDictionary(it => (it.Alias, it.extension.FieldTypeAlias), it => it.extension.SettingsType);
         }
 
         public override FormField Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
@@ -43,6 +48,21 @@ namespace SproutForms.Core.JsonConverters
                 }
             }
 
+            FormFieldExtensionValue? extension = null;
+            if (root.TryGetProperty("Extension", out var ext) && ext.ValueKind != JsonValueKind.Null)
+            {
+                var formTypeAlias = ext.GetProperty("FormTypeAlias").GetString()!;
+                var settings = ext.GetProperty("Settings");
+                extension = new FormFieldExtensionValue
+                {
+                    FormTypeAlias = formTypeAlias,
+                    Settings = _extensionSettingsTypes.TryGetValue((formTypeAlias, fieldTypeAlias), out var settingsType)
+                        ? JsonSerializer.Deserialize(settings.GetRawText(), settingsType, options)!
+                        // preserve as JsonElement so we don't lose the raw data
+                        : JsonSerializer.Deserialize<JsonElement>(settings.GetRawText(), options)
+                };
+            }
+
             return new FormField
             {
                 Alias = alias,
@@ -50,7 +70,8 @@ namespace SproutForms.Core.JsonConverters
                 FieldTypeAlias = fieldTypeAlias,
                 Required = required,
                 Configuration = configuration,
-                Conditions = conditions
+                Conditions = conditions,
+                Extension = extension
             };
         }
 
@@ -78,6 +99,20 @@ namespace SproutForms.Core.JsonConverters
                 writer.WriteNullValue();
             else
                 JsonSerializer.Serialize(writer, value.Conditions, options);
+
+            writer.WritePropertyName("Extension");
+            if (value.Extension is null)
+            {
+                writer.WriteNullValue();
+            }
+            else
+            {
+                writer.WriteStartObject();
+                writer.WriteString("FormTypeAlias", value.Extension.FormTypeAlias);
+                writer.WritePropertyName("Settings");
+                JsonSerializer.Serialize(writer, value.Extension.Settings, value.Extension.Settings.GetType(), options);
+                writer.WriteEndObject();
+            }
 
             writer.WriteEndObject();
         }

@@ -1,6 +1,7 @@
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import {
   customElement,
+  nothing,
   repeat,
   state,
 } from "@umbraco-cms/backoffice/external/lit";
@@ -15,7 +16,11 @@ import { UUIRadioElement } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
-import { FormDto, FormOutcomeTypeDto } from "../models";
+import {
+  FormDefinitionTypeDto,
+  FormDto,
+  FormOutcomeTypeDto,
+} from "../models";
 
 @customElement("form-settings")
 export class FormSettingsElement extends UmbElementMixin(LitElement) {
@@ -30,6 +35,12 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
   @state()
   outcomes: Array<FormOutcomeTypeDto> = [];
 
+  @state()
+  formTypes: Array<FormDefinitionTypeDto> = [];
+
+  @state()
+  formType?: FormDefinitionTypeDto;
+
   constructor() {
     super();
 
@@ -40,6 +51,13 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
       this.context = context;
 
+      this.observe(context?.formTypes, (formTypes) => {
+        this.formTypes = formTypes ?? [];
+      });
+      this.observe(context?.formType, (formType) => {
+        this.formType = formType;
+      });
+
       context?.form.subscribe((form) => {
         this.form = form;
 
@@ -49,6 +67,15 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
             value: this.form.alias,
           },
         ];
+
+        Object.entries(this.form.definition.type.settings).forEach(
+          ([key, value]) => {
+            this._values.push({
+              alias: "type-" + key,
+              value: value,
+            });
+          }
+        );
 
         Object.entries(this.form.definition.outcome.configuration).forEach(
           ([key, value]) => {
@@ -71,6 +98,15 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
       if (item.alias == "alias") {
         updateForm.alias = item.value as string;
         this.context?.lockAliasUpdate();
+      } else if (item.alias.startsWith("type-")) {
+        const actualAlias = item.alias.replace("type-", "");
+        if (
+          Object.keys(updateForm.definition!.type.settings).includes(
+            actualAlias
+          )
+        ) {
+          updateForm.definition!.type.settings[actualAlias] = item.value;
+        }
       } else if (item.alias.startsWith("outcome-")) {
         const actualAlias = item.alias.replace("outcome-", "");
         if (
@@ -103,10 +139,59 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
       displayName: outcome.displayName,
       configuration: configuration,
     };
-    console.log(clonedDefinition);
     this.context?.updateForm({
       definition: clonedDefinition,
     });
+  }
+
+  // The selected outcome stays listed even when the form type doesn't allow it, so it can be seen and replaced
+  #getAvailableOutcomes() {
+    const formType = this.formType;
+    if (!formType) return this.outcomes;
+
+    return this.outcomes.filter(
+      (outcome) =>
+        formType.allowedOutcomeTypeAliases.includes(outcome.alias) ||
+        outcome.alias === this.form?.definition.outcome.typeAlias
+    );
+  }
+
+  #renderFormType() {
+    if (!this.form) return nothing;
+
+    // A standard form is all there is until another form type is registered
+    const type = this.form.definition.type;
+    if (this.formTypes.length < 2 && type.typeAlias === "standard") return nothing;
+
+    return html`
+      <umb-property-layout
+        label="Form type"
+        description="The kind of form this is. It is chosen when the form is created, and can't be changed."
+      >
+        <div slot="editor" class="option">
+          <h3>${type.displayName}</h3>
+          ${this.formType
+            ? html`<p class="option-description">${this.formType.description}</p>`
+            : nothing}
+          ${repeat(
+            this.formType?.properties ?? [],
+            (prop) => prop.alias,
+            (prop) => html`
+              <umb-property
+                alias=${"type-" + prop.alias}
+                label=${prop.displayName}
+                description=""
+                property-editor-ui-alias=${prop.propertyEditor}
+                .appearance=${{
+                  labelOnTop: true,
+                }}
+                val
+              ></umb-property>
+            `
+          )}
+        </div>
+      </umb-property-layout>
+    `;
   }
 
   render() {
@@ -124,17 +209,19 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
             val
           ></umb-property>
 
+          ${this.#renderFormType()}
+
           <umb-property-layout
             label="Submit outcome"
             description="What should happen to the client after they submit the form?"
           >
-            <div slot="editor" class="outcome-container">
+            <div slot="editor" class="option-container">
               ${repeat(
-                this.outcomes,
+                this.#getAvailableOutcomes(),
                 (item) => item.alias,
                 (item) => html`
-                  <div class="outcome">
-                    <div class="outcome-header">
+                  <div class="option">
+                    <div class="option-header">
                       <h3>${item.displayName}</h3>
                       <uui-radio
                         .value=${item.alias}
@@ -179,17 +266,18 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
       background-color: white;
     }
 
-    .outcome-container {
+    .option-container {
       display: flex;
+      flex-wrap: wrap;
       gap: 16px;
     }
 
-    .outcome {
+    .option {
       padding: 16px 24px;
       border: 1px solid #ccc;
       border-radius: 8px;
 
-      .outcome-header {
+      .option-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -198,6 +286,15 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
         h3 {
           margin: 0;
         }
+      }
+
+      > h3 {
+        margin: 0 0 8px;
+      }
+
+      .option-description {
+        margin: 0 0 8px;
+        color: var(--uui-color-text-alt);
       }
     }
   `;

@@ -16,6 +16,11 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
     - `aiTestFailingWorkflow`: a Custom POST workflow to a dead port, so it always fails. Use it for retry and failure handling.
     - `aiTestWorkflowOrder`: three workflows (email, dead-port Custom POST, email). The first should reach `Succeeded`, the second `Failed`, and the third stay `Pending` behind it. The stored `Order` values are 0, 1, 2.
     - `aiTestUnknownOutcome`: its submit outcome type isn't registered. A submit is still saved, and `forms.js` shows its fallback confirmation.
+  - Example form types (`src/SproutForms.Site/Examples/`, registered by `ExamplesComposer` in every environment, with front-end handlers in `wwwroot/examples/form-type-examples.js`):
+    - `exampleQuiz`: a quiz with a pass mark of 3. `strongest` = `espresso` (2 points) and `origin` = `yemen` (1 point) score 3 of 3 and pass; the stored results are `{"score":3,"maxScore":3,"passed":true}`. The page shows the score and the pass or fail message.
+    - `examplePoll`: one radio question. The result shows the vote percentages of all submissions, with the visitor's own vote marked.
+    - `exampleProductFinder`: `cups` and `taste` answers point to products. `few` + `strong` recommend the espresso machine, `many` + `mild` the filter machine, and a tie goes to the product listed first. A submit redirects to the product's URL, which doesn't exist in the demo site, with or without JavaScript.
+    - Adding a field type a type doesn't allow, or an extension on a field type it doesn't extend, makes startup fail with the validator's message.
 - **Email:** goes to the pickup folder `src/SproutForms.Site/umbraco/Data/AiTest/Mail/*.eml`. Nothing is ever delivered, whatever address a form's workflow names.
 - **Uploads:** stored in `src/SproutForms.Site/umbraco/Data/AiTest/Uploads/`, set by `SproutForms:LocalDiskFileStorage:RootPath` in `appsettings.AiTest.json`.
 - **Settings:** `appsettings.AiTest.json` also sets `SproutForms:StoreIpAddress` (`false`, the package default). Edits to it apply without a restart. Put it back when you're done.

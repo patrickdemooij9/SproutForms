@@ -1,4 +1,5 @@
 ﻿using SproutForms.Core.Models.Conditions;
+using SproutForms.Core.Models.FormTypes;
 using System.Text.Json;
 
 namespace SproutForms.Core.Models
@@ -11,5 +12,6 @@ namespace SproutForms.Core.Models
         public bool Required { get; set; }
         public required object Configuration { get; set; }
         public FieldConditions? Conditions { get; set; }
+        public FormFieldExtensionValue? Extension { get; set; }
     }
 }
