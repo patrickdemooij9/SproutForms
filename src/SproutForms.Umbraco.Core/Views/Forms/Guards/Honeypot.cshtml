@@ -1,0 +1,9 @@
+@using SproutForms.Umbraco.Core.Implementations
+
+@* Hidden with an inline style, so it stays hidden on sites that don't use the default theme *@
+<div aria-hidden="true" style="position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;">
+    <label>
+        Leave this field empty
+        <input type="text" name="@HoneypotSubmissionGuard.FieldName" value="" tabindex="-1" autocomplete="off" />
+    </label>
+</div>

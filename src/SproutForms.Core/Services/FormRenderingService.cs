@@ -41,7 +41,8 @@ namespace SproutForms.Umbraco.Core.Services
                 submissionGuards.Add(new FormSubmissionGuardViewModel
                 {
                     Alias = _formSubmissionGuard.Alias,
-                    Settings = _formSubmissionGuard.GetFrontendSettings()
+                    Settings = _formSubmissionGuard.GetFrontendSettings(),
+                    PartialViewPath = _formSubmissionGuard.PartialViewPath
                 });
             }
             return new RenderedFormViewModel
