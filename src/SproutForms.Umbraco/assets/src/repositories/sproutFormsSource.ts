@@ -80,6 +80,30 @@ export class SproutFormsSource {
     }))
   }
 
+  async getFormHistory(formId: string, skip: number, take: number) {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFormHistory({
+      query: { formId, skip, take }
+    }));
+  }
+
+  async getFormVersions(formId: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFormVersions({
+      query: { formId }
+    }));
+  }
+
+  async compareFormVersion(formId: string, versionId: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsFormVersionsCompare({
+      query: { formId, versionId }
+    }));
+  }
+
+  async rollbackForm(formId: string, versionId: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsFormRollback({
+      query: { formId, versionId }
+    }));
+  }
+
   async deleteForms(formIds: string[]){
     return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsForm({
       body: formIds

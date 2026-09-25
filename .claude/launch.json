@@ -5,7 +5,7 @@
       "name": "sproutforms-aitest",
       "runtimeExecutable": "pwsh",
       "runtimeArgs": ["-NoProfile", "-File", "scripts/ai-test/run-site.ps1"],
-      "port": 62970
+      "port": 5970
     },
     {
       "name": "sproutforms-aitest-backoffice",

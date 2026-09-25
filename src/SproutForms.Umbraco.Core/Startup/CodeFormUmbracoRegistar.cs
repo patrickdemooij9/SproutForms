@@ -34,11 +34,12 @@ namespace SproutForms.Umbraco.Core.Startup
             var formsRepo = scope.ServiceProvider.GetRequiredService<IFormRepository>();
             var versionsRepo = scope.ServiceProvider.GetRequiredService<IFormVersionRepository>();
             var typeValidator = scope.ServiceProvider.GetRequiredService<FormDefinitionTypeValidator>();
+            var auditRepo = scope.ServiceProvider.GetRequiredService<IFormAuditRepository>();
 
             foreach (var factory in _registry.Factories)
             {
                 var form = factory(scope.ServiceProvider);
-                await RegisterAsync(form, formsRepo, versionsRepo, typeValidator);
+                await RegisterAsync(form, formsRepo, versionsRepo, auditRepo, typeValidator);
             }
         }
 
@@ -51,6 +52,7 @@ namespace SproutForms.Umbraco.Core.Startup
             ICodeFirstForm codeForm,
             IFormRepository formsRepo,
             IFormVersionRepository versionsRepo,
+            IFormAuditRepository auditRepo,
             FormDefinitionTypeValidator typeValidator)
         {
             var definition = codeForm.Build();
@@ -86,6 +88,7 @@ namespace SproutForms.Umbraco.Core.Startup
                 };
 
                 versionsRepo.Add(version);
+                auditRepo.Add(CreateAuditEntry(form.Id, FormAuditAction.Created, version));
 
                 return;
             }
@@ -95,7 +98,7 @@ namespace SproutForms.Umbraco.Core.Startup
                 return;
 
             // A new instance, because the latest version is the repository's cached one
-            versionsRepo.Add(new FormVersion
+            var newVersion = new FormVersion
             {
                 Id = Guid.NewGuid(),
                 FormId = form.Id,
@@ -105,7 +108,21 @@ namespace SproutForms.Umbraco.Core.Startup
                 DefinitionHash = hash,
                 CreatedAt = DateTime.UtcNow,
                 CreatedBy = "System"
-            });
+            };
+            versionsRepo.Add(newVersion);
+            auditRepo.Add(CreateAuditEntry(form.Id, FormAuditAction.Saved, newVersion));
+        }
+
+        private static FormAuditEntry CreateAuditEntry(Guid formId, FormAuditAction action, FormVersion version)
+        {
+            return new FormAuditEntry
+            {
+                FormId = formId,
+                Action = action,
+                UserKey = version.CreatedBy,
+                CreatedAt = version.CreatedAt,
+                VersionId = version.Id
+            };
         }
     }
 }

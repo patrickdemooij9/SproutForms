@@ -52,10 +52,12 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly FormDefinitionTypeValidator _formDefinitionTypeValidator;
         private readonly IFormDefinitionType[] _formDefinitionTypes;
         private readonly IEnumerable<IFormDefinitionTypeDescriptor> _formDefinitionTypeDescriptors;
+        private readonly FormHistoryService _formHistoryService;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors, FormHistoryService formHistoryService)
         {
+            _formHistoryService = formHistoryService;
             _formDefinitionTypeValidator = formDefinitionTypeValidator;
             _formDefinitionTypes = formDefinitionTypes.ToArray();
             _formDefinitionTypeDescriptors = formDefinitionTypeDescriptors;
@@ -113,6 +115,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             return Ok(new FormBackofficeModel
             {
                 Id = id,
+                FolderId = form.FolderId,
                 Name = form.Name,
                 Version = latestVersion.Version,
                 Alias = form.Alias,
@@ -152,13 +155,10 @@ namespace SproutForms.Umbraco.Core.Controllers
         [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
         public IActionResult SaveForm([FromBody]FormBackofficeModel model)
         {
-            if (model.Id.HasValue)
+            var existingForm = model.Id.HasValue ? _formRepository.GetById(model.Id.Value) : null;
+            if (existingForm?.Source == FormSource.Code)
             {
-                var existingForm = _formRepository.GetById(model.Id.Value);
-                if (existingForm != null && existingForm.Source == FormSource.Code)
-                {
-                    throw new InvalidOperationException("Can't edit form which is code based");
-                }
+                throw new InvalidOperationException("Can't edit form which is code based");
             }
 
             var alias = model.Alias;
@@ -268,20 +268,71 @@ namespace SproutForms.Umbraco.Core.Controllers
             };
             form.Id = _formRepository.Save(form);
 
+            // A save that doesn't change the definition adds no version, so the history only shows real changes
+            var userKey = GetCurrentUserKey();
             var hash = FormDefinitionHasher.Hash(newDefinition);
-            _formVersionRepository.Add(new FormVersion
+            FormVersion? newVersion = null;
+            if (latestVersion?.DefinitionHash != hash)
             {
-                Id = Guid.NewGuid(),
-                FormId = form.Id,
-                Version = latestVersion?.Version + 1 ?? 1,
-                Status = FormStatus.Published,
-                Definition = newDefinition,
-                DefinitionHash = hash,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key.ToString() ?? string.Empty
-            });
+                newVersion = new FormVersion
+                {
+                    Id = Guid.NewGuid(),
+                    FormId = form.Id,
+                    Version = latestVersion?.Version + 1 ?? 1,
+                    Status = FormStatus.Published,
+                    Definition = newDefinition,
+                    DefinitionHash = hash,
+                    CreatedAt = DateTime.UtcNow,
+                    CreatedBy = userKey
+                };
+                _formVersionRepository.Add(newVersion);
+            }
+            _formHistoryService.RecordSave(existingForm, form, newVersion, userKey);
 
             return GetForm(form.Id); //TODO: Probably just map everything back
+        }
+
+        [HttpGet("form/history")]
+        [ProducesResponseType(typeof(PagedViewModel<FormAuditEntryBackofficeModel>), 200)]
+        public async Task<IActionResult> GetFormHistory(Guid formId, int skip, int take)
+        {
+            return Ok(await _formHistoryService.GetHistoryAsync(formId, skip, take));
+        }
+
+        [HttpGet("form/versions")]
+        [ProducesResponseType(typeof(FormVersionBackofficeModel[]), 200)]
+        public async Task<IActionResult> GetFormVersions(Guid formId)
+        {
+            return Ok(await _formHistoryService.GetVersionsAsync(formId));
+        }
+
+        [HttpGet("form/versions/compare")]
+        [ProducesResponseType(typeof(FormVersionComparisonBackofficeModel), 200)]
+        [ProducesResponseType(404)]
+        public async Task<IActionResult> CompareFormVersion(Guid formId, Guid versionId)
+        {
+            var comparison = await _formHistoryService.CompareAsync(formId, versionId);
+            return comparison is null ? NotFound() : Ok(comparison);
+        }
+
+        [HttpPost("form/rollback")]
+        [ProducesResponseType(typeof(FormBackofficeModel), 200)]
+        [ProducesResponseType(typeof(ValidationProblemDetails), 400)]
+        public IActionResult RollbackForm(Guid formId, Guid versionId)
+        {
+            var errors = _formHistoryService.Rollback(formId, versionId, GetCurrentUserKey());
+            if (errors.Count > 0)
+            {
+                return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["version"] = [.. errors]
+                })
+                {
+                    Type = "Error",
+                    Title = "The form can't be rolled back to this version."
+                });
+            }
+            return GetForm(formId);
         }
 
         [HttpGet("fieldTypes")]
@@ -600,6 +651,9 @@ namespace SproutForms.Umbraco.Core.Controllers
             var stream = await _fileStorageProvider.OpenReadAsync(fileReference, CancellationToken.None);
             return File(stream, fileReference.ContentType);
         }*/
+
+        private string GetCurrentUserKey()
+            => _backOfficeSecurityAccessor.BackOfficeSecurity?.CurrentUser?.Key.ToString() ?? string.Empty;
 
         private string GenerateAlias(Guid? id, string name)
         {

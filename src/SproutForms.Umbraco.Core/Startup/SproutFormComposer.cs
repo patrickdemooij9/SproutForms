@@ -49,11 +49,14 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormVersionRepository, FormVersionRepository>();
             builder.Services.AddSingleton<IFormRepository, FormRepository>();
             builder.Services.AddSingleton<IFolderRepository, FolderRepository>();
+            builder.Services.AddSingleton<IFormAuditRepository, FormAuditRepository>();
             builder.Services.AddSingleton<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
             builder.Services.AddSingleton<IUnitOfWorkProvider, ScopeUnitOfWorkProvider>();
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
             builder.Services.AddSingleton<FormDeletionService>();
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
+            builder.Services.AddSingleton<FormVersionComparer>();
+            builder.Services.AddSingleton<FormHistoryService>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
 
             builder.Services.AddSingleton<IFormDefinitionType, StandardFormDefinitionType>();

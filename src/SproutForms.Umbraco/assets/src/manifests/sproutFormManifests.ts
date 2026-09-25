@@ -21,6 +21,7 @@ import SproutFormSubmissionsListContext from "../workspaces/sproutFormSubmission
 import { ManifestModal } from "@umbraco-cms/backoffice/modal";
 import CreateFormAction from "../actions/CreateFormAction";
 import { FORM_TYPE_PICKER_MODAL_ALIAS } from "../modals/formTypePickerModal.alias";
+import { FORM_ROLLBACK_MODAL_ALIAS } from "../modals/formRollbackModal.token";
 import { WORKFLOW_TEMPLATE_MODAL_ALIAS } from "../modals/workflowTemplateModal.token";
 import DeleteFormAction from "../actions/deleteFormAction";
 import { SubmissionFieldManifest } from "./submissionFieldManifest";
@@ -241,6 +242,13 @@ const FormTypePickerModal: ManifestModal = {
   js: () => import("../modals/formTypePickerModal.element"),
 };
 
+const FormRollbackModal: ManifestModal = {
+  type: "modal",
+  alias: FORM_ROLLBACK_MODAL_ALIAS,
+  name: "SproutForms Form Rollback Modal",
+  js: () => import("../modals/formRollbackModal.element"),
+};
+
 const WorkflowTemplateModal: ManifestModal = {
   type: "modal",
   alias: WORKFLOW_TEMPLATE_MODAL_ALIAS,
@@ -314,6 +322,7 @@ export const SproutFormManifests = [
   FormSubmissionsCollectionViewManifest,
   FormSubmissionInfoModal,
   FormTypePickerModal,
+  FormRollbackModal,
   WorkflowTemplateModal,
   FileFieldSubmissionField,
   KeyValuePairFieldConfigProperty,

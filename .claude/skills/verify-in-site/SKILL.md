@@ -37,8 +37,8 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 1. **Rebuild what you changed.**
    - C#: the site's `dotnet run` builds, so nothing extra is needed. Restart the server after C# changes (`preview_stop`, then step 2).
    - `forms.ts`: the site serves the committed bundle `wwwroot/forms.js`, so rebuild it from `src/SproutForms.Umbraco/assets` with `npm run minify:forms`. Without that, your TypeScript change isn't what runs.
-2. **Start the site:** `preview_start` with name `sproutforms-aitest` (`.claude/launch.json`, port 62970). The first start does the unattended install. Confirm in `preview_logs` (search `Application started`) that the SproutForms migrations and `WorkflowExecutionWorker` started.
-3. **Open the form:** navigate to `http://localhost:62970/ai-test/forms/testFormCode`, or to a form you added to `Code/` and registered in `Program.cs`.
+2. **Start the site:** `preview_start` with name `sproutforms-aitest` (`.claude/launch.json`, port 5970). The first start does the unattended install. Confirm in `preview_logs` (search `Application started`) that the SproutForms migrations and `WorkflowExecutionWorker` started.
+3. **Open the form:** navigate to `http://localhost:5970/ai-test/forms/testFormCode`, or to a form you added to `Code/` and registered in `Program.cs`.
 4. **Exercise it:**
    - Get refs from `read_page` with `filter: interactive`, fill fields with `form_input`, and click radios and Submit **by `ref`**. Coordinate clicks taken from a scaled screenshot miss.
    - Read the result with `get_page_text` or `javascript_tool`. Errors render as `.form-error` next to the field and `.form-global-errors` at the top. Success replaces the form with the outcome message.

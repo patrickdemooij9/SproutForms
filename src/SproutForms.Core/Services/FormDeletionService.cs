@@ -7,7 +7,7 @@ using System.Text.Json;
 namespace SproutForms.Core.Services
 {
     /// <summary>
-    /// Deletes a form with everything that belongs to it: versions, submissions, their workflow executions and their uploaded files.
+    /// Deletes a form with everything that belongs to it: versions, history, submissions, their workflow executions and their uploaded files.
     /// </summary>
     public class FormDeletionService
     {
@@ -15,6 +15,7 @@ namespace SproutForms.Core.Services
         private readonly IFormVersionRepository _formVersionRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
+        private readonly IFormAuditRepository _formAuditRepository;
         private readonly IFormFileStorageProvider[] _fileStorageProviders;
         private readonly IUnitOfWorkProvider _unitOfWorkProvider;
         private readonly ILogger<FormDeletionService> _logger;
@@ -24,6 +25,7 @@ namespace SproutForms.Core.Services
             IFormVersionRepository formVersionRepository,
             IFormSubmissionRepository formSubmissionRepository,
             IWorkflowExecutionRepository workflowExecutionRepository,
+            IFormAuditRepository formAuditRepository,
             IEnumerable<IFormFileStorageProvider> fileStorageProviders,
             IUnitOfWorkProvider unitOfWorkProvider,
             ILogger<FormDeletionService> logger)
@@ -32,6 +34,7 @@ namespace SproutForms.Core.Services
             _formVersionRepository = formVersionRepository;
             _formSubmissionRepository = formSubmissionRepository;
             _workflowExecutionRepository = workflowExecutionRepository;
+            _formAuditRepository = formAuditRepository;
             _fileStorageProviders = [.. fileStorageProviders];
             _unitOfWorkProvider = unitOfWorkProvider;
             _logger = logger;
@@ -47,6 +50,7 @@ namespace SproutForms.Core.Services
                 await _workflowExecutionRepository.DeleteAllByForm(formId);
                 _formSubmissionRepository.DeleteAllByForm(formId);
                 _formVersionRepository.DeleteAllByForm(formId);
+                _formAuditRepository.DeleteAllByForm(formId);
                 _formRepository.Delete(formId);
                 unitOfWork.Complete();
             }

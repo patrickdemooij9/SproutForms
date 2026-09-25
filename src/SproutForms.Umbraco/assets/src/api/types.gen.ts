@@ -66,6 +66,23 @@ export type FormActivityViewModel = {
     forms: Array<FormActivityItem>;
 };
 
+export enum FormAuditAction {
+    CREATED = 'Created',
+    SAVED = 'Saved',
+    RENAMED = 'Renamed',
+    MOVED = 'Moved',
+    ROLLED_BACK = 'RolledBack'
+}
+
+export type FormAuditEntryBackofficeModel = {
+    id: string;
+    action: FormAuditAction;
+    userName: string;
+    createdAt: string;
+    version?: number | null;
+    comment?: string | null;
+};
+
 export type FormBackofficeModel = {
     id?: string | null;
     folderId?: string | null;
@@ -75,6 +92,27 @@ export type FormBackofficeModel = {
     source: number;
     definition: FormDefinitionBackofficeModel;
 };
+
+export type FormChangeBackofficeModel = {
+    section: FormChangeSection;
+    name: string;
+    changeType: FormChangeType;
+    properties: Array<FormPropertyChangeBackofficeModel>;
+};
+
+export enum FormChangeSection {
+    FORM = 'Form',
+    PAGE = 'Page',
+    FIELD = 'Field',
+    WORKFLOW = 'Workflow',
+    OUTCOME = 'Outcome'
+}
+
+export enum FormChangeType {
+    ADDED = 'Added',
+    REMOVED = 'Removed',
+    CHANGED = 'Changed'
+}
 
 export type FormColumnBackofficeModel = {
     width: number;
@@ -172,6 +210,12 @@ export type FormPropertyBackofficeModel = {
     value?: unknown;
 };
 
+export type FormPropertyChangeBackofficeModel = {
+    name: string;
+    currentValue?: string | null;
+    versionValue?: string | null;
+};
+
 export type FormRowBackofficeModel = {
     columns: Array<FormColumnBackofficeModel>;
 };
@@ -213,6 +257,21 @@ export type FormTypeSelectionBackofficeModel = {
     };
 };
 
+export type FormVersionBackofficeModel = {
+    id: string;
+    version: number;
+    createdAt: string;
+    createdByName: string;
+    isCurrent: boolean;
+};
+
+export type FormVersionComparisonBackofficeModel = {
+    version: FormVersionBackofficeModel;
+    changes: Array<FormChangeBackofficeModel>;
+    removedFieldsWithSubmissions: Array<string>;
+    rollbackErrors: Array<string>;
+};
+
 export type FormWorkflowBackofficeModel = {
     alias: string;
     typeAlias: string;
@@ -237,6 +296,11 @@ export type NotificationHeaderModel = {
     message: string;
     category: string;
     type: EventMessageTypeModel;
+};
+
+export type PagedFormAuditEntryBackofficeModel = {
+    total: number;
+    items: Array<FormAuditEntryBackofficeModel>;
 };
 
 export type PagedFormListBackofficeModel = {
@@ -472,6 +536,98 @@ export type PostUmbracoSproutFormsFormResponses = {
 };
 
 export type PostUmbracoSproutFormsFormResponse = PostUmbracoSproutFormsFormResponses[keyof PostUmbracoSproutFormsFormResponses];
+
+export type GetUmbracoSproutFormsFormHistoryData = {
+    body?: never;
+    path?: never;
+    query?: {
+        formId?: string;
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/sproutForms/form/history';
+};
+
+export type GetUmbracoSproutFormsFormHistoryResponses = {
+    /**
+     * OK
+     */
+    200: PagedFormAuditEntryBackofficeModel;
+};
+
+export type GetUmbracoSproutFormsFormHistoryResponse = GetUmbracoSproutFormsFormHistoryResponses[keyof GetUmbracoSproutFormsFormHistoryResponses];
+
+export type PostUmbracoSproutFormsFormRollbackData = {
+    body?: never;
+    path?: never;
+    query?: {
+        formId?: string;
+        versionId?: string;
+    };
+    url: '/umbraco/sproutForms/form/rollback';
+};
+
+export type PostUmbracoSproutFormsFormRollbackErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+};
+
+export type PostUmbracoSproutFormsFormRollbackError = PostUmbracoSproutFormsFormRollbackErrors[keyof PostUmbracoSproutFormsFormRollbackErrors];
+
+export type PostUmbracoSproutFormsFormRollbackResponses = {
+    /**
+     * OK
+     */
+    200: FormBackofficeModel;
+};
+
+export type PostUmbracoSproutFormsFormRollbackResponse = PostUmbracoSproutFormsFormRollbackResponses[keyof PostUmbracoSproutFormsFormRollbackResponses];
+
+export type GetUmbracoSproutFormsFormVersionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        formId?: string;
+    };
+    url: '/umbraco/sproutForms/form/versions';
+};
+
+export type GetUmbracoSproutFormsFormVersionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<FormVersionBackofficeModel>;
+};
+
+export type GetUmbracoSproutFormsFormVersionsResponse = GetUmbracoSproutFormsFormVersionsResponses[keyof GetUmbracoSproutFormsFormVersionsResponses];
+
+export type GetUmbracoSproutFormsFormVersionsCompareData = {
+    body?: never;
+    path?: never;
+    query?: {
+        formId?: string;
+        versionId?: string;
+    };
+    url: '/umbraco/sproutForms/form/versions/compare';
+};
+
+export type GetUmbracoSproutFormsFormVersionsCompareErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetUmbracoSproutFormsFormVersionsCompareResponses = {
+    /**
+     * OK
+     */
+    200: FormVersionComparisonBackofficeModel;
+};
+
+export type GetUmbracoSproutFormsFormVersionsCompareResponse = GetUmbracoSproutFormsFormVersionsCompareResponses[keyof GetUmbracoSproutFormsFormVersionsCompareResponses];
 
 export type GetUmbracoSproutFormsFormsData = {
     body?: never;
