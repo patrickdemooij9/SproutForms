@@ -107,7 +107,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
 
-            builder.Services.AddSingleton<IFormSubmissionGuard, NoFormSubmissionGuard>();
+            builder.Services.AddSingleton<IFormSubmissionGuard, HoneypotSubmissionGuard>();
 
             builder.Services.AddCodeFirstForms((it) => { });
 

@@ -72,5 +72,5 @@ Some cases can't be reached through the rendered form. Client-side validation st
 - **Check where an error came from.** Client-side validation can show the same message the server would. `read_network_requests` with `urlPattern: "/api/forms/"` shows whether the submit reached the server, and with which status (400 = rejected, 200 = accepted).
 - **Resubmit without reloading.** After a failed submit, fix the input and submit again on the same page. That's what visitors do, and it catches client-side state corrupted by the error handling.
 - **Refs go stale.** If the pane was closed and reopened, `ref`s from an earlier `read_page` or `find` no longer work, so look them up again. When `read_page` returns an empty page, `find` still works.
-- **Nothing to watch in reCAPTCHA.** It is off: `NoFormSubmissionGuard` is registered, so the guard always allows.
+- **The honeypot guard is on, reCAPTCHA is off.** `HoneypotSubmissionGuard` is registered, so a submit with a value in the hidden `sf_Honeypot` input is rejected with a 400 and "Your submission could not be processed." When you post directly, leave that field out or empty.
 - **Ignore the restore warnings.** The `NU1902`/`NU1903` package warnings flood the start of `preview_logs`, so search the logs rather than reading the head.

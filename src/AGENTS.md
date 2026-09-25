@@ -35,7 +35,7 @@ npm run build
 - **FormSubmission** - Captured form entries
 - **Flows**: `FormWorkflow`, `WorkflowExecution`, `WorkflowExecutionStatus`
 - **Outcomes**: `ShowMessageOutcome`, `RedirectUrlOutcome`, `RedirectUmbracoPageOutcome`
-- **Submission Guards**: `IFormSubmissionGuard`, `RecaptchaV3SubmissionGuard`
+- **Submission Guards**: `IFormSubmissionGuard`, `HoneypotSubmissionGuard` (the default), `RecaptchaV3SubmissionGuard`, `NoFormSubmissionGuard`. Only one guard is active: registering another `IFormSubmissionGuard` replaces the honeypot. A guard that needs markup in the form sets `PartialViewPath`.
 
 ### Repositories
 - `IFormRepository` / `FormRepository`
