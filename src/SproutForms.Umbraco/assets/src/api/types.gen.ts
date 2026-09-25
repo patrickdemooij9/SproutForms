@@ -83,10 +83,12 @@ export type FormColumnBackofficeModel = {
 
 export type FormDefinitionBackofficeModel = {
     type: FormTypeSelectionBackofficeModel;
-    rows: Array<FormRowBackofficeModel>;
+    pages: Array<FormPageBackofficeModel>;
     fields: Array<FormFieldBackofficeModel>;
     outcome: FormOutcomeBackofficeModel;
     workflows: Array<FormWorkflowBackofficeModel>;
+    submitLabel?: string | null;
+    showProgress: boolean;
 };
 
 export type FormDefinitionTypeBackofficeModel = {
@@ -152,6 +154,14 @@ export type FormOutcomeTypeBackofficeModel = {
     alias: string;
     displayName: string;
     properties: Array<FormPropertyBackofficeModel>;
+};
+
+export type FormPageBackofficeModel = {
+    title?: string | null;
+    rows: Array<FormRowBackofficeModel>;
+    nextLabel?: string | null;
+    previousLabel?: string | null;
+    visibility?: ConditionDefinition | null;
 };
 
 export type FormPropertyBackofficeModel = {

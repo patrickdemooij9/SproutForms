@@ -26,6 +26,7 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
         <form-canvas
           .selectedState=${this.selectedState}
           @select-field=${this.onSelectField}
+          @select-page=${this.onSelectPage}
         >
         </form-canvas>
 
@@ -48,6 +49,16 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
       row: e.detail.row,
       field: e.detail.field?.id,
       column: e.detail.column,
+    };
+  }
+
+  // A page's tab was chosen: the canvas shows its rows, and the inspector its settings
+  private onSelectPage() {
+    this.selectedState = {
+      row: null,
+      field: null,
+      column: null,
+      pageSettings: true,
     };
   }
 

@@ -26,6 +26,15 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   definition!: FormDefinitionDto;
 
   @state()
+  private rows: FormRowDto[] = [];
+
+  @state()
+  private currentPageIndex = 0;
+
+  @state()
+  private draggedPageIndex?: number;
+
+  @state()
   private fieldTypes: FormFieldTypeDto[] = [];
 
   @state()
@@ -45,6 +54,12 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       context?.form.subscribe((form) => {
         this.definition = form.definition;
       });
+      this.observe(context?.currentPage, (page) => {
+        this.rows = page?.rows ?? [];
+      });
+      this.observe(context?.currentPageIndex, (index) => {
+        this.currentPageIndex = index ?? 0;
+      });
     });
 
     new SproutFormsSource(this).getFieldTypes().then((resp) => {
@@ -53,12 +68,13 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   render() {
-    const hasFields = this.definition.rows.some((row) => row.columns.length > 0);
+    const hasFields = this.rows.some((row) => row.columns.length > 0);
     const isNewRowSelected = !this.selectedState.row && !this.selectedState.column;
 
     return html`
       <div class="canvas">
-        ${this.definition.rows.map((row) => {
+        ${this.renderPages()}
+        ${this.rows.map((row) => {
           const rowSize = row.columns.reduce(
             (a, b) =>
               a +
@@ -98,6 +114,71 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
         </button>
       </div>
     `;
+  }
+
+  private renderPages() {
+    return html`
+      <div class="pages" role="tablist" aria-label="Pages">
+        ${this.definition.pages.map((page, index) => {
+          const isCurrent = index === this.currentPageIndex;
+          const hasConditions = (page.visibility?.rules?.length ?? 0) > 0;
+          return html`
+            <button
+              class="page-tab ${isCurrent ? "current" : ""} ${this.draggedPageIndex === index ? "dragging" : ""}"
+              role="tab"
+              aria-selected=${isCurrent}
+              title=${isCurrent ? "Page settings" : "Show this page. Drop a field here to move it to this page"}
+              draggable="true"
+              @click=${() => this.selectPage(index)}
+              @dragstart=${(event: DragEvent) => this.onPageDragStart(event, index)}
+              @dragend=${this.onDragEnd}
+              @dragover=${this.onDragOver}
+              @drop=${(event: DragEvent) => this.onDropOnPage(event, index)}
+            >
+              <span class="page-number">${index + 1}</span>
+              <span class="page-title">${page.title || `Page ${index + 1}`}</span>
+              ${hasConditions
+                ? html`<uui-icon name="icon-directions" title="Only shown when its conditions hold"></uui-icon>`
+                : nothing}
+            </button>
+          `;
+        })}
+        <button class="page-add" title="Add a page at the end" @click=${this.addPage}>
+          <uui-icon name="icon-add"></uui-icon> Add page
+        </button>
+      </div>
+    `;
+  }
+
+  private selectPage(index: number) {
+    this.context?.setCurrentPage(index);
+    this.dispatchEvent(new CustomEvent("select-page", { bubbles: true, composed: true }));
+  }
+
+  private addPage() {
+    this.context?.addPage();
+    this.dispatchEvent(new CustomEvent("select-page", { bubbles: true, composed: true }));
+  }
+
+  private onPageDragStart(event: DragEvent, index: number) {
+    this.draggedPageIndex = index;
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", `page-${index}`);
+    }
+  }
+
+  // A field dropped on a tab moves to that page; a tab dropped on a tab takes its place
+  private onDropOnPage(event: DragEvent, index: number) {
+    event.preventDefault();
+    if (this.draggedFieldId) {
+      this.context?.moveFieldToPage(this.draggedFieldId, index);
+      this.draggedFieldId = undefined;
+      this.selectPage(index);
+    } else if (this.draggedPageIndex !== undefined) {
+      this.context?.movePage(this.draggedPageIndex, index);
+      this.draggedPageIndex = undefined;
+    }
   }
 
   private renderColumn(
@@ -140,7 +221,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
             <span class="field-type">${fieldType?.displayName ?? field.fieldTypeAlias}</span>
           </span>
           ${when(
-            field.conditions?.visibility || field.conditions?.required,
+            // A condition whose rules were all removed is still stored, so look for rules
+            (field.conditions?.visibility?.rules?.length ?? 0) + (field.conditions?.required?.rules?.length ?? 0) > 0,
             () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has conditions"></uui-icon>`,
           )}
           ${when(
@@ -243,6 +325,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   // A drag that is cancelled never reaches a drop target
   private onDragEnd() {
     this.draggedFieldId = undefined;
+    this.draggedPageIndex = undefined;
   }
 
   private onDragOver(event: DragEvent) {
@@ -285,6 +368,75 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     .row {
       display: flex;
       gap: var(--uui-size-space-3);
+    }
+
+    .pages {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--uui-size-space-2);
+      margin-bottom: var(--uui-size-space-3);
+    }
+
+    .page-tab,
+    .page-add {
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-2);
+      min-width: 0;
+      padding: var(--uui-size-space-2) var(--uui-size-space-4);
+      font: inherit;
+      color: var(--uui-color-text);
+      background: var(--uui-color-surface);
+      border: 1px solid var(--uui-color-border);
+      border-radius: calc(var(--uui-border-radius) * 2);
+      cursor: pointer;
+      transition: border-color 120ms, box-shadow 120ms;
+
+      &:hover {
+        border-color: var(--uui-color-border-emphasis);
+      }
+    }
+
+    .page-tab {
+      max-width: 240px;
+
+      &.current {
+        border-color: var(--uui-color-selected);
+        box-shadow: 0 0 0 1px var(--uui-color-selected);
+        font-weight: 700;
+      }
+
+      &.dragging {
+        opacity: 0.5;
+      }
+    }
+
+    .page-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--uui-color-surface-alt);
+      font-size: var(--uui-type-small-size);
+    }
+
+    .page-tab.current .page-number {
+      background: var(--uui-color-selected);
+      color: var(--uui-color-selected-contrast);
+    }
+
+    .page-title {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .page-add {
+      color: var(--uui-color-interactive);
+      border-style: dashed;
     }
 
     .column-outer {

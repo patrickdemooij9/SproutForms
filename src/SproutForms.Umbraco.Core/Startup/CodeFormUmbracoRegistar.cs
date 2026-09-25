@@ -54,9 +54,9 @@ namespace SproutForms.Umbraco.Core.Startup
             FormDefinitionTypeValidator typeValidator)
         {
             var definition = codeForm.Build();
-            var typeErrors = typeValidator.Validate(definition);
-            if (typeErrors.Count > 0)
-                throw new InvalidOperationException($"Code-first form '{codeForm.Alias}' is invalid: {string.Join(" ", typeErrors)}");
+            var errors = FormDefinitionStructureValidator.Validate(definition).Concat(typeValidator.Validate(definition)).ToList();
+            if (errors.Count > 0)
+                throw new InvalidOperationException($"Code-first form '{codeForm.Alias}' is invalid: {string.Join(" ", errors)}");
 
             var hash = FormDefinitionHasher.Hash(definition);
 

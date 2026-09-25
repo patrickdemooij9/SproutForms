@@ -14,6 +14,10 @@ namespace SproutForms.Umbraco.Core.Services
 {
     public class FormRenderingService
     {
+        private const string DefaultSubmitLabel = "Submit";
+        private const string DefaultNextLabel = "Next";
+        private const string DefaultPreviousLabel = "Previous";
+
         private readonly IFormFieldType[] _fieldTypes;
         private readonly IFormSubmissionGuard _formSubmissionGuard;
         private readonly IHttpContextAccessor _httpContextAccessor;
@@ -45,10 +49,13 @@ namespace SproutForms.Umbraco.Core.Services
                     PartialViewPath = _formSubmissionGuard.PartialViewPath
                 });
             }
+            var fields = version.Definition.Fields.ToArray();
             return new RenderedFormViewModel
             {
                 Id = version.FormId,
-                Rows = version.Definition.Rows.Select(it => BuildRow(it, version.Definition.Fields.ToArray())).ToList(),
+                Pages = version.Definition.Pages.Select((page, index) => BuildPage(page, index, fields)).ToList(),
+                SubmitLabel = string.IsNullOrWhiteSpace(version.Definition.SubmitLabel) ? DefaultSubmitLabel : version.Definition.SubmitLabel,
+                ShowProgress = version.Definition.ShowProgress,
                 SubmissionGuards = submissionGuards,
                 HasErrors = _errors.Count > 0
             };
@@ -64,11 +71,38 @@ namespace SproutForms.Umbraco.Core.Services
                 _values = JsonSerializer.Deserialize<Dictionary<string, string>>(valuesRaw.ToString()!)!;
         }
 
+        private FormPageViewModel BuildPage(FormPage page, int index, FormField[] fields)
+            => new()
+            {
+                Index = index,
+                Title = page.Title,
+                Rows = page.Rows.Select(it => BuildRow(it, fields)).ToList(),
+                NextLabel = string.IsNullOrWhiteSpace(page.NextLabel) ? DefaultNextLabel : page.NextLabel,
+                PreviousLabel = string.IsNullOrWhiteSpace(page.PreviousLabel) ? DefaultPreviousLabel : page.PreviousLabel,
+                Visibility = page.Visibility
+            };
+
         private FormRowViewModel BuildRow(FormRow row, FormField[] fields)
             => new()
             {
                 Columns = row.Columns.Select(it => BuildColumn(it, fields)).ToList()
             };
+
+        // Required comes first, so an empty field shows the same message the server would
+        private static List<ValidationRule> GetValidationRules(FormField field, IFormFieldType fieldType)
+        {
+            var rules = new List<ValidationRule>();
+            if (field.Required)
+            {
+                rules.Add(new ValidationRule
+                {
+                    Type = "required",
+                    Message = "Field is required."
+                });
+            }
+            rules.AddRange(fieldType.GetValidationRules(field.Configuration));
+            return rules;
+        }
 
         private FormColumnViewModel BuildColumn(FormColumn column, FormField[] fields)
         {
@@ -84,7 +118,7 @@ namespace SproutForms.Umbraco.Core.Services
                 RendersOwnLabel = fieldType.RendersOwnLabel,
                 Configuration = field.Configuration,
                 Conditions = field.Conditions,
-                ValidationRules = fieldType.GetValidationRules(field.Configuration),
+                ValidationRules = GetValidationRules(field, fieldType),
             };
 
             if (_errors.TryGetValue(field.Alias, out var errors) is true)

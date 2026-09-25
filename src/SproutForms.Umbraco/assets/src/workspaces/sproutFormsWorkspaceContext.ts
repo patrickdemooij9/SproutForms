@@ -13,15 +13,18 @@ import { SproutFormsWorkspaceElement } from "./sproutFormsWorkspace.element";
 import {
   mergeObservables,
   UmbArrayState,
+  UmbNumberState,
   UmbObjectState,
 } from "@umbraco-cms/backoffice/observable-api";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import {
   FormColumnDto,
+  FormDefinitionDto,
   FormDefinitionTypeDto,
   FormDto,
   FormFieldDto,
+  FormPageDto,
   FormRowDto,
   SOURCE_UI,
 } from "../models";
@@ -49,9 +52,10 @@ export default class SproutFormsWorkspaceContext
         displayName: "Standard form",
         settings: {},
       },
-      rows: [],
+      pages: [{ id: crypto.randomUUID(), rows: [] }],
       fields: [],
       workflows: [],
+      showProgress: true,
       outcome: {
         typeAlias: "message",
         displayName: "Show a message",
@@ -63,6 +67,14 @@ export default class SproutFormsWorkspaceContext
   });
   public readonly form = this.#form.asObservable();
   public readonly formId = this.#form.value.id;
+
+  // The page the Build tab shows and edits
+  #currentPageIndex = new UmbNumberState(0);
+  public readonly currentPageIndex = this.#currentPageIndex.asObservable();
+  public readonly currentPage = mergeObservables(
+    [this.form, this.#currentPageIndex.asObservable()],
+    ([form, index]) => form.definition.pages[index],
+  );
 
   #formTypes = new UmbArrayState<FormDefinitionTypeDto>([], (it) => it.alias);
   public readonly formTypes = this.#formTypes.asObservable();
@@ -105,6 +117,7 @@ export default class SproutFormsWorkspaceContext
         setup: (_component, _info) => {
           this.#updateAlias = false;
           this.source.getForm(_info.match.params.unique).then((resp) => {
+            this.#currentPageIndex.setValue(0);
             this.#form.update(mapToDto(resp.data));
           });
         },
@@ -172,29 +185,130 @@ export default class SproutFormsWorkspaceContext
     }
   }
 
+  getCurrentPageIndex(): number {
+    return this.#currentPageIndex.getValue();
+  }
+
+  setCurrentPage(index: number) {
+    const pageCount = this.#form.value.definition.pages.length;
+    this.#currentPageIndex.setValue(Math.min(Math.max(index, 0), pageCount - 1));
+  }
+
+  #setPages(pages: FormPageDto[]) {
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        pages,
+      },
+    });
+  }
+
+  // Adds an empty page at the end and shows it
+  addPage() {
+    const pages = [...this.#form.value.definition.pages, { id: crypto.randomUUID(), rows: [] }];
+    this.#setPages(pages);
+    this.#currentPageIndex.setValue(pages.length - 1);
+  }
+
+  updatePage(index: number, changes: Partial<FormPageDto>) {
+    this.#setPages(
+      this.#form.value.definition.pages.map((page, i) => (i === index ? { ...page, ...changes } : page)),
+    );
+  }
+
+  // The page's fields move to the page before it, or after it for the first page, so removing a page never removes fields
+  removePage(index: number) {
+    const pages = this.#form.value.definition.pages;
+    if (pages.length <= 1) return;
+
+    const targetIndex = index === 0 ? 1 : index - 1;
+    const updatedPages = pages.map((page, i) =>
+      i === targetIndex ? { ...page, rows: [...page.rows, ...pages[index].rows] } : page,
+    );
+    updatedPages.splice(index, 1);
+    this.#setPages(updatedPages);
+    this.#currentPageIndex.setValue(index === 0 ? 0 : index - 1);
+  }
+
+  movePage(fromIndex: number, toIndex: number) {
+    const pages = [...this.#form.value.definition.pages];
+    if (fromIndex === toIndex || toIndex < 0 || toIndex >= pages.length) return;
+
+    const current = pages[this.#currentPageIndex.getValue()];
+    const [moved] = pages.splice(fromIndex, 1);
+    pages.splice(toIndex, 0, moved);
+    this.#setPages(pages);
+    this.#currentPageIndex.setValue(pages.indexOf(current));
+  }
+
+  getPageIndexOfField(fieldId: string): number {
+    return this.#form.value.definition.pages.findIndex((page) =>
+      page.rows.some((row) => row.columns.some((col) => col.fieldId === fieldId)),
+    );
+  }
+
+  // Moves the field to a new row at the end of the page
+  moveFieldToPage(fieldId: string, pageIndex: number) {
+    const sourceIndex = this.getPageIndexOfField(fieldId);
+    if (sourceIndex === -1 || sourceIndex === pageIndex) return;
+
+    const pages = structuredClone(this.#form.value.definition.pages);
+    const column = pages[sourceIndex].rows
+      .flatMap((row) => row.columns)
+      .find((col) => col.fieldId === fieldId)!;
+    pages[sourceIndex].rows = pages[sourceIndex].rows
+      .map((row) => ({ ...row, columns: row.columns.filter((col) => col !== column) }))
+      .filter((row) => row.columns.length > 0);
+    pages[pageIndex].rows.push({
+      id: crypto.randomUUID(),
+      columns: [{ ...column, width: 12 }],
+    });
+    this.#setPages(pages);
+  }
+
+  // The fields a condition may use: those on earlier pages, and on the page itself when includeOwnPage is set
+  getFieldsBeforePage(pageIndex: number, includeOwnPage: boolean): FormFieldDto[] {
+    const lastPage = includeOwnPage ? pageIndex : pageIndex - 1;
+    const fieldIds = new Set(
+      this.#form.value.definition.pages
+        .slice(0, lastPage + 1)
+        .flatMap((page) => page.rows)
+        .flatMap((row) => row.columns)
+        .map((col) => col.fieldId),
+    );
+    return this.#form.value.definition.fields.filter((field) => fieldIds.has(field.id));
+  }
+
+  getCurrentPageRows(): FormRowDto[] {
+    return this.#form.value.definition.pages[this.#currentPageIndex.getValue()]?.rows ?? [];
+  }
+
+  // Returns a copy of the definition with the rows of the current page replaced
+  withCurrentPageRows(definition: FormDefinitionDto, rows: FormRowDto[]): FormDefinitionDto {
+    const index = this.#currentPageIndex.getValue();
+    return {
+      ...definition,
+      pages: definition.pages.map((page, i) => (i === index ? { ...page, rows } : page)),
+    };
+  }
+
   setColumnSize(
     row: FormRowDto,
     column: FormColumnDto,
     newSize: number
   ) {
-    const rowIndex = this.#form.value.definition.rows.findIndex(
-      (r) => r === row
-    );
+    const rows = this.getCurrentPageRows();
+    const rowIndex = rows.findIndex((r) => r === row);
     if (rowIndex === -1) return;
 
-    const columnIndex = this.#form.value.definition.rows[
-      rowIndex
-    ].columns.findIndex((c) => c === column);
+    const columnIndex = rows[rowIndex].columns.findIndex((c) => c === column);
     if (columnIndex === -1) return;
 
-    const updatedRows = structuredClone(this.#form.value.definition.rows);
+    const updatedRows = structuredClone(rows);
     updatedRows[rowIndex].columns[columnIndex].width = newSize;
 
     this.#form.update({
-      definition: {
-        ...this.#form.value.definition,
-        rows: updatedRows,
-      },
+      definition: this.withCurrentPageRows(this.#form.value.definition, updatedRows),
     });
   }
 
@@ -203,16 +317,17 @@ export default class SproutFormsWorkspaceContext
     targetRow?: FormRowDto,
     targetColumn?: FormColumnDto
   ) {
-    const sourceRowIndex = this.#form.value.definition.rows.findIndex(row => 
+    const rows = this.getCurrentPageRows();
+    const sourceRowIndex = rows.findIndex(row => 
       row.columns.some(col => col.fieldId === fieldId)
     );
     if (sourceRowIndex === -1) return;
 
-    const sourceRow = this.#form.value.definition.rows[sourceRowIndex];
+    const sourceRow = rows[sourceRowIndex];
     const sourceColumnIndex = sourceRow.columns.findIndex(col => col.fieldId === fieldId);
     if (sourceColumnIndex === -1) return;
 
-    const updatedRows = structuredClone(this.#form.value.definition.rows);
+    const updatedRows = structuredClone(rows);
     
     // Switch existing column with new field
     if (targetRow && targetColumn) {
@@ -264,25 +379,25 @@ export default class SproutFormsWorkspaceContext
     }
 
     this.#form.update({
-      definition: {
-        ...this.#form.value.definition,
-        rows: updatedRows,
-      },
+      definition: this.withCurrentPageRows(this.#form.value.definition, updatedRows),
     });
   }
 
   removeField(fieldId: string) {
-    const updatedRows = this.#form.value.definition.rows.map(row => ({
-      ...row,
-      columns: row.columns.filter(col => col.fieldId !== fieldId)
-    })).filter(row => row.columns.length > 0);
+    const updatedPages = this.#form.value.definition.pages.map(page => ({
+      ...page,
+      rows: page.rows.map(row => ({
+        ...row,
+        columns: row.columns.filter(col => col.fieldId !== fieldId)
+      })).filter(row => row.columns.length > 0),
+    }));
 
     const updatedFields = this.#form.value.definition.fields.filter(f => f.id !== fieldId);
 
     this.#form.update({
       definition: {
         ...this.#form.value.definition,
-        rows: updatedRows,
+        pages: updatedPages,
         fields: updatedFields,
       },
     });

@@ -67,3 +67,61 @@
             background: #aaa;
             cursor: not-allowed;
         }
+
+/* Forms with pages: Previous on the left, Next and Submit on the right */
+form[data-sf-paged] .form-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+    form[data-sf-paged] .form-actions .form-next,
+    form[data-sf-paged] .form-actions button[type="submit"] {
+        margin-left: auto;
+    }
+
+    .form-actions .form-previous {
+        background: #fff;
+        color: #1976d2;
+        border: 1px solid #1976d2;
+    }
+
+        .form-actions .form-previous:hover {
+            background: #e3f2fd;
+        }
+
+.form-page:focus {
+    outline: none;
+}
+
+.form-page-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+    padding: 0;
+}
+
+.form-progress {
+    display: flex;
+    gap: 0.5rem;
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+}
+
+    .form-progress-step {
+        flex: 1;
+        padding-top: 0.5rem;
+        border-top: 4px solid #ddd;
+        color: #666;
+        font-size: 0.875rem;
+    }
+
+        .form-progress-step.is-complete {
+            border-top-color: #90caf9;
+        }
+
+        .form-progress-step.is-current {
+            border-top-color: #1976d2;
+            color: #222;
+            font-weight: 600;
+        }

@@ -1,6 +1,11 @@
 @using SproutForms.Umbraco.Core.Models.ViewModels
 @model RenderedFormViewModel
 
+@{
+    // A form with one page renders exactly as before pages existed: no page wrapper, progress or navigation
+    var isPaged = Model.Pages.Count > 1;
+}
+
 <div class="form-root">
     @if (TempData[$"{Model.Id}:SuccessMessage"] is string message)
     {
@@ -10,30 +15,48 @@
     }
     else
     {
-        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)'>
+        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)' @if (isPaged) { <text> data-sf-paged="true"</text> }>
             @Html.AntiForgeryToken()
             <input type="hidden" name="sf_PageUrl" value="" data-sf-page-url="true" />
             @foreach (var guard in Model.SubmissionGuards.Where(it => it.PartialViewPath is not null))
             {
                 @await Html.PartialAsync(guard.PartialViewPath!)
             }
-            @foreach (var row in Model.Rows)
+            @if (isPaged && Model.ShowProgress)
             {
-                <div class="form-row">
-                    @foreach (var col in row.Columns)
+                <ol class="form-progress" hidden>
+                    @foreach (var formPage in Model.Pages)
                     {
-                        <div class="form-col col-@col.Width">
-                            @await Html.PartialAsync(
-                            $"~/Views/Forms/Field.cshtml",
-                                col.Field
-                                )
-            </div>
+                        <li class="form-progress-step" data-sf-progress-step="@formPage.Index">@(string.IsNullOrWhiteSpace(formPage.Title) ? $"Step {formPage.Index + 1}" : formPage.Title)</li>
+                    }
+                </ol>
+            }
+            @foreach (var formPage in Model.Pages)
+            {
+                @if (isPaged)
+                {
+                    @* Without JavaScript every page shows, one after the other, and the form posts as a whole *@
+                    <fieldset class="form-page" tabindex="-1" data-sf-page="@formPage.Index" data-sf-next-label="@formPage.NextLabel" data-sf-previous-label="@formPage.PreviousLabel" @if (formPage.Visibility != null) { <text> data-sf-page-conditions='@Json.Serialize(formPage.Visibility)'</text> }>
+                        @if (!string.IsNullOrWhiteSpace(formPage.Title))
+                        {
+                            <legend class="form-page-title">@formPage.Title</legend>
                         }
-                </div>
+                        @await Html.PartialAsync("~/Views/Forms/Rows.cshtml", formPage.Rows)
+                    </fieldset>
+                }
+                else
+                {
+                    @await Html.PartialAsync("~/Views/Forms/Rows.cshtml", formPage.Rows)
+                }
             }
 
             <div class="form-actions">
-                <button type="submit">Submit</button>
+                @if (isPaged)
+                {
+                    <button type="button" class="form-previous" data-sf-previous hidden></button>
+                    <button type="button" class="form-next" data-sf-next hidden></button>
+                }
+                <button type="submit">@Model.SubmitLabel</button>
             </div>
         </form>
     }

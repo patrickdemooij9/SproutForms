@@ -73,17 +73,9 @@ namespace SproutForms.Core.Controllers
                 }
             }
 
-            // File field values may only come from an actual upload, never from a posted text value
-            foreach (var fileField in formVersion.Definition.Fields.Where(f => f.Configuration is FileFieldConfig))
-            {
-                values.Remove(fileField.Alias);
-            }
-
             var request = new FormSubmissionRequest
             {
-                Values = values.Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key)).ToDictionary(
-                         kvp => kvp.Key,
-                         kvp => JsonSerializer.SerializeToElement(kvp.Value)),
+                Values = GetFieldValues(formVersion, values),
                 PageUrl = pageUrl
             };
 
@@ -151,6 +143,39 @@ namespace SproutForms.Core.Controllers
 
             return RedirectBack(pageUrl);
         }
+
+        /// <summary>
+        /// Validates one page of a form before the visitor moves on to the next, so rules only the server checks show on the page they belong to. Nothing is saved.
+        /// </summary>
+        [HttpPost("{id}/pages/{pageIndex:int}/validate")]
+        [ValidateAntiForgeryToken]
+        public IActionResult ValidatePage(
+            Guid id,
+            int pageIndex,
+            [FromForm] Dictionary<string, string> values)
+        {
+            var formVersion = _formVersions.GetPublished(id);
+            if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
+                return NotFound();
+
+            var errors = _submissionService.ValidatePage(formVersion, pageIndex, GetFieldValues(formVersion, values));
+            if (errors.Count != 0)
+            {
+                return BadRequest(new AjaxFormResponse
+                {
+                    Success = false,
+                    Errors = errors
+                });
+            }
+
+            return Ok(new AjaxFormResponse { Success = true });
+        }
+
+        // Only the form's own fields, and file field values only from an actual upload, never from a posted text value
+        private static Dictionary<string, JsonElement> GetFieldValues(FormVersion formVersion, Dictionary<string, string> values)
+            => values
+                .Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key && f.Configuration is not FileFieldConfig))
+                .ToDictionary(kvp => kvp.Key, kvp => JsonSerializer.SerializeToElement(kvp.Value));
 
         /// <summary>
         /// Redirects to the page the form was posted from, but only to a page on this site; the posted page URL and the Referer header are both client-controlled.

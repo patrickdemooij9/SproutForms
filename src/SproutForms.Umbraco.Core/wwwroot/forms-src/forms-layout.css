@@ -79,3 +79,18 @@
 .form-group.sf-hidden {
     display: none !important;
 }
+
+/* Pages: forms.js shows one page at a time, without it they show one after the other */
+.form-page {
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.form-page[hidden],
+.form-progress[hidden],
+.form-progress-step[hidden],
+.form-actions button[hidden] {
+    display: none !important;
+}

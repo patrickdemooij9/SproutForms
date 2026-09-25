@@ -58,6 +58,42 @@ And supports the following flows:
 
 Data is automatically stored in the database and can be viewed as such in the backoffice. You also have the option to either show a message or redirect the user to a different page.
 
+## Pages
+
+A form can be split into pages. forms.js shows one page at a time with Previous and Next buttons, and a progress list of the page titles. Next checks the current page's fields before it moves on, first in the browser and then on the server (`POST /api/forms/{id}/pages/{index}/validate`), so rules only the server checks, such as the email format, show on the page they belong to. Uploads are only checked when the form is submitted. The form is still submitted once, from the last page, and an error on an earlier page takes the visitor back to it. Without JavaScript every page shows, one after the other.
+
+In the backoffice, the Build tab shows the form's pages above the canvas. Click a page to edit its fields and, in the side panel, its title, button labels and when it's shown. Drop a field on a page to move it there, or drag a page to reorder. The submit button's text and whether the progress steps show are on the Settings tab.
+
+A form is checked when it's saved, and when a code-first form is registered: every field is placed on exactly one page, only a form's single page may be empty, and a condition only uses fields from earlier pages (or, for a field, its own page).
+
+In code, add each page with `Page`. A page without a title shows as "Step n" in the progress list:
+
+```csharp
+new FormBuilder("order", "Order")
+    .Page("About you", page => page
+        .NextLabel("Continue")
+        .Row(row => row.Col(12, col => col.Text("name", "Name").Required().Done())))
+    .Page("Your order", page => page
+        .PreviousLabel("Back")
+        .Row(row => row.Col(12, col => col.Textarea("message", "Message").Done())))
+    .SubmitLabel("Send order")
+    .Build();
+```
+
+A page can depend on earlier answers with `VisibleWhen`. When its conditions don't hold, the page is skipped and left out of the progress list, and its fields aren't validated, in the browser or on the server:
+
+```csharp
+.Page("Delivery address", page => page
+    .VisibleWhen(c => c.Field("delivery", ConditionComparison.Equals, "home"))
+    .Row(row => row.Col(12, col => col.Text("address", "Address").Required().Done())))
+```
+
+A form built with only `Row` has a single page, and renders without page navigation. Every page change raises a `sproutforms:pagechange` event on the form, with the new and previous page index in `detail`:
+
+```js
+document.addEventListener("sproutforms:pagechange", e => window.scrollTo({ top: e.target.offsetTop }));
+```
+
 # Extending: form types
 
 A **form type** decides what kind of form something is: a standard form, a quiz, a poll, a product finder, or your own. Editors choose it when they create a form, and it can't be changed afterwards. A form type can:

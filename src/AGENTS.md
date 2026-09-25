@@ -31,7 +31,7 @@ npm run build
 ## Key Architecture
 
 ### Domain Models (`SproutForms.Core/Models/`)
-- **Form**, **FormField**, **FormColumn**, **FormRow** - Core form structure
+- **Form**, **FormField**, **FormPage**, **FormRow**, **FormColumn** - Core form structure. A definition's layout is a list of pages, each holding rows of columns that point to a field by alias
 - **FormSubmission** - Captured form entries
 - **Flows**: `FormWorkflow`, `WorkflowExecution`, `WorkflowExecutionStatus`
 - **Outcomes**: `ShowMessageOutcome`, `RedirectUrlOutcome`, `RedirectUmbracoPageOutcome`
@@ -68,6 +68,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `AddFoldersMigration` - Folder support
 - `FormsUserGroupMigration` - User group setup
 - `AddSubmissionResultsMigration` - `ResultsJson` column for the results a form type computes
+- `WrapRowsInPagesMigration` - moves the rows of every stored definition into a single page
 
 ## Adding New Field Types
 
@@ -85,6 +86,7 @@ A form type (`IFormDefinitionType`, in `SproutForms.Core/Models/FormTypes/`) say
 - A type can process a submission by overriding `ProcessSubmissionAsync`. It runs after field validation, before the submission is saved, and returns **results** to store with it (such as a quiz score, in `FormSubmission.Results`) or errors that reject it. `GetSettings` and `GetFieldSettings<T>` give the form's and a field's typed settings.
 - A submit outcome (`IFormSubmitOutcomeType.HandleAsync`) gets a `FormSubmitOutcomeContext` with its configuration, the saved submission (values and results) and the form version. An outcome that throws is logged, and the visitor gets the default confirmation, because the submission is already saved. forms.js shows a `message` as HTML, so never put submitted values in it.
 - A field or outcome type that only belongs in certain form types implements `IRestrictedToFormTypes`.
+- `FormDefinitionStructureValidator` checks a definition's layout (every field on exactly one page, no empty page unless it's the only one, conditions only use fields from earlier pages) at the same two moments as the type validator below.
 - `FormDefinitionTypeValidator` enforces these rules. It runs when a code-first form is registered (an invalid form fails startup) and when the backoffice saves a form.
 - Code-first forms choose a type with `FormBuilder.OfType(alias, settings)`, set a field's extension settings with `FieldBuilder.Extend(settings)`, use any outcome type with `FormBuilder.SetOutcome(alias, configuration)`, and any workflow type with `WorkflowBuilder.Add(alias, workflowTypeAlias, configuration)`.
 - Register a type as `IFormDefinitionType` in a composer.

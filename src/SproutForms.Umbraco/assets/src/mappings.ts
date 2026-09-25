@@ -18,14 +18,20 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
       type: {
         ...model.definition.type,
       },
-      rows: model.definition.rows.map((row) => ({
+      pages: model.definition.pages.map((page) => ({
+        ...page,
         id: crypto.randomUUID(),
-        columns: row.columns.map((col) => ({
+        rows: page.rows.map((row) => ({
           id: crypto.randomUUID(),
-          width: col.width,
-          fieldId: fields.find((f) => f.alias == col.fieldAlias)?.id!,
+          columns: row.columns.map((col) => ({
+            id: crypto.randomUUID(),
+            width: col.width,
+            fieldId: fields.find((f) => f.alias == col.fieldAlias)?.id!,
+          })),
         })),
       })),
+      submitLabel: model.definition.submitLabel,
+      showProgress: model.definition.showProgress,
       fields: fields,
       outcome: {
         ...model.definition.outcome,
@@ -50,13 +56,21 @@ export function mapToPost(model: FormDto): FormBackofficeModel {
       type: {
         ...model.definition.type,
       },
-      rows: model.definition.rows.map((row) => ({
-        columns: row.columns.map((col) => ({
-          width: col.width,
-          fieldAlias: model.definition.fields.find((f) => f.id == col.fieldId)
-            ?.alias!,
+      pages: model.definition.pages.map((page) => ({
+        title: page.title,
+        nextLabel: page.nextLabel,
+        previousLabel: page.previousLabel,
+        visibility: page.visibility,
+        rows: page.rows.map((row) => ({
+          columns: row.columns.map((col) => ({
+            width: col.width,
+            fieldAlias: model.definition.fields.find((f) => f.id == col.fieldId)
+              ?.alias!,
+          })),
         })),
       })),
+      submitLabel: model.definition.submitLabel,
+      showProgress: model.definition.showProgress,
       fields: model.definition.fields,
       outcome: {
         ...model.definition.outcome,

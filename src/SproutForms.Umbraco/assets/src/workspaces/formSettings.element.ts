@@ -64,6 +64,14 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
             alias: "alias",
             value: this.form.alias,
           },
+          {
+            alias: "submitLabel",
+            value: this.form.definition.submitLabel ?? "",
+          },
+          {
+            alias: "showProgress",
+            value: this.form.definition.showProgress,
+          },
         ];
 
         Object.entries(this.form.definition.type.settings).forEach(
@@ -96,6 +104,10 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
       if (item.alias == "alias") {
         updateForm.alias = item.value as string;
         this.context?.lockAliasUpdate();
+      } else if (item.alias == "submitLabel") {
+        updateForm.definition!.submitLabel = (item.value as string) || null;
+      } else if (item.alias == "showProgress") {
+        updateForm.definition!.showProgress = item.value === true;
       } else if (item.alias.startsWith("type-")) {
         const actualAlias = item.alias.replace("type-", "");
         if (
@@ -247,6 +259,27 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
               label="Alias"
               description="The generated alias for this form. This is used for programmatic implementations."
               property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+              val
+            ></umb-property>
+          </uui-box>
+
+          <uui-box headline="Pages">
+            <p class="box-description">
+              How the form's buttons read, and whether a form with more than one page shows its steps.
+              Each page's own title and button labels are set on the Build tab.
+            </p>
+            <umb-property
+              alias="submitLabel"
+              label="Submit button"
+              description="The text of the submit button. Empty means Submit."
+              property-editor-ui-alias="Umb.PropertyEditorUi.TextBox"
+              val
+            ></umb-property>
+            <umb-property
+              alias="showProgress"
+              label="Show progress"
+              description="Shows the page titles as steps above a form with more than one page."
+              property-editor-ui-alias="Umb.PropertyEditorUi.Toggle"
               val
             ></umb-property>
           </uui-box>

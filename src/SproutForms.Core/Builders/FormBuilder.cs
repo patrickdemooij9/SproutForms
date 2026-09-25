@@ -9,7 +9,9 @@ namespace SproutForms.Core.Builders
     public class FormBuilder
     {
         private readonly List<FormField> _fields = [];
-        private readonly List<FormRow> _rows = [];
+        private readonly List<FormPage> _pages = [];
+        private FormPage? _implicitPage;
+        private string? _submitLabel;
         private readonly List<FormWorkflow> _workflows = [];
         private FormSubmitOutcome? _outcome;
         private FormDefinitionTypeReference? _type;
@@ -32,11 +34,38 @@ namespace SproutForms.Core.Builders
             return field;
         }
 
+        /// <summary>
+        /// Adds a row to the first page, for forms that don't use <see cref="Page"/>.
+        /// </summary>
         public FormBuilder Row(Action<RowBuilder> configure)
         {
+            if (_implicitPage == null)
+            {
+                if (_pages.Count > 0)
+                    throw new InvalidOperationException("Rows after a page belong to a page. Add them with Page(title, page => page.Row(...)).");
+
+                _implicitPage = new FormPage();
+                _pages.Add(_implicitPage);
+            }
+
             var row = new RowBuilder(this);
             configure(row);
-            _rows.Add(row.Build());
+            _implicitPage.Rows.Add(row.Build());
+            return this;
+        }
+
+        public FormBuilder Page(string? title, Action<PageBuilder> configure)
+        {
+            var page = new PageBuilder(this, title);
+            configure(page);
+            _pages.Add(page.Build());
+            _implicitPage = null;
+            return this;
+        }
+
+        public FormBuilder SubmitLabel(string label)
+        {
+            _submitLabel = label;
             return this;
         }
 
@@ -79,8 +108,9 @@ namespace SproutForms.Core.Builders
             var definition = new FormDefinition
             {
                 Fields = _fields,
-                Rows = _rows,
-                Workflows = _workflows
+                Pages = _pages,
+                Workflows = _workflows,
+                SubmitLabel = _submitLabel
             };
             if (_type != null)
             {
