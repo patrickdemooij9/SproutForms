@@ -53,6 +53,17 @@ interface GuardDefinition {
     settings: Record<string, unknown>;
 }
 
+interface PageState {
+    pages: HTMLElement[];
+    conditions: Array<FieldCondition | undefined>;
+    current: number;
+}
+
+interface PageChangeDetail {
+    index: number;
+    previousIndex: number;
+}
+
 interface FormSubmitResult {
     outcomeType?: string;
     outcomeData?: Record<string, unknown>;
@@ -168,8 +179,11 @@ window.SproutForms = {
 
         async validateField(fieldContainer: Element): Promise<ValidationResult> {
             const rules = (fieldContainer.getAttribute("data-sf-validate") || "").split(",");
-            const input = fieldContainer.querySelector("input, textarea, select") as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-            const value = input?.value;
+            // A condition can make a field required that isn't required on its own
+            if (fieldContainer.querySelector("[data-conditional-required]") && !rules.includes("required")) {
+                rules.unshift("required");
+            }
+            const value = getFieldValue(fieldContainer);
             const containerEl = fieldContainer as HTMLElement;
 
             for (const rule of rules) {
@@ -184,6 +198,7 @@ window.SproutForms = {
                         valid: false,
                         rule,
                         message: containerEl.dataset[`sf${capitalizedType}Message`]
+                            ?? (rule === "required" ? "Field is required." : undefined)
                     };
                 }
             }
@@ -207,8 +222,16 @@ document.addEventListener("submit", async function (e) {
 
     e.preventDefault();
 
+    // Enter in a field submits the form, which on any page but the last means going to the next page
+    const pageState = pageStates.get(form);
+    if (pageState && !isOnLastPage(pageState)) {
+        await goToNextPage(form);
+        return;
+    }
+
     const validation = await validateAllFields(form);
     if (!validation) {
+        showFirstPageWithError(form);
         return;
     }
 
@@ -244,6 +267,7 @@ document.addEventListener("submit", async function (e) {
 
     if (!response.ok) {
         applyErrors(form, result.errors || {});
+        showFirstPageWithError(form);
         return;
     }
 
@@ -259,6 +283,22 @@ document.addEventListener("submit", async function (e) {
     // Confirm it anyway, so the visitor doesn't think it failed and submit again.
     showFallbackSuccess(form);
 });
+
+// The value the field submits: the checked radio, a checkbox only when it's checked, and the file name of an upload
+function getFieldValue(fieldContainer: Element): string | undefined {
+    const inputs = Array.from(fieldContainer.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
+    const first = inputs[0];
+    if (!first) return undefined;
+
+    if (first instanceof HTMLInputElement && (first.type === "radio" || first.type === "checkbox")) {
+        const checked = inputs.find(input => input instanceof HTMLInputElement && input.type === first.type && input.checked);
+        return checked?.value;
+    }
+    if (first instanceof HTMLInputElement && first.type === "file") {
+        return first.files?.[0]?.name;
+    }
+    return first.value;
+}
 
 function showFallbackSuccess(form: HTMLFormElement) {
     const success = document.createElement("div");
@@ -277,6 +317,217 @@ function initForm(form: Element) {
     initConditionalFields(form as HTMLFormElement);
     initPageUrl(form as HTMLFormElement);
     initValidation(form as HTMLFormElement);
+    initPages(form as HTMLFormElement);
+}
+
+const pageStates = new WeakMap<HTMLFormElement, PageState>();
+
+function initPages(form: HTMLFormElement) {
+    if (!form.hasAttribute("data-sf-paged")) return;
+
+    const pages = Array.from(form.querySelectorAll<HTMLElement>("[data-sf-page]"));
+    const state: PageState = {
+        pages,
+        conditions: pages.map(page => parsePageConditions(page)),
+        current: 0
+    };
+    pageStates.set(form, state);
+    updatePageVisibility(form);
+
+    form.querySelector("[data-sf-previous]")?.addEventListener("click", () => goToPreviousPage(form));
+    form.querySelector("[data-sf-next]")?.addEventListener("click", () => goToNextPage(form));
+    form.querySelector(".form-progress")?.removeAttribute("hidden");
+
+    // After a post without JavaScript the errors are already rendered, so start on the first page that has one
+    const pageWithError = findFirstPageWithError(state);
+    showPage(form, pageWithError === -1 ? 0 : pageWithError, false);
+}
+
+function parsePageConditions(page: HTMLElement): FieldCondition | undefined {
+    const raw = page.getAttribute("data-sf-page-conditions");
+    if (!raw) return undefined;
+
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        console.error("Failed to parse page conditions:", e);
+        return undefined;
+    }
+}
+
+// Marks the pages whose conditions don't hold as skipped, and updates the buttons and progress to match
+function updatePageVisibility(form: HTMLFormElement) {
+    const state = pageStates.get(form);
+    if (!state) return;
+
+    const formValues = getFormValues(form);
+    state.pages.forEach((page, index) => {
+        const isVisible = window.SproutForms.conditions.evaluate(state.conditions[index], formValues);
+        page.classList.toggle("sf-page-skipped", !isVisible);
+    });
+
+    updatePageNavigation(form, state);
+    updateProgress(form, state);
+}
+
+// The current page always counts as visible: its conditions only depend on earlier pages
+function getVisiblePageIndexes(state: PageState): number[] {
+    return state.pages
+        .map((_, index) => index)
+        .filter(index => index === state.current || !state.pages[index].classList.contains("sf-page-skipped"));
+}
+
+function isOnLastPage(state: PageState): boolean {
+    const visible = getVisiblePageIndexes(state);
+    return visible.indexOf(state.current) === visible.length - 1;
+}
+
+function showPage(form: HTMLFormElement, index: number, moveFocus: boolean) {
+    const state = pageStates.get(form);
+    if (!state) return;
+
+    const previousIndex = state.current;
+    state.current = index;
+    state.pages.forEach((page, i) => page.hidden = i !== index);
+
+    updatePageNavigation(form, state);
+    updateProgress(form, state);
+
+    if (moveFocus) {
+        state.pages[index].focus();
+    }
+    if (previousIndex !== index) {
+        form.dispatchEvent(new CustomEvent<PageChangeDetail>("sproutforms:pagechange", {
+            bubbles: true,
+            detail: { index, previousIndex }
+        }));
+    }
+}
+
+function updatePageNavigation(form: HTMLFormElement, state: PageState) {
+    const visible = getVisiblePageIndexes(state);
+    const position = visible.indexOf(state.current);
+    const page = state.pages[state.current];
+    const isLast = position === visible.length - 1;
+
+    const previousButton = form.querySelector<HTMLButtonElement>("[data-sf-previous]");
+    if (previousButton) {
+        previousButton.hidden = position <= 0;
+        previousButton.textContent = page.dataset.sfPreviousLabel ?? "";
+    }
+
+    const nextButton = form.querySelector<HTMLButtonElement>("[data-sf-next]");
+    if (nextButton) {
+        nextButton.hidden = isLast;
+        nextButton.textContent = page.dataset.sfNextLabel ?? "";
+    }
+
+    const submitButton = form.querySelector<HTMLButtonElement>("button[type=submit]");
+    if (submitButton) {
+        submitButton.hidden = !isLast;
+    }
+}
+
+function updateProgress(form: HTMLFormElement, state: PageState) {
+    const visible = getVisiblePageIndexes(state);
+    const currentPosition = visible.indexOf(state.current);
+
+    form.querySelectorAll<HTMLElement>("[data-sf-progress-step]").forEach(step => {
+        const index = parseInt(step.dataset.sfProgressStep ?? "", 10);
+        const position = visible.indexOf(index);
+        const isCurrent = index === state.current;
+
+        step.hidden = position === -1;
+        step.classList.toggle("is-current", isCurrent);
+        step.classList.toggle("is-complete", position !== -1 && position < currentPosition);
+        if (isCurrent) {
+            step.setAttribute("aria-current", "step");
+        } else {
+            step.removeAttribute("aria-current");
+        }
+    });
+}
+
+async function goToNextPage(form: HTMLFormElement) {
+    const state = pageStates.get(form);
+    if (!state) return;
+
+    const page = state.pages[state.current];
+    const isValid = await validateAllFields(page);
+    if (!isValid) return;
+
+    const nextButton = form.querySelector<HTMLButtonElement>("[data-sf-next]");
+    if (nextButton) nextButton.disabled = true;
+    try {
+        if (!await validatePageOnServer(form, state.current)) return;
+    } finally {
+        if (nextButton) nextButton.disabled = false;
+    }
+
+    const visible = getVisiblePageIndexes(state);
+    const next = visible[visible.indexOf(state.current) + 1];
+    if (next !== undefined) {
+        showPage(form, next, true);
+    }
+}
+
+// Checks the rules only the server knows. Uploads aren't sent; they're checked when the form is submitted.
+async function validatePageOnServer(form: HTMLFormElement, pageIndex: number): Promise<boolean> {
+    const formData = new FormData(form);
+    form.querySelectorAll<HTMLInputElement>("input[type=file]").forEach(input => formData.delete(input.name));
+
+    let response: Response;
+    try {
+        response = await fetch(`${form.action}/pages/${pageIndex}/validate`, {
+            method: "POST",
+            headers: {
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            body: formData
+        });
+    } catch {
+        applyGlobalError(form, "Something went wrong. Please try again.");
+        return false;
+    }
+
+    const page = pageStates.get(form)?.pages[pageIndex];
+    if (page) clearErrors(page);
+
+    if (response.status === 400) {
+        const result = await response.json() as FormSubmitResult;
+        applyErrors(form, result.errors || {});
+        return false;
+    }
+    if (!response.ok) {
+        applyGlobalError(form, "Something went wrong. Please try again.");
+        return false;
+    }
+    return true;
+}
+
+function goToPreviousPage(form: HTMLFormElement) {
+    const state = pageStates.get(form);
+    if (!state) return;
+
+    const visible = getVisiblePageIndexes(state);
+    const previous = visible[visible.indexOf(state.current) - 1];
+    if (previous !== undefined) {
+        showPage(form, previous, true);
+    }
+}
+
+function findFirstPageWithError(state: PageState): number {
+    return state.pages.findIndex(page => page.querySelector(".form-error"));
+}
+
+function showFirstPageWithError(form: HTMLFormElement) {
+    const state = pageStates.get(form);
+    if (!state) return;
+
+    const index = findFirstPageWithError(state);
+    if (index !== -1 && index !== state.current) {
+        showPage(form, index, true);
+    }
 }
 
 function initPageUrl(form: HTMLFormElement) {
@@ -341,13 +592,19 @@ function clearFieldError(group: HTMLElement) {
     }
 }
 
-async function validateAllFields(form: HTMLFormElement): Promise<boolean> {
+// Validates the fields inside root: the whole form, or a single page
+async function validateAllFields(root: ParentNode): Promise<boolean> {
     let isValid = true;
-    const groups = form.querySelectorAll("[data-sf-validate]");
+    // Fields with conditions too, since a condition can make them required
+    const groups = root.querySelectorAll("[data-sf-validate], [data-condition-field]");
 
     for (const group of groups) {
         const groupEl = group as HTMLElement;
         if (groupEl.classList.contains("sf-hidden") || groupEl.style.display === "none") {
+            continue;
+        }
+        // A skipped page's fields aren't validated, on the server either
+        if (groupEl.closest(".sf-page-skipped")) {
             continue;
         }
 
@@ -394,10 +651,11 @@ function getFormValues(form: HTMLFormElement): Record<string, unknown> {
         values[key] = value;
     }
 
+    // The value the server receives: the checkbox's value when checked, otherwise the hidden "false" next to it
     const checkboxes = form.querySelectorAll("input[type='checkbox']");
     checkboxes.forEach(cb => {
         const checkbox = cb as HTMLInputElement;
-        values[checkbox.name] = checkbox.checked;
+        values[checkbox.name] = checkbox.checked ? checkbox.value : "false";
     });
 
     return values;
@@ -451,6 +709,8 @@ function evaluateAllConditions(form: HTMLFormElement) {
             }
         }
     });
+
+    updatePageVisibility(form);
 }
 
 window.SproutForms.submissionGuard.register("recaptchaV3", {
@@ -552,9 +812,10 @@ window.SproutForms.validation.register("maxDate", async (value, options) => {
     return false;
 });
 
-function clearErrors(form: HTMLFormElement) {
-    form.querySelectorAll(".form-error").forEach(e => e.remove());
-    form.querySelectorAll("[aria-invalid]").forEach(el => {
+// Clears the errors inside root: the whole form, or a single page
+function clearErrors(root: ParentNode) {
+    root.querySelectorAll(".form-error").forEach(e => e.remove());
+    root.querySelectorAll("[aria-invalid]").forEach(el => {
         el.setAttribute("aria-invalid", "false");
     });
 }

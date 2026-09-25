@@ -10,7 +10,9 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public Guid Id { get; init; }
         public bool HasErrors { get; init; }
 
-        public IReadOnlyList<FormRowViewModel> Rows { get; init; } = [];
+        public IReadOnlyList<FormPageViewModel> Pages { get; init; } = [];
+        public required string SubmitLabel { get; init; }
+        public bool ShowProgress { get; init; }
         public IReadOnlyList<FormSubmissionGuardViewModel> SubmissionGuards { get; init; } = [];
     }
 

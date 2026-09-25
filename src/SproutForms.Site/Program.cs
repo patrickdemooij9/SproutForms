@@ -23,6 +23,7 @@ if (builder.Environment.IsEnvironment("AiTest"))
         it.Add<AiTestFailingWorkflowForm>();
         it.Add<AiTestWorkflowOrderForm>();
         it.Add<AiTestUnknownOutcomeForm>();
+        it.Add<AiTestMultiPageForm>();
     });
 }
 

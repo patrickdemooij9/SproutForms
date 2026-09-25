@@ -1,4 +1,4 @@
-import { FieldConditions } from "./api";
+import { ConditionDefinition, FieldConditions } from "./api";
 
 export interface FormDto {
   id?: string | null;
@@ -12,10 +12,21 @@ export interface FormDto {
 
 export interface FormDefinitionDto {
   type: FormTypeSelectionDto;
-  rows: Array<FormRowDto>;
+  pages: Array<FormPageDto>;
   fields: Array<FormFieldDto>;
   outcome: FormOutcomeDto;
   workflows: Array<FormWorkflowDto>;
+  submitLabel?: string | null;
+  showProgress: boolean;
+}
+
+export interface FormPageDto {
+  id: string;
+  title?: string | null;
+  rows: Array<FormRowDto>;
+  nextLabel?: string | null;
+  previousLabel?: string | null;
+  visibility?: ConditionDefinition | null;
 }
 
 export interface FormRowDto {
@@ -125,6 +136,8 @@ export type SelectedState = {
   field: string | null;
   column: FormColumnDto | null;
   row: FormRowDto | null;
+  // The inspector shows the current page's settings instead of the field list
+  pageSettings?: boolean;
 };
 
 export type SelectedResizeState = {

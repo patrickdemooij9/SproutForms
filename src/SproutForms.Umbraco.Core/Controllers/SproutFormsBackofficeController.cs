@@ -126,7 +126,9 @@ namespace SproutForms.Umbraco.Core.Controllers
                         DisplayName = outcomeDescriptor.DisplayName,
                         Configuration = outcomeDescriptor.FromConfig(latestVersion.Definition.SubmitOutcome.Configuration).ToDictionary(it => it.Alias, it => it.Value)
                     },
-                    Rows = [.. latestVersion.Definition.Rows.Select(row => new FormRowBackofficeModel(row))],
+                    Pages = [.. latestVersion.Definition.Pages.Select(page => new FormPageBackofficeModel(page))],
+                    SubmitLabel = latestVersion.Definition.SubmitLabel,
+                    ShowProgress = latestVersion.Definition.ShowProgress,
                     Fields = [.. latestVersion.Definition.Fields.Select(field => Map(field, formTypeDescriptor))],
                     Workflows = latestVersion.Definition.Workflows.Select(flow =>
                     {
@@ -191,14 +193,23 @@ namespace SproutForms.Umbraco.Core.Controllers
                     TypeAlias = formType.Alias,
                     Settings = formTypeDescriptor.ToConfig(model.Definition.Type.Settings)
                 },
-                Rows = model.Definition.Rows.Select(r => new FormRow
+                Pages = model.Definition.Pages.Select(p => new FormPage
                 {
-                    Columns = r.Columns.Select(c => new FormColumn
+                    Title = p.Title,
+                    NextLabel = p.NextLabel,
+                    PreviousLabel = p.PreviousLabel,
+                    Visibility = p.Visibility,
+                    Rows = p.Rows.Select(r => new FormRow
                     {
-                        FieldAlias = c.FieldAlias,
-                        Width = c.Width
+                        Columns = r.Columns.Select(c => new FormColumn
+                        {
+                            FieldAlias = c.FieldAlias,
+                            Width = c.Width
+                        }).ToList()
                     }).ToList()
                 }).ToList(),
+                SubmitLabel = model.Definition.SubmitLabel,
+                ShowProgress = model.Definition.ShowProgress,
                 Fields = model.Definition.Fields.Select(field => Map(field, formType, formTypeDescriptor)).ToList(),
                 Workflows = model.Definition.Workflows.Select(it =>
                 {
@@ -219,6 +230,19 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Configuration = outcomeDescriptor.ToConfig(model.Definition.Outcome.Configuration)
                 }
             };
+            var structureErrors = FormDefinitionStructureValidator.Validate(newDefinition);
+            if (structureErrors.Count > 0)
+            {
+                return BadRequest(new ValidationProblemDetails(new Dictionary<string, string[]>
+                {
+                    ["pages"] = [.. structureErrors]
+                })
+                {
+                    Type = "Error",
+                    Title = "The form's pages aren't valid."
+                });
+            }
+
             var typeErrors = _formDefinitionTypeValidator.Validate(newDefinition);
             if (typeErrors.Count > 0)
             {

@@ -4,6 +4,7 @@ import {
   customElement,
   html,
   LitElement,
+  nothing,
   property,
   PropertyValues,
   state,
@@ -21,6 +22,7 @@ import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { FieldChangeEvent } from "./formInspectorFieldType.element";
 
 import "./formInspectorFieldType.element";
+import "./formPageSettings.element";
 
 @customElement("form-inspector")
 export class FormInspector extends UmbElementMixin(LitElement) {
@@ -79,6 +81,52 @@ export class FormInspector extends UmbElementMixin(LitElement) {
     }
   }
 
+  // A field's conditions can use the fields on its own page and earlier pages
+  #getConditionFields(field: FormFieldDto) {
+    const pageIndex = this.context?.getPageIndexOfField(field.id) ?? -1;
+    return pageIndex === -1 ? [] : this.context!.getFieldsBeforePage(pageIndex, true);
+  }
+
+  #renderMoveToPage(field: FormFieldDto) {
+    if (this.definition.pages.length < 2) return nothing;
+
+    const pageIndex = this.context?.getPageIndexOfField(field.id) ?? -1;
+    return html`
+      <div class="move-to-page">
+        <uui-label for="move-to-page">Page</uui-label>
+        <select
+          id="move-to-page"
+          .value=${String(pageIndex)}
+          @change=${(e: Event) => this.#moveToPage(field, Number((e.target as HTMLSelectElement).value))}
+        >
+          ${this.definition.pages.map(
+            (page, index) => html`<option value=${index} ?selected=${index === pageIndex}>
+              ${page.title || `Page ${index + 1}`}
+            </option>`,
+          )}
+        </select>
+      </div>
+    `;
+  }
+
+  // Follows the field to its new page, so it stays selected
+  #moveToPage(field: FormFieldDto, pageIndex: number) {
+    this.context?.moveFieldToPage(field.id, pageIndex);
+    this.context?.setCurrentPage(pageIndex);
+    const row = this.context?.getCurrentPageRows().find((it) => it.columns.some((col) => col.fieldId === field.id));
+    this.dispatchEvent(
+      new CustomEvent("select-field", {
+        detail: {
+          row,
+          column: row?.columns.find((col) => col.fieldId === field.id),
+          field,
+        },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   #handleFieldUpdate(event: FieldChangeEvent) {
     this.context?.updateField(event.field);
   }
@@ -114,14 +162,17 @@ export class FormInspector extends UmbElementMixin(LitElement) {
                     <uui-icon name="icon-wrong"></uui-icon>
                   </uui-button>
                 </div>
+                ${this.#renderMoveToPage(this.selectedField)}
                 <sf-inspector-field-type
                   .field=${this.selectedField}
                   .fieldType=${fieldType!}
-                  .fields=${this.definition.fields}
+                  .fields=${this.#getConditionFields(this.selectedField)}
                   .formType=${this.formType}
                   @field-change=${this.#handleFieldUpdate}>
                 </sf-inspector-field-type>
               `
+            : this.selectedState.pageSettings
+            ? html`<sf-page-settings></sf-page-settings>`
             : html`
                 <div class="panel-header">
                   <div class="panel-title">
@@ -176,7 +227,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       });
     }
     // The rows in the workspace state are frozen, so place the field in a copy
-    const rows = structuredClone(this.definition.rows);
+    const rows = structuredClone(this.context?.getCurrentPageRows() ?? []);
     let row = rows.find((it) => it.id === this.selectedState.row?.id);
     let column = row?.columns.find((it) => it.id === this.selectedState.column?.id);
     if (column) {
@@ -194,12 +245,13 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       };
       row.columns.push(column);
     }
-    newDefinition.rows = rows;
     newDefinition.fields = [...newDefinition.fields, newField];
-    this.context?.updateForm({ definition: newDefinition });
+    this.context?.updateForm({
+      definition: this.context.withCurrentPageRows(newDefinition, rows),
+    });
 
     // Select the new field, using the row and column objects the canvas now renders
-    const newRow = this.definition.rows.find((it) => it.id === row!.id);
+    const newRow = this.context?.getCurrentPageRows().find((it) => it.id === row!.id);
     this.dispatchEvent(
       new CustomEvent("select-field", {
         detail: {
@@ -214,6 +266,24 @@ export class FormInspector extends UmbElementMixin(LitElement) {
   }
 
   static styles = css`
+    .move-to-page {
+      display: flex;
+      align-items: center;
+      gap: var(--uui-size-space-3);
+      padding: var(--uui-size-space-3) var(--uui-size-space-5);
+      border-bottom: 1px solid var(--uui-color-border);
+    }
+
+    .move-to-page select {
+      flex: 1;
+      padding: 6px 10px;
+      border: 1px solid var(--uui-color-border);
+      border-radius: var(--uui-border-radius);
+      background-color: var(--uui-color-surface);
+      color: var(--uui-color-text);
+      font: inherit;
+    }
+
     .panel-header {
       display: flex;
       align-items: center;
