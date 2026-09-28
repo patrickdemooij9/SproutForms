@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using SproutForms.Core.Fields.Configs;
+using SproutForms.Core.Models;
 using SproutForms.Core.Models.Files;
 using SproutForms.Core.Repositories;
 using System.Text.Json;
@@ -8,6 +9,7 @@ namespace SproutForms.Core.Services
 {
     /// <summary>
     /// Deletes a form with everything that belongs to it: versions, history, submissions, their workflow executions and their uploaded files.
+    /// Also deletes single submissions that way.
     /// </summary>
     public class FormDeletionService
     {
@@ -42,8 +44,9 @@ namespace SproutForms.Core.Services
 
         public async Task DeleteAsync(Guid formId)
         {
-            // Collected before the rows go; the files are only deleted once the database delete has committed
-            var files = GetUploadedFiles(formId);
+            // Collected before the rows go; the files are only deleted once the database delete has committed. The submissions in
+            // the recycle bin still have theirs
+            var files = GetUploadedFiles(_formSubmissionRepository.GetAllByForm(formId));
 
             using (var unitOfWork = _unitOfWorkProvider.Begin())
             {
@@ -55,12 +58,34 @@ namespace SproutForms.Core.Services
                 unitOfWork.Complete();
             }
 
+            await DeleteFilesAsync(files);
+        }
+
+        public async Task DeleteSubmissionsAsync(IReadOnlyCollection<FormSubmission> submissions)
+        {
+            if (submissions.Count == 0) return;
+
+            var files = GetUploadedFiles(submissions);
+            var ids = submissions.Select(it => it.Id).ToArray();
+
+            using (var unitOfWork = _unitOfWorkProvider.Begin())
+            {
+                await _workflowExecutionRepository.DeleteBySubmissions(ids);
+                _formSubmissionRepository.Delete(ids);
+                unitOfWork.Complete();
+            }
+
+            await DeleteFilesAsync(files);
+        }
+
+        private async Task DeleteFilesAsync(IEnumerable<StoredFileReference> files)
+        {
             foreach (var file in files)
             {
                 var provider = _fileStorageProviders.FirstOrDefault(p => p.Alias == file.StorageProvider);
                 if (provider is null)
                 {
-                    _logger.LogWarning("Could not delete file {FileId} of deleted form {FormId}: storage provider {StorageProviderAlias} is not registered", file.Id, formId, file.StorageProvider);
+                    _logger.LogWarning("Could not delete file {FileId} of a deleted submission: storage provider {StorageProviderAlias} is not registered", file.Id, file.StorageProvider);
                     continue;
                 }
 
@@ -70,15 +95,14 @@ namespace SproutForms.Core.Services
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Could not delete file {FileId} of deleted form {FormId}", file.Id, formId);
+                    _logger.LogWarning(ex, "Could not delete file {FileId} of a deleted submission", file.Id);
                 }
             }
         }
 
-        private List<StoredFileReference> GetUploadedFiles(Guid formId)
+        private List<StoredFileReference> GetUploadedFiles(IEnumerable<FormSubmission> submissions)
         {
             var files = new List<StoredFileReference>();
-            var submissions = _formSubmissionRepository.GetByForm(formId, 0, int.MaxValue, out _);
 
             foreach (var versionSubmissions in submissions.GroupBy(s => s.FormVersionId))
             {

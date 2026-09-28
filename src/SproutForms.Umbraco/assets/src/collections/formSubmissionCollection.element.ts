@@ -19,6 +19,30 @@ import SproutFormSubmissionsListContext, {
 } from "../workspaces/sproutFormSubmissionsContext";
 
 import "./formSubmissionNameLayout.element";
+import { FormSubmissionOverviewItem } from "../models";
+
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
+  dateStyle: "long",
+  timeStyle: "short",
+};
+
+const NAME_COLUMN: UmbTableColumn = {
+  name: "Name",
+  alias: "name",
+  elementName: "sf-form-submission-name-column-layout",
+};
+const STATUS_COLUMN: UmbTableColumn = { name: "Workflow Status", alias: "workflowStatus" };
+const ACTIONS_COLUMN: UmbTableColumn = { name: "", alias: "actions", elementName: "umb-entity-actions-table-column-view" };
+
+// The recycle bin shows when and by whom a submission was deleted as well
+const COLUMNS = [NAME_COLUMN, STATUS_COLUMN, ACTIONS_COLUMN];
+const TRASHED_COLUMNS = [
+  NAME_COLUMN,
+  { name: "Deleted", alias: "trashedAt" },
+  { name: "Deleted by", alias: "trashedBy" },
+  STATUS_COLUMN,
+  ACTIONS_COLUMN,
+];
 
 @customElement("sprout-forms-form-submission-collection")
 export default class FormSubmissionCollectionElement extends UmbLitElement {
@@ -30,17 +54,7 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
   };
 
   @state()
-  private _tableColumns: Array<UmbTableColumn> = [
-    {
-      name: "Name",
-      alias: "name",
-      elementName: "sf-form-submission-name-column-layout",
-    },
-    {
-      name: "Workflow Status",
-      alias: "workflowStatus",
-    },
-  ];
+  private _tableColumns: Array<UmbTableColumn> = COLUMNS;
 
   @state()
   private _tableItems: Array<UmbTableItem> = [];
@@ -79,30 +93,45 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
             (this._selection = selection.filter((it) => it) as string[])
         );
         this.observe(this.#context.items, (items) => {
-          this._tableItems = items.map<UmbTableItem>((item) => {
-            return {
-              id: item.unique,
-              icon: "icon-trafic",
-              data: [
-                {
-                  columnAlias: "name",
-                  value: {
-                    unique: item.unique,
-                    name: item.name,
-                  },
-                },
-                {
-                  columnAlias: "workflowStatus",
-                  value: item.workflowStages?.map((stage) =>
-                    this.#getStatusDot(stage.status)
-                  ) ?? [],
-                },
-              ],
-            };
-          });
+          this._tableColumns = items.some((item) => item.trashedAt) ? TRASHED_COLUMNS : COLUMNS;
+          this._tableItems = items.map((item) => this.#toTableItem(item));
         });
       }
     );
+  }
+
+  #toTableItem(item: FormSubmissionOverviewItem): UmbTableItem {
+    return {
+      id: item.unique,
+      icon: "icon-trafic",
+      data: [
+        {
+          columnAlias: "name",
+          value: {
+            unique: item.unique,
+            name: item.name,
+          },
+        },
+        {
+          columnAlias: "trashedAt",
+          value: item.trashedAt ? this.localize.date(item.trashedAt, DATE_OPTIONS) : "",
+        },
+        {
+          columnAlias: "trashedBy",
+          value: item.trashedByName ?? "",
+        },
+        {
+          columnAlias: "workflowStatus",
+          value: item.workflowStages?.map((stage) =>
+            this.#getStatusDot(stage.status)
+          ) ?? [],
+        },
+        {
+          columnAlias: "actions",
+          value: { entityType: item.entityType, unique: item.unique, name: item.name },
+        },
+      ],
+    };
   }
 
   #onSelected(event: UmbTableSelectedEvent) {

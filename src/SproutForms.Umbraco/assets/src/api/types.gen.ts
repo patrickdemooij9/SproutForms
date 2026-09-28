@@ -73,7 +73,10 @@ export enum FormAuditAction {
     MOVED = 'Moved',
     ROLLED_BACK = 'RolledBack',
     MOVED_TO_RECYCLE_BIN = 'MovedToRecycleBin',
-    RESTORED_FROM_RECYCLE_BIN = 'RestoredFromRecycleBin'
+    RESTORED_FROM_RECYCLE_BIN = 'RestoredFromRecycleBin',
+    SUBMISSIONS_MOVED_TO_RECYCLE_BIN = 'SubmissionsMovedToRecycleBin',
+    SUBMISSIONS_RESTORED_FROM_RECYCLE_BIN = 'SubmissionsRestoredFromRecycleBin',
+    SUBMISSIONS_DELETED = 'SubmissionsDeleted'
 }
 
 export type FormAuditEntryBackofficeModel = {
@@ -234,6 +237,8 @@ export type FormSubmissionListItemBackofficeModel = {
     name: string;
     pageUrl?: string | null;
     workflowStages: Array<WorkflowStageStatusModel>;
+    trashedAt?: string | null;
+    trashedByName?: string | null;
 };
 
 export type FormSubmissionValueBackofficeModel = {
@@ -894,6 +899,7 @@ export type GetUmbracoSproutFormsSubmissionsData = {
         formId?: string;
         skip?: number;
         take?: number;
+        trashed?: boolean;
     };
     url: '/umbraco/sproutForms/submissions';
 };
@@ -906,6 +912,70 @@ export type GetUmbracoSproutFormsSubmissionsResponses = {
 };
 
 export type GetUmbracoSproutFormsSubmissionsResponse = GetUmbracoSproutFormsSubmissionsResponses[keyof GetUmbracoSproutFormsSubmissionsResponses];
+
+export type DeleteUmbracoSproutFormsSubmissionsRecycleBinData = {
+    body?: Array<string>;
+    path?: never;
+    query?: {
+        formId?: string;
+    };
+    url: '/umbraco/sproutForms/submissions/recycleBin';
+};
+
+export type DeleteUmbracoSproutFormsSubmissionsRecycleBinResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type DeleteUmbracoSproutFormsSubmissionsRecycleBinAllData = {
+    body?: never;
+    path?: never;
+    query?: {
+        formId?: string;
+    };
+    url: '/umbraco/sproutForms/submissions/recycleBin/all';
+};
+
+export type DeleteUmbracoSproutFormsSubmissionsRecycleBinAllResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostUmbracoSproutFormsSubmissionsRecycleBinRestoreData = {
+    body?: Array<string>;
+    path?: never;
+    query?: {
+        formId?: string;
+    };
+    url: '/umbraco/sproutForms/submissions/recycleBin/restore';
+};
+
+export type PostUmbracoSproutFormsSubmissionsRecycleBinRestoreResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostUmbracoSproutFormsSubmissionsTrashData = {
+    body?: Array<string>;
+    path?: never;
+    query?: {
+        formId?: string;
+    };
+    url: '/umbraco/sproutForms/submissions/trash';
+};
+
+export type PostUmbracoSproutFormsSubmissionsTrashResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetUmbracoSproutFormsTemplatesData = {
     body?: never;

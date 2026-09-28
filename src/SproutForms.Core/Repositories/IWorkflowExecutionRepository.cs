@@ -10,5 +10,6 @@ namespace SproutForms.Core.Repositories
         Task<WorkflowExecution[]> GetPendingExecutions(int take);
         Task<WorkflowExecution[]> GetBySubmissionId(Guid submissionId);
         Task DeleteAllByForm(Guid formId);
+        Task DeleteBySubmissions(IEnumerable<Guid> submissionIds);
     }
 }

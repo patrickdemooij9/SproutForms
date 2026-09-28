@@ -8,7 +8,7 @@ import {
   UmbRepositoryResponse,
 } from "@umbraco-cms/backoffice/repository";
 import { SproutFormsSource } from "./sproutFormsSource";
-import { FormSubmissionOverviewItem } from "../models";
+import { FormSubmissionOverviewItem, SUBMISSION_ENTITY_TYPE, TRASHED_SUBMISSION_ENTITY_TYPE } from "../models";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "../workspaces/sproutFormsWorkspaceContext";
@@ -20,6 +20,9 @@ export default class FormSubmissionsRepository
 {
   #source: SproutFormsSource = new SproutFormsSource(this);
   #context?: SproutFormsWorkspaceContext;
+
+  // The repository of the form's recycle bin lists the trashed submissions instead
+  protected trashed = false;
 
   constructor(host: UmbControllerHost) {
     super(host);
@@ -34,7 +37,8 @@ export default class FormSubmissionsRepository
     const data = await this.#source.getSubmissions(
       filter?.take ?? 10,
       filter?.skip ?? 0,
-      this.#context?.getFormId() ?? ""
+      this.#context?.getFormId() ?? "",
+      this.trashed
     );
     const result: UmbRepositoryResponse<
       UmbPagedModel<FormSubmissionOverviewItem>
@@ -43,11 +47,15 @@ export default class FormSubmissionsRepository
         total: data.data!.total,
         items: data.data!.items.map((item) => ({
           unique: item.id.toString(),
-          entityType: "sprout-submission",
           ...item,
+          entityType: this.trashed ? TRASHED_SUBMISSION_ENTITY_TYPE : SUBMISSION_ENTITY_TYPE,
         })),
       },
     };
     return result;
   }
+}
+
+export class TrashedFormSubmissionsRepository extends FormSubmissionsRepository {
+  protected override trashed = true;
 }

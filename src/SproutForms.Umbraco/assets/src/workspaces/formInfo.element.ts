@@ -37,6 +37,9 @@ const ACTION_TAGS: Record<FormAuditAction, { label: string; look: string; color:
   [FormAuditAction.ROLLED_BACK]: { label: "Rollback", look: "secondary", color: "default" },
   [FormAuditAction.MOVED_TO_RECYCLE_BIN]: { label: "Trashed", look: "secondary", color: "danger" },
   [FormAuditAction.RESTORED_FROM_RECYCLE_BIN]: { label: "Restored", look: "secondary", color: "positive" },
+  [FormAuditAction.SUBMISSIONS_MOVED_TO_RECYCLE_BIN]: { label: "Entries trashed", look: "secondary", color: "danger" },
+  [FormAuditAction.SUBMISSIONS_RESTORED_FROM_RECYCLE_BIN]: { label: "Entries restored", look: "secondary", color: "positive" },
+  [FormAuditAction.SUBMISSIONS_DELETED]: { label: "Entries deleted", look: "secondary", color: "danger" },
 };
 
 @customElement("form-info")

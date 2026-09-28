@@ -55,6 +55,7 @@ Located in `SproutForms.Umbraco.Core/Descriptors/`:
 - `IFormSubmissionService` / `FormSubmissionService` - Handles form submissions
 - `FormRenderingService` - Renders forms to HTML
 - `FormRecycleBinService` - Deleting a form in the backoffice moves it to the recycle bin (`Form.TrashedAt`). A trashed form is treated as deleted everywhere but the bin: it doesn't render, takes no submissions, and its workflows pause. `FormDeletionService` deletes it for good from the bin, and `RecycleBinCleanupJob` does so after `SproutForms:RecycleBin:RetentionDays` (default 30, 0 keeps it)
+- `FormSubmissionRecycleBinService` - The same for submissions (`FormSubmission.TrashedAt`), with a recycle bin per form in its Submissions tab. `IFormSubmissionRepository.GetByForm` and `Count` leave trashed submissions out, `GetAllByForm` includes them. Each action is one entry in the form's history, however many submissions it covered
 
 ### Database Entities
 Located in `SproutForms.Umbraco.Core/Models/Database/`:
@@ -73,6 +74,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `WrapRowsInPagesMigration` - moves the rows of every stored definition into a single page
 - `AddFormAuditMigration` - `SproutForms_FormAudit` table for a form's history
 - `AddFormRecycleBinMigration` - `TrashedAt` and `TrashedBy` columns that put a form in the recycle bin
+- `AddSubmissionRecycleBinMigration` - the same columns for submissions
 
 ## Adding New Field Types
 

@@ -13,7 +13,8 @@ using Umbraco.Cms.Web.Common.Routing;
 namespace SproutForms.Umbraco.Core.Controllers
 {
     /// <summary>
-    /// Deleting a form in the backoffice moves it to the recycle bin; it is only deleted for good from there.
+    /// Deleting a form or a submission in the backoffice moves it to the recycle bin; it is only deleted for good from there.
+    /// Every form has a recycle bin of its own for its submissions.
     /// </summary>
     [ApiExplorerSettings(GroupName = "Backoffice SproutForms")]
     [ApiController]
@@ -23,6 +24,7 @@ namespace SproutForms.Umbraco.Core.Controllers
     public class SproutFormsRecycleBinController : Controller
     {
         private readonly FormRecycleBinService _formRecycleBinService;
+        private readonly FormSubmissionRecycleBinService _submissionRecycleBinService;
         private readonly IFormRepository _formRepository;
         private readonly IFolderRepository _folderRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
@@ -31,6 +33,7 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         public SproutFormsRecycleBinController(
             FormRecycleBinService formRecycleBinService,
+            FormSubmissionRecycleBinService submissionRecycleBinService,
             IFormRepository formRepository,
             IFolderRepository folderRepository,
             IFormSubmissionRepository formSubmissionRepository,
@@ -38,6 +41,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             IBackOfficeSecurityAccessor backOfficeSecurityAccessor)
         {
             _formRecycleBinService = formRecycleBinService;
+            _submissionRecycleBinService = submissionRecycleBinService;
             _formRepository = formRepository;
             _folderRepository = folderRepository;
             _formSubmissionRepository = formSubmissionRepository;
@@ -116,6 +120,38 @@ namespace SproutForms.Umbraco.Core.Controllers
         public async Task<IActionResult> Empty()
         {
             await _formRecycleBinService.EmptyAsync();
+            return Ok();
+        }
+
+        [HttpPost("submissions/trash")]
+        [ProducesResponseType(200)]
+        public IActionResult MoveSubmissionsToRecycleBin(Guid formId, [FromBody] Guid[] submissionIds)
+        {
+            _submissionRecycleBinService.MoveToRecycleBin(formId, submissionIds, GetCurrentUserKey());
+            return Ok();
+        }
+
+        [HttpPost("submissions/recycleBin/restore")]
+        [ProducesResponseType(200)]
+        public IActionResult RestoreSubmissions(Guid formId, [FromBody] Guid[] submissionIds)
+        {
+            _submissionRecycleBinService.Restore(formId, submissionIds, GetCurrentUserKey());
+            return Ok();
+        }
+
+        [HttpDelete("submissions/recycleBin")]
+        [ProducesResponseType(200)]
+        public async Task<IActionResult> DeleteSubmissionsPermanently(Guid formId, [FromBody] Guid[] submissionIds)
+        {
+            await _submissionRecycleBinService.DeletePermanentlyAsync(formId, submissionIds, GetCurrentUserKey());
+            return Ok();
+        }
+
+        [HttpDelete("submissions/recycleBin/all")]
+        [ProducesResponseType(200)]
+        public async Task<IActionResult> EmptySubmissionsRecycleBin(Guid formId)
+        {
+            await _submissionRecycleBinService.EmptyAsync(formId, GetCurrentUserKey());
             return Ok();
         }
 

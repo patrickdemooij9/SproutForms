@@ -52,10 +52,12 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly IFormDefinitionType[] _formDefinitionTypes;
         private readonly IEnumerable<IFormDefinitionTypeDescriptor> _formDefinitionTypeDescriptors;
         private readonly FormHistoryService _formHistoryService;
+        private readonly BackofficeUserNameResolver _userNameResolver;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors, FormHistoryService formHistoryService)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors, FormHistoryService formHistoryService, BackofficeUserNameResolver userNameResolver)
         {
+            _userNameResolver = userNameResolver;
             _formHistoryService = formHistoryService;
             _formDefinitionTypeValidator = formDefinitionTypeValidator;
             _formDefinitionTypes = formDefinitionTypes.ToArray();
@@ -510,18 +512,23 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         [HttpGet("submissions")]
         [ProducesResponseType(typeof(PagedViewModel<FormSubmissionListItemBackofficeModel>), 200)]
-        public IActionResult GetSubmissions(Guid formId, int skip, int take)
+        public async Task<IActionResult> GetSubmissions(Guid formId, int skip, int take, bool trashed = false)
         {
-            var submissions = _formSubmissionRepository.GetByForm(formId, skip, take, out var totalCount);
+            // The recycle bin lists the most recently trashed first
+            var submissions = trashed
+                ? _formSubmissionRepository.GetTrashedByForm(formId, skip, take, out var totalCount)
+                : _formSubmissionRepository.GetByForm(formId, skip, take, out totalCount);
+            var userNames = new Dictionary<string, string>();
 
-            var submissionItems = submissions.Select(it =>
+            var submissionItems = new List<FormSubmissionListItemBackofficeModel>();
+            foreach (var it in submissions)
             {
                 var workflowStages = new List<WorkflowStageStatusModel>();
                 var formVersion = _formVersionRepository.Get(it.FormVersionId);
 
                 if (formVersion != null)
                 {
-                    var workflowExecutions = _workflowExecutionRepository.GetBySubmissionId(it.Id).GetAwaiter().GetResult(); //TODO: Combine this together and do one database call for performance reasons...
+                    var workflowExecutions = await _workflowExecutionRepository.GetBySubmissionId(it.Id); //TODO: Combine this together and do one database call for performance reasons...
 
                     foreach (var workflow in formVersion.Definition.Workflows)
                     {
@@ -538,14 +545,16 @@ namespace SproutForms.Umbraco.Core.Controllers
                     }
                 }
 
-                return new FormSubmissionListItemBackofficeModel
+                submissionItems.Add(new FormSubmissionListItemBackofficeModel
                 {
                     Id = it.Id,
                     Name = "Submission at " + it.SubmittedAt.ToString("G"),
                     PageUrl = it.PageUrl,
-                    WorkflowStages = workflowStages
-                };
-            }).ToArray();
+                    WorkflowStages = workflowStages,
+                    TrashedAt = it.TrashedAt,
+                    TrashedByName = it.IsTrashed ? await _userNameResolver.GetNameAsync(it.TrashedBy ?? string.Empty, userNames) : null
+                });
+            }
 
             return Ok(new PagedViewModel<FormSubmissionListItemBackofficeModel>
             {

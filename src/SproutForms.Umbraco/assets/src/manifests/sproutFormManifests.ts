@@ -15,7 +15,17 @@ import {
 } from "@umbraco-cms/backoffice/extension-registry";
 import SproutFormsWorkspaceContext from "../workspaces/sproutFormsWorkspaceContext";
 import { ManifestDashboard } from "@umbraco-cms/backoffice/dashboard";
-import FormSubmissionsRepository from "../repositories/sproutFormSubmissionsRepository";
+import FormSubmissionsRepository, { TrashedFormSubmissionsRepository } from "../repositories/sproutFormSubmissionsRepository";
+import {
+  DeleteSubmissionPermanentlyEntityAction,
+  DeleteSubmissionsPermanentlyBulkAction,
+  EmptySubmissionsRecycleBinAction,
+  RestoreSubmissionEntityAction,
+  RestoreSubmissionsBulkAction,
+  TrashSubmissionEntityAction,
+  TrashSubmissionsBulkAction,
+} from "../actions/submissionRecycleBinActions";
+import { SUBMISSIONS_COLLECTION_ALIAS, SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS } from "../collections/submissionCollectionAliases";
 import FormSubmissionCollectionElement from "../collections/formSubmissionCollection.element";
 import SproutFormSubmissionsListContext from "../workspaces/sproutFormSubmissionsContext";
 import { ManifestModal } from "@umbraco-cms/backoffice/modal";
@@ -35,7 +45,7 @@ import RecycleBinWorkspaceContext, { RECYCLE_BIN_ENTITY_TYPE } from "../workspac
 import RecycleBinCollectionContext, { RECYCLE_BIN_COLLECTION_ALIAS } from "../workspaces/recycleBinCollectionContext";
 import RecycleBinCollectionElement from "../collections/recycleBinCollection.element";
 import RecycleBinRepository from "../repositories/recycleBinRepository";
-import { TRASHED_FORM_ENTITY_TYPE } from "../models";
+import { SUBMISSION_ENTITY_TYPE, TRASHED_FORM_ENTITY_TYPE, TRASHED_SUBMISSION_ENTITY_TYPE } from "../models";
 import { ManifestEntityAction } from "@umbraco-cms/backoffice/entity-action";
 import { SubmissionFieldManifest } from "./submissionFieldManifest";
 import FileSubmissionFieldElement from "../workspaces/submissionEditors/fileSubmissionField.element";
@@ -243,7 +253,7 @@ const RecycleBinCollection: ManifestCollection = {
 
 const RecycleBinCollectionView: ManifestCollectionView = {
   type: "collectionView",
-  alias: `.overview`,
+  alias: `${RECYCLE_BIN_COLLECTION_ALIAS}.overview`,
   name: "SproutForms Recycle Bin Overview",
   element: RecycleBinCollectionElement,
   meta: {
@@ -269,7 +279,7 @@ const RecycleBinRepositoryManifest: ManifestRepository = {
 const RecycleBinEmptyAction: ManifestCollectionAction = {
   type: "collectionAction",
   kind: "button",
-  alias: `.emptyAction`,
+  alias: `${RECYCLE_BIN_COLLECTION_ALIAS}.emptyAction`,
   name: "Empty SproutForms Recycle Bin",
   api: EmptyRecycleBinAction,
   meta: {
@@ -285,7 +295,7 @@ const RecycleBinEmptyAction: ManifestCollectionAction = {
 
 const RecycleBinRestoreBulkAction: ManifestEntityBulkAction = {
   type: "entityBulkAction",
-  alias: `.restoreAction`,
+  alias: `${RECYCLE_BIN_COLLECTION_ALIAS}.restoreAction`,
   name: "Restore Forms From Recycle Bin",
   weight: 20,
   api: RestoreFormsBulkAction,
@@ -303,7 +313,7 @@ const RecycleBinRestoreBulkAction: ManifestEntityBulkAction = {
 
 const RecycleBinDeleteBulkAction: ManifestEntityBulkAction = {
   type: "entityBulkAction",
-  alias: `.deleteAction`,
+  alias: `${RECYCLE_BIN_COLLECTION_ALIAS}.deleteAction`,
   name: "Delete Forms Permanently",
   weight: 10,
   api: DeleteFormsPermanentlyBulkAction,
@@ -357,7 +367,7 @@ const FormSubmissionsRepositoryManifest: ManifestRepository = {
 const FormSubmissionsCollectionManifest: ManifestCollection = {
   type: "collection",
   kind: "default",
-  alias: "sproutForms.collections.submissions",
+  alias: SUBMISSIONS_COLLECTION_ALIAS,
   name: "Submissions Collection",
   api: SproutFormSubmissionsListContext,
   meta: {
@@ -378,9 +388,158 @@ const FormSubmissionsCollectionViewManifest: ManifestCollectionView = {
   conditions: [
     {
       alias: UMB_COLLECTION_ALIAS_CONDITION,
-      match: "sproutForms.collections.submissions",
+      match: SUBMISSIONS_COLLECTION_ALIAS,
     },
   ],
+};
+
+const SubmissionTrashBulkAction: ManifestEntityBulkAction = {
+  type: "entityBulkAction",
+  alias: `${SUBMISSIONS_COLLECTION_ALIAS}.trashAction`,
+  name: "Move Submissions To Recycle Bin",
+  weight: 10,
+  api: TrashSubmissionsBulkAction,
+  forEntityTypes: [SUBMISSION_ENTITY_TYPE],
+  meta: {
+    label: "Move to recycle bin",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: SUBMISSIONS_COLLECTION_ALIAS,
+    },
+  ],
+};
+
+const SubmissionTrashEntityAction: ManifestEntityAction = {
+  type: "entityAction",
+  kind: "default",
+  alias: "sproutForms.entityActions.submission.trash",
+  name: "Move Submission To Recycle Bin",
+  weight: 100,
+  api: TrashSubmissionEntityAction,
+  forEntityTypes: [SUBMISSION_ENTITY_TYPE],
+  meta: {
+    icon: "icon-trash",
+    label: "Move to recycle bin",
+  },
+};
+
+const SubmissionsRecycleBinRepositoryManifest: ManifestRepository = {
+  type: "repository",
+  alias: "sproutForms.repositories.submissions.recycleBin",
+  name: "SproutForms Submissions Recycle Bin Repository",
+  api: TrashedFormSubmissionsRepository,
+};
+
+const SubmissionsRecycleBinCollection: ManifestCollection = {
+  type: "collection",
+  kind: "default",
+  alias: SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS,
+  name: "SproutForms Submissions Recycle Bin Collection",
+  api: SproutFormSubmissionsListContext,
+  meta: {
+    repositoryAlias: "sproutForms.repositories.submissions.recycleBin",
+  },
+};
+
+const SubmissionsRecycleBinCollectionView: ManifestCollectionView = {
+  type: "collectionView",
+  alias: `${SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS}.overview`,
+  name: "SproutForms Submissions Recycle Bin Overview",
+  js: FormSubmissionCollectionElement,
+  meta: {
+    label: "Overview",
+    icon: "icon-list",
+    pathName: "overview",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS,
+    },
+  ],
+};
+
+const SubmissionsRecycleBinEmptyAction: ManifestCollectionAction = {
+  type: "collectionAction",
+  kind: "button",
+  alias: `${SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS}.emptyAction`,
+  name: "Empty SproutForms Submissions Recycle Bin",
+  api: EmptySubmissionsRecycleBinAction,
+  meta: {
+    label: "Empty recycle bin",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS,
+    },
+  ],
+};
+
+const SubmissionsRecycleBinRestoreBulkAction: ManifestEntityBulkAction = {
+  type: "entityBulkAction",
+  alias: `${SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS}.restoreAction`,
+  name: "Restore Submissions From Recycle Bin",
+  weight: 20,
+  api: RestoreSubmissionsBulkAction,
+  forEntityTypes: [TRASHED_SUBMISSION_ENTITY_TYPE],
+  meta: {
+    label: "Restore",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS,
+    },
+  ],
+};
+
+const SubmissionsRecycleBinDeleteBulkAction: ManifestEntityBulkAction = {
+  type: "entityBulkAction",
+  alias: `${SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS}.deleteAction`,
+  name: "Delete Submissions Permanently",
+  weight: 10,
+  api: DeleteSubmissionsPermanentlyBulkAction,
+  forEntityTypes: [TRASHED_SUBMISSION_ENTITY_TYPE],
+  meta: {
+    label: "Delete permanently",
+  },
+  conditions: [
+    {
+      alias: UMB_COLLECTION_ALIAS_CONDITION,
+      match: SUBMISSIONS_RECYCLE_BIN_COLLECTION_ALIAS,
+    },
+  ],
+};
+
+const TrashedSubmissionRestoreEntityAction: ManifestEntityAction = {
+  type: "entityAction",
+  kind: "default",
+  alias: "sproutForms.entityActions.trashedSubmission.restore",
+  name: "Restore Submission From Recycle Bin",
+  weight: 200,
+  api: RestoreSubmissionEntityAction,
+  forEntityTypes: [TRASHED_SUBMISSION_ENTITY_TYPE],
+  meta: {
+    icon: "icon-undo",
+    label: "Restore",
+  },
+};
+
+const TrashedSubmissionDeleteEntityAction: ManifestEntityAction = {
+  type: "entityAction",
+  kind: "default",
+  alias: "sproutForms.entityActions.trashedSubmission.delete",
+  name: "Delete Submission Permanently",
+  weight: 100,
+  api: DeleteSubmissionPermanentlyEntityAction,
+  forEntityTypes: [TRASHED_SUBMISSION_ENTITY_TYPE],
+  meta: {
+    icon: "icon-trash",
+    label: "Delete permanently",
+  },
 };
 
 const FormSubmissionInfoModal: ManifestModal = {
@@ -485,6 +644,16 @@ export const SproutFormManifests = [
   FormSubmissionsRepositoryManifest,
   FormSubmissionsCollectionManifest,
   FormSubmissionsCollectionViewManifest,
+  SubmissionTrashBulkAction,
+  SubmissionTrashEntityAction,
+  SubmissionsRecycleBinRepositoryManifest,
+  SubmissionsRecycleBinCollection,
+  SubmissionsRecycleBinCollectionView,
+  SubmissionsRecycleBinEmptyAction,
+  SubmissionsRecycleBinRestoreBulkAction,
+  SubmissionsRecycleBinDeleteBulkAction,
+  TrashedSubmissionRestoreEntityAction,
+  TrashedSubmissionDeleteEntityAction,
   FormSubmissionInfoModal,
   FormTypePickerModal,
   FormRollbackModal,

@@ -18,5 +18,10 @@ namespace SproutForms.Core.Models
 
         // What the form's type computed from the values, such as a quiz score
         public IReadOnlyDictionary<string, JsonElement> Results { get; init; } = new Dictionary<string, JsonElement>();
+
+        // Set while the submission is in its form's recycle bin, where it is treated as deleted everywhere but in the bin itself
+        public DateTime? TrashedAt { get; set; }
+        public string? TrashedBy { get; set; }
+        public bool IsTrashed => TrashedAt.HasValue;
     }
 }
