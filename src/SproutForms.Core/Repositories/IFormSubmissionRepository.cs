@@ -14,6 +14,7 @@ namespace SproutForms.Core.Repositories
             out int totalCount
         );
         int Count(Guid formId);
+        IReadOnlyCollection<Guid> GetVersionIdsWithSubmissions(Guid formId);
         void DeleteAllByForm(Guid formId);
     }
 }

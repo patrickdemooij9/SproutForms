@@ -115,5 +115,16 @@ namespace SproutForms.Umbraco.Core.Repositories
                 .On<FormSubmissionEntity, FormVersionEntity>((submission, version) => submission.FormVersionId == version.Id)
                 .Where<FormVersionEntity>(it => it.FormId == formId));
         }
+
+        public IReadOnlyCollection<Guid> GetVersionIdsWithSubmissions(Guid formId)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            return scope.Database.Fetch<Guid>(scope.SqlContext.Sql()
+                .SelectDistinct<FormSubmissionEntity>(it => it.FormVersionId)
+                .From<FormSubmissionEntity>()
+                .InnerJoin<FormVersionEntity>()
+                .On<FormSubmissionEntity, FormVersionEntity>((submission, version) => submission.FormVersionId == version.Id)
+                .Where<FormVersionEntity>(it => it.FormId == formId));
+        }
     }
 }

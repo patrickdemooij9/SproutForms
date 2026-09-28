@@ -29,6 +29,7 @@ import {
   SOURCE_UI,
 } from "../models";
 import { mapToDto, mapToPost } from "../mappings";
+import { FormBackofficeModel } from "../api";
 
 export default class SproutFormsWorkspaceContext
   extends UmbContextBase
@@ -75,6 +76,10 @@ export default class SproutFormsWorkspaceContext
     [this.form, this.#currentPageIndex.asObservable()],
     ([form, index]) => form.definition.pages[index],
   );
+
+  // Counts the times the form was stored, so views can reload what a save or rollback changed, such as the history
+  #storedCount = new UmbNumberState(0);
+  public readonly storedCount = this.#storedCount.asObservable();
 
   #formTypes = new UmbArrayState<FormDefinitionTypeDto>([], (it) => it.alias);
   public readonly formTypes = this.#formTypes.asObservable();
@@ -161,6 +166,12 @@ export default class SproutFormsWorkspaceContext
     this.source.generateAlias(name, this.#form.value.id!).then((result) => {
       this.#form.update({ alias: result.data });
     });
+  }
+
+  // Replaces the form with a stored one, such as the form after a rollback
+  loadForm(model: FormBackofficeModel) {
+    this.#form.update(mapToDto(model));
+    this.#storedCount.setValue(this.#storedCount.getValue() + 1);
   }
 
   lockAliasUpdate() {
@@ -436,7 +447,7 @@ export default class SproutFormsWorkspaceContext
     // tryExecute has already shown the error, such as fields the form type doesn't allow
     if (!returnValue.data) return;
 
-    this.#form.update(mapToDto(returnValue.data));
+    this.loadForm(returnValue.data);
 
     history.replaceState(
       {},

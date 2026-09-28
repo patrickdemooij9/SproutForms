@@ -101,6 +101,11 @@ namespace SproutForms.Umbraco.Core.Repositories
             return _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId)).OrderByDescending(it => it.CreatedAt).FirstOrDefault();
         }
 
+        public IReadOnlyList<FormVersion> GetAll(Guid formId)
+        {
+            return [.. _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId)).OrderByDescending(it => it.Version)];
+        }
+
         public FormVersion? GetPublished(Guid formId)
         {
             return _cachePolicy.GetByProperty(formId, DoGetByFormId, nameof(FormVersion.FormId)).FirstOrDefault(it => it.Status == FormStatus.Published);

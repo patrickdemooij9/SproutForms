@@ -17,6 +17,7 @@ namespace SproutForms.Umbraco.Core.Startup.Migrations
             To<AddWorkflowTemplatesMigration>("v5");
             To<AddSubmissionResultsMigration>("v6");
             To<WrapRowsInPagesMigration>("v7");
+            To<AddFormAuditMigration>("v8");
         }
     }
 }

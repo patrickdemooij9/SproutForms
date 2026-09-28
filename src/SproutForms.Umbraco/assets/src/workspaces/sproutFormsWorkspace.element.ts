@@ -13,6 +13,7 @@ import "./formEditor.element";
 import "./formSettings.element";
 import "./formIntegrations.element";
 import "./formSubmissions.element";
+import "./formInfo.element";
 import { UUIInputEvent } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
@@ -24,6 +25,7 @@ enum TabState {
   Settings,
   Integrations,
   Submissions,
+  Info,
 }
 
 type Tab = { state: TabState; label: string; icon: string };
@@ -58,7 +60,7 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     await this.context?.save();
   }
 
-  // Submissions only exist once the form has been saved
+  // Submissions and history only exist once the form has been saved
   #getTabs(): Array<Tab> {
     const tabs: Array<Tab> = [
       { state: TabState.Editor, label: "Build", icon: "icon-layout" },
@@ -67,12 +69,13 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     ];
     if (this.form.id) {
       tabs.push({ state: TabState.Submissions, label: "Submissions", icon: "icon-inbox" });
+      tabs.push({ state: TabState.Info, label: "Info", icon: "icon-info" });
     }
     return tabs;
   }
 
   get #isReadOnly() {
-    return this.form.source === SOURCE_CODE && this.tabState !== TabState.Submissions;
+    return this.form.source === SOURCE_CODE && this.tabState !== TabState.Submissions && this.tabState !== TabState.Info;
   }
 
   render() {
@@ -136,6 +139,10 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
             ${when(
               this.tabState == TabState.Submissions,
               () => html`<form-submissions></form-submissions>`,
+            )}
+            ${when(
+              this.tabState == TabState.Info,
+              () => html`<form-info></form-info>`,
             )}
           </div>
         </div>
@@ -201,7 +208,8 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     form-editor,
     form-settings,
     form-integrations,
-    form-submissions {
+    form-submissions,
+    form-info {
       display: block;
       height: 100%;
     }

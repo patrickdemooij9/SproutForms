@@ -43,6 +43,7 @@ npm run build
 - `IFormVersionRepository` / `FormVersionRepository`
 - `IFolderRepository` / `FolderRepository`
 - `IWorkflowExecutionRepository` / `WorkflowExecutionRepository`
+- `IFormAuditRepository` / `FormAuditRepository` - a form's history (created, saved, renamed, rolled back)
 
 ### Descriptors (Umbraco Backoffice)
 Located in `SproutForms.Umbraco.Core/Descriptors/`:
@@ -69,6 +70,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `FormsUserGroupMigration` - User group setup
 - `AddSubmissionResultsMigration` - `ResultsJson` column for the results a form type computes
 - `WrapRowsInPagesMigration` - moves the rows of every stored definition into a single page
+- `AddFormAuditMigration` - `SproutForms_FormAudit` table for a form's history
 
 ## Adding New Field Types
 
