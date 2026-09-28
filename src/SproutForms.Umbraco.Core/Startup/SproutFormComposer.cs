@@ -55,6 +55,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
             builder.Services.AddSingleton<FormDeletionService>();
             builder.Services.AddSingleton<FormRecycleBinService>();
+            builder.Services.AddSingleton<FormSubmissionRecycleBinService>();
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<FormVersionComparer>();
             builder.Services.AddSingleton<FormHistoryService>();

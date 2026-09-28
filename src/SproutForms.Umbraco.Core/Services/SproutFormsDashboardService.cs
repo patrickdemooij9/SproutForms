@@ -39,8 +39,8 @@ namespace SproutForms.Umbraco.Core.Services
 
             var heroMetrics = new HeroMetricsViewModel();
 
-            // The submissions of forms in the recycle bin count as deleted, and so do their workflows
-            var hiddenSubmissionIds = GetSubmissionIdsOfTrashedForms(scope);
+            // Submissions in the recycle bin, or whose form is, count as deleted, and so do their workflows
+            var hiddenSubmissionIds = GetTrashedSubmissionIds(scope);
 
             var submissionsLast60Days = scope.Database.Fetch<FormSubmissionEntity>(
                 scope.SqlContext.Sql()
@@ -180,16 +180,21 @@ namespace SproutForms.Umbraco.Core.Services
             };
         }
 
-        private static HashSet<Guid> GetSubmissionIdsOfTrashedForms(IScope scope)
+        private static HashSet<Guid> GetTrashedSubmissionIds(IScope scope)
         {
-            return [.. scope.Database.Fetch<Guid>(scope.SqlContext.Sql()
+            var ofTrashedForms = scope.Database.Fetch<Guid>(scope.SqlContext.Sql()
                 .Select<FormSubmissionEntity>(it => it.Id)
                 .From<FormSubmissionEntity>()
                 .InnerJoin<FormVersionEntity>()
                 .On<FormSubmissionEntity, FormVersionEntity>((submission, version) => submission.FormVersionId == version.Id)
                 .InnerJoin<FormEntity>()
                 .On<FormVersionEntity, FormEntity>((version, form) => version.FormId == form.Id)
-                .Where<FormEntity>(it => it.TrashedAt != null))];
+                .Where<FormEntity>(it => it.TrashedAt != null));
+            var trashed = scope.Database.Fetch<Guid>(scope.SqlContext.Sql()
+                .Select<FormSubmissionEntity>(it => it.Id)
+                .From<FormSubmissionEntity>()
+                .Where<FormSubmissionEntity>(it => it.TrashedAt != null));
+            return [.. ofTrashedForms, .. trashed];
         }
 
         private SubmissionTrendViewModel BuildSubmissionTrend(

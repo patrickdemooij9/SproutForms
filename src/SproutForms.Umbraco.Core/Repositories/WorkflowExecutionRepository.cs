@@ -71,7 +71,7 @@ namespace SproutForms.Umbraco.Core.Repositories
                 AND prev.[Order] < w.[Order]
                 AND prev.Status <> @3
         )
-        -- Paused while the form is in the recycle bin, and picked up again when it is restored
+        -- Paused while the submission or its form is in the recycle bin, and picked up again when it is restored
         AND NOT EXISTS (
             SELECT 1
             FROM SproutForms_FormSubmissions AS s
@@ -79,7 +79,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             INNER JOIN SproutForms_Forms AS f ON f.Id = v.FormId
             WHERE
                 s.Id = w.SubmissionId
-                AND f.TrashedAt IS NOT NULL
+                AND (s.TrashedAt IS NOT NULL OR f.TrashedAt IS NOT NULL)
         )
     ORDER BY
         w.CreatedUtc ASC
@@ -162,6 +162,16 @@ namespace SproutForms.Umbraco.Core.Repositories
         INNER JOIN SproutForms_FormVersions AS v ON v.Id = s.FormVersionId
         WHERE v.FormId = @0
     )", formId);
+        }
+
+        public async Task DeleteBySubmissions(IEnumerable<Guid> submissionIds)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            // In batches, to stay below the parameter limit of every database provider
+            foreach (var batch in submissionIds.Distinct().Chunk(500))
+            {
+                await scope.Database.ExecuteAsync("DELETE FROM SproutForms_WorkflowExecutions WHERE SubmissionId IN (@0)", [batch]);
+            }
         }
 
         private WorkflowExecutionEntity ToEntity(WorkflowExecution execution)

@@ -169,12 +169,18 @@ export type TrashedFormItem = {
   totalSubmissions: number;
 };
 
+export const SUBMISSION_ENTITY_TYPE = "sprout-submission";
+export const TRASHED_SUBMISSION_ENTITY_TYPE = "sprout-trashed-submission";
+
 export type FormSubmissionOverviewItem = {
   unique: string;
-  entityType: string;
+  entityType: typeof SUBMISSION_ENTITY_TYPE | typeof TRASHED_SUBMISSION_ENTITY_TYPE;
 
   id: string;
   name: string;
+  // Set for a submission in the recycle bin
+  trashedAt?: string | null;
+  trashedByName?: string | null;
   workflowStages?: Array<{
     workflowAlias: string;
     displayName: string;

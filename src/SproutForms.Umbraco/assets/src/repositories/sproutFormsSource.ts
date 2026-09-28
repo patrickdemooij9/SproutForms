@@ -22,15 +22,44 @@ export class SproutFormsSource {
     return treeData;
   }
 
-  async getSubmissions(take: number, skip: number, formId: string) {
+  // With trashed, the submissions in the form's recycle bin instead
+  async getSubmissions(take: number, skip: number, formId: string, trashed = false) {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsSubmissions({
       query: {
         skip,
         take,
-        formId
+        formId,
+        trashed
       }
     }))
-  } 
+  }
+
+  async trashSubmissions(formId: string, submissionIds: string[]) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsSubmissionsTrash({
+      query: { formId },
+      body: submissionIds
+    }));
+  }
+
+  async restoreSubmissions(formId: string, submissionIds: string[]) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsSubmissionsRecycleBinRestore({
+      query: { formId },
+      body: submissionIds
+    }));
+  }
+
+  async deleteSubmissionsPermanently(formId: string, submissionIds: string[]) {
+    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsSubmissionsRecycleBin({
+      query: { formId },
+      body: submissionIds
+    }));
+  }
+
+  async emptySubmissionsRecycleBin(formId: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsSubmissionsRecycleBinAll({
+      query: { formId }
+    }));
+  }
 
   async getSubmission(submissionId: string) {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsSubmission({ query: { submissionId } }));

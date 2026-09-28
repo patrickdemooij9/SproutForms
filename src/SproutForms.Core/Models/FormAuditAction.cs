@@ -9,6 +9,10 @@ namespace SproutForms.Core.Models
         Moved = 3,
         RolledBack = 4,
         MovedToRecycleBin = 5,
-        RestoredFromRecycleBin = 6
+        RestoredFromRecycleBin = 6,
+        // The entries of a form, one entry per action however many submissions it covered
+        SubmissionsMovedToRecycleBin = 7,
+        SubmissionsRestoredFromRecycleBin = 8,
+        SubmissionsDeleted = 9
     }
 }

@@ -37,5 +37,13 @@ namespace SproutForms.Umbraco.Core.Models.Database
         [NullSetting(NullSetting = NullSettings.Null)]
         [SpecialDbType(SpecialDbTypes.NVARCHARMAX)]
         public string? ResultsJson { get; set; }
+
+        [Column("TrashedAt")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        public DateTime? TrashedAt { get; set; }
+
+        [Column("TrashedBy")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        public string? TrashedBy { get; set; }
     }
 }

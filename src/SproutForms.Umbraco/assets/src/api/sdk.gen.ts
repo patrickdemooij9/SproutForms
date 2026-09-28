@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { DeleteUmbracoSproutFormsRecycleBinAllData, DeleteUmbracoSproutFormsRecycleBinAllResponses, DeleteUmbracoSproutFormsRecycleBinData, DeleteUmbracoSproutFormsRecycleBinResponses, DeleteUmbracoSproutFormsTemplatesByIdData, DeleteUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsDashboardData, GetUmbracoSproutFormsDashboardResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormHistoryData, GetUmbracoSproutFormsFormHistoryResponses, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsFormTypesData, GetUmbracoSproutFormsFormTypesResponses, GetUmbracoSproutFormsFormVersionsCompareData, GetUmbracoSproutFormsFormVersionsCompareErrors, GetUmbracoSproutFormsFormVersionsCompareResponses, GetUmbracoSproutFormsFormVersionsData, GetUmbracoSproutFormsFormVersionsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRecycleBinData, GetUmbracoSproutFormsRecycleBinResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsTemplatesByIdData, GetUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsTemplatesData, GetUmbracoSproutFormsTemplatesResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFolderData, PostUmbracoSproutFormsFolderResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormErrors, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsFormRollbackData, PostUmbracoSproutFormsFormRollbackErrors, PostUmbracoSproutFormsFormRollbackResponses, PostUmbracoSproutFormsFormTrashData, PostUmbracoSproutFormsFormTrashErrors, PostUmbracoSproutFormsFormTrashResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses, PostUmbracoSproutFormsRecycleBinRestoreData, PostUmbracoSproutFormsRecycleBinRestoreResponses, PostUmbracoSproutFormsSubmissionWorkflowApproveData, PostUmbracoSproutFormsSubmissionWorkflowApproveErrors, PostUmbracoSproutFormsSubmissionWorkflowDeclineData, PostUmbracoSproutFormsSubmissionWorkflowDeclineErrors, PostUmbracoSproutFormsSubmissionWorkflowRetryData, PostUmbracoSproutFormsSubmissionWorkflowRetryErrors, PostUmbracoSproutFormsSubmissionWorkflowRetryResponses, PostUmbracoSproutFormsTemplatesData, PostUmbracoSproutFormsTemplatesResponses, PutUmbracoSproutFormsTemplatesByIdData, PutUmbracoSproutFormsTemplatesByIdResponses } from './types.gen';
+import type { DeleteUmbracoSproutFormsRecycleBinAllData, DeleteUmbracoSproutFormsRecycleBinAllResponses, DeleteUmbracoSproutFormsRecycleBinData, DeleteUmbracoSproutFormsRecycleBinResponses, DeleteUmbracoSproutFormsSubmissionsRecycleBinAllData, DeleteUmbracoSproutFormsSubmissionsRecycleBinAllResponses, DeleteUmbracoSproutFormsSubmissionsRecycleBinData, DeleteUmbracoSproutFormsSubmissionsRecycleBinResponses, DeleteUmbracoSproutFormsTemplatesByIdData, DeleteUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsAncestorsData, GetUmbracoSproutFormsAncestorsResponses, GetUmbracoSproutFormsChildrenData, GetUmbracoSproutFormsChildrenResponses, GetUmbracoSproutFormsDashboardData, GetUmbracoSproutFormsDashboardResponses, GetUmbracoSproutFormsFieldTypesData, GetUmbracoSproutFormsFieldTypesResponses, GetUmbracoSproutFormsFormData, GetUmbracoSproutFormsFormHistoryData, GetUmbracoSproutFormsFormHistoryResponses, GetUmbracoSproutFormsFormResponses, GetUmbracoSproutFormsFormsData, GetUmbracoSproutFormsFormsResponses, GetUmbracoSproutFormsFormTypesData, GetUmbracoSproutFormsFormTypesResponses, GetUmbracoSproutFormsFormVersionsCompareData, GetUmbracoSproutFormsFormVersionsCompareErrors, GetUmbracoSproutFormsFormVersionsCompareResponses, GetUmbracoSproutFormsFormVersionsData, GetUmbracoSproutFormsFormVersionsResponses, GetUmbracoSproutFormsOutcomeTypesData, GetUmbracoSproutFormsOutcomeTypesResponses, GetUmbracoSproutFormsRecycleBinData, GetUmbracoSproutFormsRecycleBinResponses, GetUmbracoSproutFormsRootData, GetUmbracoSproutFormsRootResponses, GetUmbracoSproutFormsSubmissionData, GetUmbracoSproutFormsSubmissionResponses, GetUmbracoSproutFormsSubmissionsData, GetUmbracoSproutFormsSubmissionsResponses, GetUmbracoSproutFormsTemplatesByIdData, GetUmbracoSproutFormsTemplatesByIdResponses, GetUmbracoSproutFormsTemplatesData, GetUmbracoSproutFormsTemplatesResponses, GetUmbracoSproutFormsWorkflowTypesData, GetUmbracoSproutFormsWorkflowTypesResponses, PostUmbracoSproutFormsFolderData, PostUmbracoSproutFormsFolderResponses, PostUmbracoSproutFormsFormData, PostUmbracoSproutFormsFormErrors, PostUmbracoSproutFormsFormResponses, PostUmbracoSproutFormsFormRollbackData, PostUmbracoSproutFormsFormRollbackErrors, PostUmbracoSproutFormsFormRollbackResponses, PostUmbracoSproutFormsFormTrashData, PostUmbracoSproutFormsFormTrashErrors, PostUmbracoSproutFormsFormTrashResponses, PostUmbracoSproutFormsGenerateAliasData, PostUmbracoSproutFormsGenerateAliasResponses, PostUmbracoSproutFormsRecycleBinRestoreData, PostUmbracoSproutFormsRecycleBinRestoreResponses, PostUmbracoSproutFormsSubmissionsRecycleBinRestoreData, PostUmbracoSproutFormsSubmissionsRecycleBinRestoreResponses, PostUmbracoSproutFormsSubmissionsTrashData, PostUmbracoSproutFormsSubmissionsTrashResponses, PostUmbracoSproutFormsSubmissionWorkflowApproveData, PostUmbracoSproutFormsSubmissionWorkflowApproveErrors, PostUmbracoSproutFormsSubmissionWorkflowDeclineData, PostUmbracoSproutFormsSubmissionWorkflowDeclineErrors, PostUmbracoSproutFormsSubmissionWorkflowRetryData, PostUmbracoSproutFormsSubmissionWorkflowRetryErrors, PostUmbracoSproutFormsSubmissionWorkflowRetryResponses, PostUmbracoSproutFormsTemplatesData, PostUmbracoSproutFormsTemplatesResponses, PutUmbracoSproutFormsTemplatesByIdData, PutUmbracoSproutFormsTemplatesByIdResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean> = Options2<TData, ThrowOnError> & {
     /**
@@ -218,6 +218,46 @@ export class BackofficeSproutForms {
         return (options?.client ?? client).get<GetUmbracoSproutFormsSubmissionsResponses, unknown, ThrowOnError>({
             url: '/umbraco/sproutForms/submissions',
             ...options
+        });
+    }
+    
+    public static deleteUmbracoSproutFormsSubmissionsRecycleBin<ThrowOnError extends boolean = true>(options?: Options<DeleteUmbracoSproutFormsSubmissionsRecycleBinData, ThrowOnError>) {
+        return (options?.client ?? client).delete<DeleteUmbracoSproutFormsSubmissionsRecycleBinResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/submissions/recycleBin',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static deleteUmbracoSproutFormsSubmissionsRecycleBinAll<ThrowOnError extends boolean = true>(options?: Options<DeleteUmbracoSproutFormsSubmissionsRecycleBinAllData, ThrowOnError>) {
+        return (options?.client ?? client).delete<DeleteUmbracoSproutFormsSubmissionsRecycleBinAllResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/submissions/recycleBin/all',
+            ...options
+        });
+    }
+    
+    public static postUmbracoSproutFormsSubmissionsRecycleBinRestore<ThrowOnError extends boolean = true>(options?: Options<PostUmbracoSproutFormsSubmissionsRecycleBinRestoreData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostUmbracoSproutFormsSubmissionsRecycleBinRestoreResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/submissions/recycleBin/restore',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
+        });
+    }
+    
+    public static postUmbracoSproutFormsSubmissionsTrash<ThrowOnError extends boolean = true>(options?: Options<PostUmbracoSproutFormsSubmissionsTrashData, ThrowOnError>) {
+        return (options?.client ?? client).post<PostUmbracoSproutFormsSubmissionsTrashResponses, unknown, ThrowOnError>({
+            url: '/umbraco/sproutForms/submissions/trash',
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options?.headers
+            }
         });
     }
     
