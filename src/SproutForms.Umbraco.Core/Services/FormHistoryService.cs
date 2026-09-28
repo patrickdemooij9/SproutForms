@@ -11,7 +11,6 @@ using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
-using Umbraco.Cms.Core.Services;
 
 namespace SproutForms.Umbraco.Core.Services
 {
@@ -20,15 +19,13 @@ namespace SproutForms.Umbraco.Core.Services
     /// </summary>
     public class FormHistoryService
     {
-        public const string SystemUserKey = "System";
-
         private readonly IFormRepository _formRepository;
         private readonly IFormVersionRepository _formVersionRepository;
         private readonly IFormSubmissionRepository _formSubmissionRepository;
         private readonly IFormAuditRepository _formAuditRepository;
         private readonly IFolderRepository _folderRepository;
         private readonly IWorkflowTemplateRepository _templateRepository;
-        private readonly IUserService _userService;
+        private readonly BackofficeUserNameResolver _userNameResolver;
         private readonly FormVersionComparer _comparer;
         private readonly FormDefinitionTypeValidator _typeValidator;
         private readonly IFormDefinitionType[] _formTypes;
@@ -47,7 +44,7 @@ namespace SproutForms.Umbraco.Core.Services
             IFormAuditRepository formAuditRepository,
             IFolderRepository folderRepository,
             IWorkflowTemplateRepository templateRepository,
-            IUserService userService,
+            BackofficeUserNameResolver userNameResolver,
             FormVersionComparer comparer,
             FormDefinitionTypeValidator typeValidator,
             IEnumerable<IFormDefinitionType> formTypes,
@@ -65,7 +62,7 @@ namespace SproutForms.Umbraco.Core.Services
             _formAuditRepository = formAuditRepository;
             _folderRepository = folderRepository;
             _templateRepository = templateRepository;
-            _userService = userService;
+            _userNameResolver = userNameResolver;
             _comparer = comparer;
             _typeValidator = typeValidator;
             _formTypes = [.. formTypes];
@@ -122,7 +119,7 @@ namespace SproutForms.Umbraco.Core.Services
                 {
                     Id = entry.Id,
                     Action = entry.Action,
-                    UserName = await GetUserNameAsync(entry.UserKey, userNames),
+                    UserName = await _userNameResolver.GetNameAsync(entry.UserKey, userNames),
                     CreatedAt = AsUtc(entry.CreatedAt),
                     Version = entry.VersionId is { } versionId && versionNumbers.TryGetValue(versionId, out var number) ? number : null,
                     Comment = entry.Comment
@@ -199,6 +196,8 @@ namespace SproutForms.Umbraco.Core.Services
         {
             if (form.Source == FormSource.Code)
                 return ["This form is defined in code, so it can't be rolled back."];
+            if (form.IsTrashed)
+                return ["This form is in the recycle bin. Restore it before rolling it back."];
             if (version.Id == current.Id)
                 return ["This is the current version."];
             if (FormDefinitionHasher.Hash(version.Definition) == FormDefinitionHasher.Hash(current.Definition))
@@ -259,7 +258,7 @@ namespace SproutForms.Umbraco.Core.Services
                 Id = version.Id,
                 Version = version.Version,
                 CreatedAt = AsUtc(version.CreatedAt),
-                CreatedByName = await GetUserNameAsync(version.CreatedBy, userNames),
+                CreatedByName = await _userNameResolver.GetNameAsync(version.CreatedBy, userNames),
                 IsCurrent = version.Id == current.Id
             };
         }
@@ -267,19 +266,6 @@ namespace SproutForms.Umbraco.Core.Services
         // Stored as UTC, but the database gives the value back without its kind, which would be sent as local time
         private static DateTime AsUtc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
 
-        private async Task<string> GetUserNameAsync(string userKey, Dictionary<string, string> userNames)
-        {
-            if (userNames.TryGetValue(userKey, out var cached)) return cached;
-
-            var name = userKey switch
-            {
-                SystemUserKey => "System",
-                _ when Guid.TryParse(userKey, out var key) => (await _userService.GetAsync(key))?.Name ?? "Deleted user",
-                _ => "Unknown user"
-            };
-            userNames[userKey] = name;
-            return name;
-        }
 
         private void Add(Guid formId, FormAuditAction action, string userKey, DateTime createdAt, Guid? versionId = null, string? comment = null)
         {

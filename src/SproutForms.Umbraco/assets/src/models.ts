@@ -155,6 +155,20 @@ export type FormOverviewItem = {
   totalSubmissions: number;
 };
 
+export const TRASHED_FORM_ENTITY_TYPE = "sprout-trashed-form";
+
+export type TrashedFormItem = {
+  unique: string;
+  entityType: typeof TRASHED_FORM_ENTITY_TYPE;
+
+  name: string;
+  alias: string;
+  trashedAt: string;
+  trashedByName: string;
+  folderName?: string | null;
+  totalSubmissions: number;
+};
+
 export type FormSubmissionOverviewItem = {
   unique: string;
   entityType: string;

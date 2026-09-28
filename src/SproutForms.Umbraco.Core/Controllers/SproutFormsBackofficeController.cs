@@ -48,21 +48,19 @@ namespace SproutForms.Umbraco.Core.Controllers
         private readonly ISproutFormsDashboardService _dashboardService;
         private readonly IWorkflowTemplateRepository _templateRepository;
         private readonly IWorkflowRunner _workflowRunner;
-        private readonly FormDeletionService _formDeletionService;
         private readonly FormDefinitionTypeValidator _formDefinitionTypeValidator;
         private readonly IFormDefinitionType[] _formDefinitionTypes;
         private readonly IEnumerable<IFormDefinitionTypeDescriptor> _formDefinitionTypeDescriptors;
         private readonly FormHistoryService _formHistoryService;
 
         //TODO: Move each section (forms, submissions, flows) to their own controllers...
-        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDeletionService formDeletionService, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors, FormHistoryService formHistoryService)
+        public SproutFormsBackofficeController(IFormRepository formRepository, IFormVersionRepository formVersionRepository, IFormSubmissionRepository formSubmissionRepository, IEnumerable<IFieldDescriptor> fieldDescriptors, IEnumerable<IFormFieldType> formFieldTypes, IEnumerable<IOutcomeDescriptor> outcomeDescriptors, IEnumerable<IFormSubmitOutcomeType> outcomeTypes, IEnumerable<IFlowDescriptor> flowDescriptors, IEnumerable<IFormWorkflowType> workflowTypes, IFormFileStorageProvider fileStorageProvider, IBackOfficeSecurityAccessor backOfficeSecurityAccessor, IWorkflowExecutionRepository workflowExecutionRepository, ISproutFormsDashboardService dashboardService, IWorkflowTemplateRepository templateRepository, IWorkflowRunner workflowRunner, FormDefinitionTypeValidator formDefinitionTypeValidator, IEnumerable<IFormDefinitionType> formDefinitionTypes, IEnumerable<IFormDefinitionTypeDescriptor> formDefinitionTypeDescriptors, FormHistoryService formHistoryService)
         {
             _formHistoryService = formHistoryService;
             _formDefinitionTypeValidator = formDefinitionTypeValidator;
             _formDefinitionTypes = formDefinitionTypes.ToArray();
             _formDefinitionTypeDescriptors = formDefinitionTypeDescriptors;
             _workflowRunner = workflowRunner;
-            _formDeletionService = formDeletionService;
             _formFieldTypes = formFieldTypes.ToArray();
             _outcomeTypes = outcomeTypes.ToArray();
             _workflowTypes = workflowTypes.ToArray();
@@ -159,6 +157,14 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (existingForm?.Source == FormSource.Code)
             {
                 throw new InvalidOperationException("Can't edit form which is code based");
+            }
+            if (existingForm?.IsTrashed == true)
+            {
+                return BadRequest(new ProblemDetails
+                {
+                    Type = "Error",
+                    Title = "The form is in the recycle bin. Restore it before editing it."
+                });
             }
 
             var alias = model.Alias;
@@ -621,15 +627,6 @@ namespace SproutForms.Umbraco.Core.Controllers
             return StatusCode(StatusCodes.Status501NotImplemented);
         }
 
-        [HttpDelete("form")]
-        public async Task<IActionResult> DeleteForm(Guid[] formIds)
-        {
-            foreach (var form in formIds)
-            {
-                await _formDeletionService.DeleteAsync(form);
-            }
-            return Ok();
-        }
 
         [HttpPost("generateAlias")]
         [ProducesResponseType(typeof(string), 200)]

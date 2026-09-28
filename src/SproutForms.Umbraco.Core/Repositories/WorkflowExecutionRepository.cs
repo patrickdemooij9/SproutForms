@@ -71,6 +71,16 @@ namespace SproutForms.Umbraco.Core.Repositories
                 AND prev.[Order] < w.[Order]
                 AND prev.Status <> @3
         )
+        -- Paused while the form is in the recycle bin, and picked up again when it is restored
+        AND NOT EXISTS (
+            SELECT 1
+            FROM SproutForms_FormSubmissions AS s
+            INNER JOIN SproutForms_FormVersions AS v ON v.Id = s.FormVersionId
+            INNER JOIN SproutForms_Forms AS f ON f.Id = v.FormId
+            WHERE
+                s.Id = w.SubmissionId
+                AND f.TrashedAt IS NOT NULL
+        )
     ORDER BY
         w.CreatedUtc ASC
 ",

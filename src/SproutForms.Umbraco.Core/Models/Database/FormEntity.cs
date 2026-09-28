@@ -24,5 +24,13 @@ namespace SproutForms.Umbraco.Core.Models.Database
         [Column("FolderId")]
         [NullSetting(NullSetting = NullSettings.Null)]
         public Guid? FolderId { get; set; }
+
+        [Column("TrashedAt")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        public DateTime? TrashedAt { get; set; }
+
+        [Column("TrashedBy")]
+        [NullSetting(NullSetting = NullSettings.Null)]
+        public string? TrashedBy { get; set; }
     }
 }

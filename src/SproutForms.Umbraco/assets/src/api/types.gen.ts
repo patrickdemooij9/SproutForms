@@ -71,7 +71,9 @@ export enum FormAuditAction {
     SAVED = 'Saved',
     RENAMED = 'Renamed',
     MOVED = 'Moved',
-    ROLLED_BACK = 'RolledBack'
+    ROLLED_BACK = 'RolledBack',
+    MOVED_TO_RECYCLE_BIN = 'MovedToRecycleBin',
+    RESTORED_FROM_RECYCLE_BIN = 'RestoredFromRecycleBin'
 }
 
 export type FormAuditEntryBackofficeModel = {
@@ -318,6 +320,11 @@ export type PagedFormTreeItemModel = {
     items: Array<FormTreeItemModel>;
 };
 
+export type PagedTrashedFormBackofficeModel = {
+    total: number;
+    items: Array<TrashedFormBackofficeModel>;
+};
+
 export type RecentSubmissionItem = {
     submissionId: string;
     formName: string;
@@ -335,6 +342,16 @@ export type SubmissionTrendDataPoint = {
 
 export type SubmissionTrendViewModel = {
     data: Array<SubmissionTrendDataPoint>;
+};
+
+export type TrashedFormBackofficeModel = {
+    id: string;
+    name: string;
+    alias: string;
+    trashedAt: string;
+    trashedByName: string;
+    folderName?: string | null;
+    totalSubmissions: number;
 };
 
 export enum TreeItemType {
@@ -480,20 +497,6 @@ export type PostUmbracoSproutFormsFolderResponses = {
 
 export type PostUmbracoSproutFormsFolderResponse = PostUmbracoSproutFormsFolderResponses[keyof PostUmbracoSproutFormsFolderResponses];
 
-export type DeleteUmbracoSproutFormsFormData = {
-    body?: Array<string>;
-    path?: never;
-    query?: never;
-    url: '/umbraco/sproutForms/form';
-};
-
-export type DeleteUmbracoSproutFormsFormResponses = {
-    /**
-     * OK
-     */
-    200: unknown;
-};
-
 export type GetUmbracoSproutFormsFormData = {
     body?: never;
     path?: never;
@@ -584,6 +587,29 @@ export type PostUmbracoSproutFormsFormRollbackResponses = {
 };
 
 export type PostUmbracoSproutFormsFormRollbackResponse = PostUmbracoSproutFormsFormRollbackResponses[keyof PostUmbracoSproutFormsFormRollbackResponses];
+
+export type PostUmbracoSproutFormsFormTrashData = {
+    body?: Array<string>;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/form/trash';
+};
+
+export type PostUmbracoSproutFormsFormTrashErrors = {
+    /**
+     * Bad Request
+     */
+    400: ValidationProblemDetails;
+};
+
+export type PostUmbracoSproutFormsFormTrashError = PostUmbracoSproutFormsFormTrashErrors[keyof PostUmbracoSproutFormsFormTrashErrors];
+
+export type PostUmbracoSproutFormsFormTrashResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetUmbracoSproutFormsFormVersionsData = {
     body?: never;
@@ -698,6 +724,67 @@ export type GetUmbracoSproutFormsOutcomeTypesResponses = {
 };
 
 export type GetUmbracoSproutFormsOutcomeTypesResponse = GetUmbracoSproutFormsOutcomeTypesResponses[keyof GetUmbracoSproutFormsOutcomeTypesResponses];
+
+export type DeleteUmbracoSproutFormsRecycleBinData = {
+    body?: Array<string>;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/recycleBin';
+};
+
+export type DeleteUmbracoSproutFormsRecycleBinResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type GetUmbracoSproutFormsRecycleBinData = {
+    body?: never;
+    path?: never;
+    query?: {
+        skip?: number;
+        take?: number;
+    };
+    url: '/umbraco/sproutForms/recycleBin';
+};
+
+export type GetUmbracoSproutFormsRecycleBinResponses = {
+    /**
+     * OK
+     */
+    200: PagedTrashedFormBackofficeModel;
+};
+
+export type GetUmbracoSproutFormsRecycleBinResponse = GetUmbracoSproutFormsRecycleBinResponses[keyof GetUmbracoSproutFormsRecycleBinResponses];
+
+export type DeleteUmbracoSproutFormsRecycleBinAllData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/recycleBin/all';
+};
+
+export type DeleteUmbracoSproutFormsRecycleBinAllResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type PostUmbracoSproutFormsRecycleBinRestoreData = {
+    body?: Array<string>;
+    path?: never;
+    query?: never;
+    url: '/umbraco/sproutForms/recycleBin/restore';
+};
+
+export type PostUmbracoSproutFormsRecycleBinRestoreResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
 
 export type GetUmbracoSproutFormsRootData = {
     body?: never;

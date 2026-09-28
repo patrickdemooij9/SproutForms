@@ -32,7 +32,7 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         public Form[] Get(int skip, int take, out int total)
         {
-            var forms = _cachePolicy.GetAll(null, DoGetAll);
+            var forms = _cachePolicy.GetAll(null, DoGetAll).Where(it => !it.IsTrashed).ToArray();
             total = forms.Length;
             return [.. forms.Skip(skip).Take(take)];
         }
@@ -44,10 +44,48 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         public Form[] GetByFolder(Guid? folderId, int skip, int take, out int total)
         {
-            var entities = _cachePolicy.GetAll(null, DoGetAll).Where(it => it.FolderId == folderId).ToArray();
+            var entities = _cachePolicy.GetAll(null, DoGetAll).Where(it => it.FolderId == folderId && !it.IsTrashed).ToArray();
             total = entities.Length;
             return [.. entities.Skip(skip).Take(take)];
         }
+
+        public Form[] GetTrashed(int skip, int take, out int total)
+        {
+            var forms = _cachePolicy.GetAll(null, DoGetAll).Where(it => it.IsTrashed).OrderByDescending(it => it.TrashedAt).ToArray();
+            total = forms.Length;
+            return [.. forms.Skip(skip).Take(take)];
+        }
+
+        public void MoveToRecycleBin(Guid formId, DateTime trashedAt, string trashedBy)
+        {
+            var form = GetById(formId) ?? throw new ArgumentException($"Could not find form with ID: {formId}");
+            var trashed = Copy(form);
+            trashed.TrashedAt = trashedAt;
+            trashed.TrashedBy = trashedBy;
+            _cachePolicy.Update(trashed, DoSave);
+        }
+
+        public void RestoreFromRecycleBin(Guid formId, Guid? folderId)
+        {
+            var form = GetById(formId) ?? throw new ArgumentException($"Could not find form with ID: {formId}");
+            var restored = Copy(form);
+            restored.FolderId = folderId;
+            restored.TrashedAt = null;
+            restored.TrashedBy = null;
+            _cachePolicy.Update(restored, DoSave);
+        }
+
+        // The cache hands out its own instances, so changes are made to a copy
+        private static Form Copy(Form form) => new()
+        {
+            Id = form.Id,
+            Name = form.Name,
+            Alias = form.Alias,
+            Source = form.Source,
+            FolderId = form.FolderId,
+            TrashedAt = form.TrashedAt,
+            TrashedBy = form.TrashedBy
+        };
 
         public Form? GetById(Guid formId)
         {
@@ -64,14 +102,7 @@ namespace SproutForms.Umbraco.Core.Repositories
                 .From<FormEntity>()
                 .Where<FormEntity>(it => it.Id == id));
 
-            return entity is null ? null : new Form
-            {
-                Id = entity.Id,
-                Name = entity.Name,
-                Alias = entity.Alias,
-                Source = (FormSource)entity.Source,
-                FolderId = entity.FolderId
-            };
+            return entity is null ? null : Map(entity);
         }
 
         private Form[] DoGetAll(Guid[]? ids)
@@ -88,15 +119,20 @@ namespace SproutForms.Umbraco.Core.Repositories
             }
             var entities = scope.Database.Fetch<FormEntity>(sql);
 
-            return [.. entities.Select(it => new Form
-            {
-                Id = it.Id,
-                Name = it.Name,
-                Alias = it.Alias,
-                Source = (FormSource)it.Source,
-                FolderId = it.FolderId
-            })];
+            return [.. entities.Select(Map)];
         }
+
+        private static Form Map(FormEntity entity) => new()
+        {
+            Id = entity.Id,
+            Name = entity.Name,
+            Alias = entity.Alias,
+            Source = (FormSource)entity.Source,
+            FolderId = entity.FolderId,
+            // The database gives the value back without its kind
+            TrashedAt = entity.TrashedAt is { } trashedAt ? DateTime.SpecifyKind(trashedAt, DateTimeKind.Utc) : null,
+            TrashedBy = entity.TrashedBy
+        };
 
         public Guid Save(Form form)
         {
@@ -105,11 +141,11 @@ namespace SproutForms.Umbraco.Core.Repositories
                 form.Id = Guid.NewGuid();
             }
 
-            _cachePolicy.Create(form, DoCreate);
+            _cachePolicy.Create(form, DoSave);
             return form.Id;
         }
 
-        private void DoCreate(Form form)
+        private void DoSave(Form form)
         {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             scope.Database.Save(new FormEntity
@@ -118,7 +154,9 @@ namespace SproutForms.Umbraco.Core.Repositories
                 Name = form.Name,
                 Alias = form.Alias,
                 Source = (int)form.Source,
-                FolderId = form.FolderId
+                FolderId = form.FolderId,
+                TrashedAt = form.TrashedAt,
+                TrashedBy = form.TrashedBy
             });
         }
 

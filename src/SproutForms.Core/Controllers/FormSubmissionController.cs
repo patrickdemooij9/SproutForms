@@ -17,6 +17,7 @@ namespace SproutForms.Core.Controllers
     [Route("api/forms")]
     public class FormSubmissionController : Controller
     {
+        private readonly IFormRepository _forms;
         private readonly IFormVersionRepository _formVersions;
         private readonly IFormSubmissionService _submissionService;
         private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
@@ -24,12 +25,14 @@ namespace SproutForms.Core.Controllers
         private readonly ILogger<FormSubmissionController> _logger;
 
         public FormSubmissionController(
+            IFormRepository forms,
             IFormVersionRepository formVersions,
             IFormSubmissionService submissionService,
             IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
             IFormSubmissionGuard? formSubmissionGuard,
             ILogger<FormSubmissionController> logger)
         {
+            _forms = forms;
             _formVersions = formVersions;
             _submissionService = submissionService;
             _outcomeTypes = outcomeTypes;
@@ -43,7 +46,7 @@ namespace SproutForms.Core.Controllers
             Guid id,
             [FromForm] Dictionary<string, string> values)
         {
-            var formVersion = _formVersions.GetPublished(id);
+            var formVersion = GetPublishedVersion(id);
             if (formVersion is null)
                 return NotFound();
 
@@ -154,7 +157,7 @@ namespace SproutForms.Core.Controllers
             int pageIndex,
             [FromForm] Dictionary<string, string> values)
         {
-            var formVersion = _formVersions.GetPublished(id);
+            var formVersion = GetPublishedVersion(id);
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
 
@@ -170,6 +173,10 @@ namespace SproutForms.Core.Controllers
 
             return Ok(new AjaxFormResponse { Success = true });
         }
+
+        // A form in the recycle bin takes no submissions, as if it was deleted
+        private FormVersion? GetPublishedVersion(Guid formId)
+            => _forms.GetById(formId) is { IsTrashed: false } ? _formVersions.GetPublished(formId) : null;
 
         // Only the form's own fields, and file field values only from an actual upload, never from a posted text value
         private static Dictionary<string, JsonElement> GetFieldValues(FormVersion formVersion, Dictionary<string, string> values)

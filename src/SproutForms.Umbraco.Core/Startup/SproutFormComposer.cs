@@ -54,9 +54,11 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IUnitOfWorkProvider, ScopeUnitOfWorkProvider>();
             builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
             builder.Services.AddSingleton<FormDeletionService>();
+            builder.Services.AddSingleton<FormRecycleBinService>();
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<FormVersionComparer>();
             builder.Services.AddSingleton<FormHistoryService>();
+            builder.Services.AddSingleton<BackofficeUserNameResolver>();
             builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
 
             builder.Services.AddSingleton<IFormDefinitionType, StandardFormDefinitionType>();
@@ -109,6 +111,7 @@ namespace SproutForms.Umbraco.Core.Startup
 
             builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
+            builder.Services.AddRecurringBackgroundJob<Implementations.RecycleBinCleanupJob>();
 
             builder.Services.AddSingleton<IFormSubmissionGuard, HoneypotSubmissionGuard>();
 

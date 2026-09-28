@@ -15,7 +15,7 @@
 
 @{
     var form = Form.GetById(Model.Value<Guid>("formPicker"));
-    if (form is null)
+    if (form is null || form.IsTrashed)
     {
         return;
     }
