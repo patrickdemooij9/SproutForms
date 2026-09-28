@@ -104,10 +104,33 @@ export class SproutFormsSource {
     }));
   }
 
-  async deleteForms(formIds: string[]){
-    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsForm({
+  // Deleting a form moves it to the recycle bin; only the bin deletes it for good
+  async trashForms(formIds: string[]){
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsFormTrash({
       body: formIds
     }))
+  }
+
+  async getRecycleBin(take: number, skip: number) {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsRecycleBin({
+      query: { skip, take }
+    }));
+  }
+
+  async restoreForms(formIds: string[]) {
+    return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsRecycleBinRestore({
+      body: formIds
+    }));
+  }
+
+  async deleteFormsPermanently(formIds: string[]) {
+    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsRecycleBin({
+      body: formIds
+    }));
+  }
+
+  async emptyRecycleBin() {
+    return await tryExecute(this.#host, BackofficeSproutForms.deleteUmbracoSproutFormsRecycleBinAll());
   }
 
   async generateAlias(name: string, formId?: string) {

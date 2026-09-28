@@ -7,6 +7,8 @@ namespace SproutForms.Core.Models
         Saved = 1,
         Renamed = 2,
         Moved = 3,
-        RolledBack = 4
+        RolledBack = 4,
+        MovedToRecycleBin = 5,
+        RestoredFromRecycleBin = 6
     }
 }

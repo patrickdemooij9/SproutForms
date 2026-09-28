@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Razor.TagHelpers;
+using Microsoft.Extensions.Logging;
 using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Services;
@@ -15,12 +16,14 @@ namespace SproutForms.Umbraco.Core.TagHelpers
         private readonly IFormRepository _formRepository;
         private readonly IFormVersionRepository _formVersionRepository;
         private readonly FormRenderingService _formRenderingService;
+        private readonly ILogger<RenderFormViewComponent> _logger;
 
-        public RenderFormViewComponent(IFormRepository formRepository, IFormVersionRepository formVersionRepository, FormRenderingService formRenderingService)
+        public RenderFormViewComponent(IFormRepository formRepository, IFormVersionRepository formVersionRepository, FormRenderingService formRenderingService, ILogger<RenderFormViewComponent> logger)
         {
             _formRepository = formRepository;
             _formVersionRepository = formVersionRepository;
             _formRenderingService = formRenderingService;
+            _logger = logger;
         }
 
         public async Task<IViewComponentResult> InvokeAsync(string? formAlias = null, Guid? formId = null)
@@ -35,9 +38,11 @@ namespace SproutForms.Umbraco.Core.TagHelpers
                 form = _formRepository.GetById(formId.Value);
             }
 
-            if (form is null)
+            // A form in the recycle bin is shown as if it was deleted
+            if (form is null || form.IsTrashed)
             {
-                return null;
+                _logger.LogWarning("Form {FormReference} doesn't exist or is in the recycle bin, so nothing is rendered", formAlias ?? formId?.ToString());
+                return Content(string.Empty);
             }
             var formVersion = _formVersionRepository.GetPublished(form.Id);
 

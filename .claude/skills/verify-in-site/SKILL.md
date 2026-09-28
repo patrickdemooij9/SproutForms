@@ -30,7 +30,7 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
   - `GET /ai-test/forms` lists the forms, with alias and source.
   - `GET /ai-test/forms/{alias}` renders one form on a bare page, with the real `forms.js` and CSS.
   - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values, the IP address and every workflow execution (status, attempts, last error).
-  - `POST /ai-test/submissions/{submissionId}/workflows/{workflowAlias}/retry` and `DELETE /ai-test/forms/{alias}` call the same services as the backoffice's retry and delete, which need a signed-in user. Deleting a code-first form only lasts until the next start, when it is registered again.
+  - `POST /ai-test/submissions/{submissionId}/workflows/{workflowAlias}/retry` and `DELETE /ai-test/forms/{alias}` call the same services as the backoffice's retry and permanent delete (the backoffice first moves a form to the recycle bin; this skips the bin), which need a signed-in user. Deleting a code-first form only lasts until the next start, when it is registered again.
 
 ## The loop
 

@@ -35,6 +35,8 @@ const ACTION_TAGS: Record<FormAuditAction, { label: string; look: string; color:
   [FormAuditAction.RENAMED]: { label: "Renamed", look: "secondary", color: "default" },
   [FormAuditAction.MOVED]: { label: "Moved", look: "secondary", color: "default" },
   [FormAuditAction.ROLLED_BACK]: { label: "Rollback", look: "secondary", color: "default" },
+  [FormAuditAction.MOVED_TO_RECYCLE_BIN]: { label: "Trashed", look: "secondary", color: "danger" },
+  [FormAuditAction.RESTORED_FROM_RECYCLE_BIN]: { label: "Restored", look: "secondary", color: "positive" },
 };
 
 @customElement("form-info")
@@ -150,6 +152,10 @@ export class FormInfoElement extends UmbElementMixin(LitElement) {
         return "Form created";
       case FormAuditAction.SAVED:
         return item.version ? `Form saved as version ${item.version}` : "Form saved";
+      case FormAuditAction.MOVED_TO_RECYCLE_BIN:
+        return "Moved to the recycle bin";
+      case FormAuditAction.RESTORED_FROM_RECYCLE_BIN:
+        return item.comment ?? "Restored from the recycle bin";
       default:
         return item.comment ?? nothing;
     }

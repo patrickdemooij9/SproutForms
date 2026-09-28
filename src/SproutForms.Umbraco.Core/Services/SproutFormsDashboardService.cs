@@ -39,9 +39,13 @@ namespace SproutForms.Umbraco.Core.Services
 
             var heroMetrics = new HeroMetricsViewModel();
 
+            // The submissions of forms in the recycle bin count as deleted, and so do their workflows
+            var hiddenSubmissionIds = GetSubmissionIdsOfTrashedForms(scope);
+
             var submissionsLast60Days = scope.Database.Fetch<FormSubmissionEntity>(
                 scope.SqlContext.Sql()
-                .SelectAll().From<FormSubmissionEntity>().Where<FormSubmissionEntity>(it => it.SubmittedAt >= sixtyDaysAgo));
+                .SelectAll().From<FormSubmissionEntity>().Where<FormSubmissionEntity>(it => it.SubmittedAt >= sixtyDaysAgo))
+                .Where(it => !hiddenSubmissionIds.Contains(it.Id)).ToList();
             var submissionsLast30Days = submissionsLast60Days.Where(it => it.SubmittedAt >= thirtyDaysAgo).ToArray();
             heroMetrics.TotalSubmissionsLast30Days = submissionsLast30Days.Length;
             heroMetrics.TotalSubmissionsPrevious30Days = submissionsLast60Days.Count(it => it.SubmittedAt < thirtyDaysAgo);
@@ -56,7 +60,8 @@ namespace SproutForms.Umbraco.Core.Services
             heroMetrics.SubmissionsToday = submissionsLast60Days.Count(s => s.SubmittedAt >= today);
 
             var workflowsLast30Days = scope.Database.Fetch<WorkflowExecutionEntity>(scope.SqlContext.Sql()
-                .SelectAll().From<WorkflowExecutionEntity>().Where<WorkflowExecutionEntity>(it => it.CreatedUtc >= thirtyDaysAgo));
+                .SelectAll().From<WorkflowExecutionEntity>().Where<WorkflowExecutionEntity>(it => it.CreatedUtc >= thirtyDaysAgo))
+                .Where(it => !hiddenSubmissionIds.Contains(it.SubmissionId)).ToList();
 
             var successfulWorkflows = workflowsLast30Days.Count(w => w.Status == (int)WorkflowExecutionStatus.Succeeded);
             var totalWorkflows = workflowsLast30Days.Count;
@@ -118,7 +123,8 @@ namespace SproutForms.Umbraco.Core.Services
                 .SelectAll()
                 .From<WorkflowExecutionEntity>()
                 .OrderByDescending<WorkflowExecutionEntity>(it => it.CreatedUtc)
-                .SelectTop(5));
+                .SelectTop(5))
+                .Where(it => !hiddenSubmissionIds.Contains(it.SubmissionId));
 
             var workflowFeed = new WorkflowFeedViewModel
             {
@@ -145,7 +151,8 @@ namespace SproutForms.Umbraco.Core.Services
                 .SelectAll()
                 .From<FormSubmissionEntity>()
                 .OrderByDescending<FormSubmissionEntity>(it => it.SubmittedAt)
-                .SelectTop(5));
+                .SelectTop(5))
+                .Where(it => !hiddenSubmissionIds.Contains(it.Id));
 
             var recentSubmissionsVm = new RecentSubmissionsViewModel
             {
@@ -171,6 +178,18 @@ namespace SproutForms.Umbraco.Core.Services
                 WorkflowFeed = workflowFeed,
                 RecentSubmissions = recentSubmissionsVm
             };
+        }
+
+        private static HashSet<Guid> GetSubmissionIdsOfTrashedForms(IScope scope)
+        {
+            return [.. scope.Database.Fetch<Guid>(scope.SqlContext.Sql()
+                .Select<FormSubmissionEntity>(it => it.Id)
+                .From<FormSubmissionEntity>()
+                .InnerJoin<FormVersionEntity>()
+                .On<FormSubmissionEntity, FormVersionEntity>((submission, version) => submission.FormVersionId == version.Id)
+                .InnerJoin<FormEntity>()
+                .On<FormVersionEntity, FormEntity>((version, form) => version.FormId == form.Id)
+                .Where<FormEntity>(it => it.TrashedAt != null))];
         }
 
         private SubmissionTrendViewModel BuildSubmissionTrend(
