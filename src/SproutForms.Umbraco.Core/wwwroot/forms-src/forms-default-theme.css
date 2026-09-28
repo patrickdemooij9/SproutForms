@@ -1,10 +1,47 @@
 /* ===========================
    Default Form Theme
-   =========================== */
+   ===========================
+
+   Override any --sf-* property on :root, on the form or on any ancestor, for example:
+   :root { --sf-color-accent: #2e7d32; --sf-radius: 0; }
+   :where() keeps the defaults at zero specificity, so an override wins wherever it's declared.
+*/
+
+:where(:root) {
+    --sf-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --sf-font-size: 1rem;
+    --sf-font-size-small: 0.875rem;
+    --sf-radius: 4px;
+    --sf-control-height: 2.5rem;
+
+    --sf-color-text: #222;
+    --sf-color-text-muted: #666;
+    --sf-color-border: #ccc;
+    --sf-color-background: #fff;
+    --sf-color-accent: #1976d2;
+    --sf-color-accent-hover: #155fa0;
+    --sf-color-accent-subtle: #e3f2fd;
+    --sf-color-on-accent: #fff;
+    --sf-color-focus-ring: rgba(25, 118, 210, 0.2);
+    --sf-color-error: #c62828;
+    --sf-color-disabled: #aaa;
+
+    --sf-input-padding: 0.5rem 0.6rem;
+    --sf-button-padding: 0.6rem 1.2rem;
+
+    --sf-progress-track: #ddd;
+    --sf-progress-complete: #90caf9;
+    /* --sf-progress-current is left out here: it falls back to the accent where it's used, so it follows an accent set on the form */
+}
 
 .form-root {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: #222;
+    font-family: var(--sf-font-family);
+    color: var(--sf-color-text);
+}
+
+/* Browsers give form controls their own font; :where() keeps this below every other rule */
+:where(.form-root) :where(input, select, textarea, button) {
+    font: inherit;
 }
 
 .form-group {
@@ -12,36 +49,72 @@
     flex-direction: column;
 }
 
-    .form-group label {
+    .form-group > label,
+    .form-choices > legend {
         font-weight: 600;
         margin-bottom: 0.25rem;
     }
 
     .form-group .required {
-        color: #c62828;
+        color: var(--sf-color-error);
         margin-left: 0.25rem;
     }
 
 .form-control {
-    padding: 0.5rem 0.6rem;
-    font-size: 1rem;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    box-sizing: border-box;
+    min-height: var(--sf-control-height);
+    /* A fixed line height keeps dropdowns and date inputs as tall as text inputs */
+    line-height: 1.25;
+    padding: var(--sf-input-padding);
+    font-size: var(--sf-font-size);
+    border: 1px solid var(--sf-color-border);
+    border-radius: var(--sf-radius);
 }
+
+    /* Browsers size a dropdown from its font rather than its line height */
+    select.form-control {
+        height: var(--sf-control-height);
+    }
 
     .form-control:focus {
         outline: none;
-        border-color: #1976d2;
-        box-shadow: 0 0 0 1px rgba(25, 118, 210, 0.2);
+        border-color: var(--sf-color-accent);
+        box-shadow: 0 0 0 1px var(--sf-color-focus-ring);
     }
 
     .form-control[aria-invalid="true"] {
-        border-color: #c62828;
+        border-color: var(--sf-color-error);
+    }
+
+/* Radio buttons: the question is the legend, the options stack below it */
+.form-choices {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+    .form-choices > legend {
+        padding: 0;
+    }
+
+.form-choice {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+}
+
+    .form-choice input {
+        margin: 0;
     }
 
 .form-error {
-    color: #c62828;
-    font-size: 0.875rem;
+    color: var(--sf-color-error);
+    font-size: var(--sf-font-size-small);
     margin-top: 0.25rem;
 }
 
@@ -50,21 +123,23 @@
 }
 
     .form-actions button {
-        background: #1976d2;
-        color: #fff;
+        background: var(--sf-color-accent);
+        color: var(--sf-color-on-accent);
         border: none;
-        padding: 0.6rem 1.2rem;
-        font-size: 1rem;
-        border-radius: 4px;
+        box-sizing: border-box;
+        min-height: var(--sf-control-height);
+        padding: var(--sf-button-padding);
+        font-size: var(--sf-font-size);
+        border-radius: var(--sf-radius);
         cursor: pointer;
     }
 
         .form-actions button:hover {
-            background: #155fa0;
+            background: var(--sf-color-accent-hover);
         }
 
         .form-actions button:disabled {
-            background: #aaa;
+            background: var(--sf-color-disabled);
             cursor: not-allowed;
         }
 
@@ -80,13 +155,13 @@ form[data-sf-paged] .form-actions {
     }
 
     .form-actions .form-previous {
-        background: #fff;
-        color: #1976d2;
-        border: 1px solid #1976d2;
+        background: var(--sf-color-background);
+        color: var(--sf-color-accent);
+        border: 1px solid var(--sf-color-accent);
     }
 
         .form-actions .form-previous:hover {
-            background: #e3f2fd;
+            background: var(--sf-color-accent-subtle);
         }
 
 .form-page:focus {
@@ -111,17 +186,17 @@ form[data-sf-paged] .form-actions {
     .form-progress-step {
         flex: 1;
         padding-top: 0.5rem;
-        border-top: 4px solid #ddd;
-        color: #666;
-        font-size: 0.875rem;
+        border-top: 4px solid var(--sf-progress-track);
+        color: var(--sf-color-text-muted);
+        font-size: var(--sf-font-size-small);
     }
 
-        .form-progress-step.is-complete {
-            border-top-color: #90caf9;
+        .form-progress-step[data-sf-complete] {
+            border-top-color: var(--sf-progress-complete);
         }
 
-        .form-progress-step.is-current {
-            border-top-color: #1976d2;
-            color: #222;
+        .form-progress-step[aria-current="step"] {
+            border-top-color: var(--sf-progress-current, var(--sf-color-accent));
+            color: var(--sf-color-text);
             font-weight: 600;
         }

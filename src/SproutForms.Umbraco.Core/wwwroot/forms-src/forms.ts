@@ -303,6 +303,7 @@ function getFieldValue(fieldContainer: Element): string | undefined {
 function showFallbackSuccess(form: HTMLFormElement) {
     const success = document.createElement("div");
     success.className = "form-success";
+    success.setAttribute("data-sf-success", "");
     success.setAttribute("role", "status");
     success.textContent = "Thank you, your submission has been received.";
     form.replaceChildren(success);
@@ -336,7 +337,7 @@ function initPages(form: HTMLFormElement) {
 
     form.querySelector("[data-sf-previous]")?.addEventListener("click", () => goToPreviousPage(form));
     form.querySelector("[data-sf-next]")?.addEventListener("click", () => goToNextPage(form));
-    form.querySelector(".form-progress")?.removeAttribute("hidden");
+    form.querySelector("[data-sf-progress]")?.removeAttribute("hidden");
 
     // After a post without JavaScript the errors are already rendered, so start on the first page that has one
     const pageWithError = findFirstPageWithError(state);
@@ -363,7 +364,7 @@ function updatePageVisibility(form: HTMLFormElement) {
     const formValues = getFormValues(form);
     state.pages.forEach((page, index) => {
         const isVisible = window.SproutForms.conditions.evaluate(state.conditions[index], formValues);
-        page.classList.toggle("sf-page-skipped", !isVisible);
+        page.toggleAttribute("data-sf-skipped", !isVisible);
     });
 
     updatePageNavigation(form, state);
@@ -374,7 +375,7 @@ function updatePageVisibility(form: HTMLFormElement) {
 function getVisiblePageIndexes(state: PageState): number[] {
     return state.pages
         .map((_, index) => index)
-        .filter(index => index === state.current || !state.pages[index].classList.contains("sf-page-skipped"));
+        .filter(index => index === state.current || !state.pages[index].hasAttribute("data-sf-skipped"));
 }
 
 function isOnLastPage(state: PageState): boolean {
@@ -438,8 +439,7 @@ function updateProgress(form: HTMLFormElement, state: PageState) {
         const isCurrent = index === state.current;
 
         step.hidden = position === -1;
-        step.classList.toggle("is-current", isCurrent);
-        step.classList.toggle("is-complete", position !== -1 && position < currentPosition);
+        step.toggleAttribute("data-sf-complete", position !== -1 && position < currentPosition);
         if (isCurrent) {
             step.setAttribute("aria-current", "step");
         } else {
@@ -517,7 +517,7 @@ function goToPreviousPage(form: HTMLFormElement) {
 }
 
 function findFirstPageWithError(state: PageState): number {
-    return state.pages.findIndex(page => page.querySelector(".form-error"));
+    return state.pages.findIndex(page => page.querySelector("[data-sf-error]"));
 }
 
 function showFirstPageWithError(form: HTMLFormElement) {
@@ -569,15 +569,14 @@ function showFieldError(group: HTMLElement, message?: string) {
     const inputs = group.querySelectorAll("input, select, textarea");
     inputs.forEach(input => input.setAttribute("aria-invalid", "true"));
 
-    const existingError = group.querySelector(".form-error");
+    const existingError = group.querySelector("[data-sf-error]");
     if (existingError) {
         existingError.remove();
     }
 
-    const errorContainer = document.createElement("div");
-    errorContainer.className = "form-error";
+    const errorContainer = createErrorElement();
     errorContainer.setAttribute("role", "alert");
-    errorContainer.textContent = message;
+    errorContainer.textContent = message ?? "";
 
     group.appendChild(errorContainer);
 }
@@ -586,7 +585,7 @@ function clearFieldError(group: HTMLElement) {
     const inputs = group.querySelectorAll("input, select, textarea");
     inputs.forEach(input => input.setAttribute("aria-invalid", "false"));
 
-    const existingError = group.querySelector(".form-error");
+    const existingError = group.querySelector("[data-sf-error]");
     if (existingError) {
         existingError.remove();
     }
@@ -600,11 +599,11 @@ async function validateAllFields(root: ParentNode): Promise<boolean> {
 
     for (const group of groups) {
         const groupEl = group as HTMLElement;
-        if (groupEl.classList.contains("sf-hidden") || groupEl.style.display === "none") {
+        if (groupEl.hidden) {
             continue;
         }
         // A skipped page's fields aren't validated, on the server either
-        if (groupEl.closest(".sf-page-skipped")) {
+        if (groupEl.closest("[data-sf-skipped]")) {
             continue;
         }
 
@@ -675,24 +674,10 @@ function evaluateAllConditions(form: HTMLFormElement) {
 
         const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, formValues);
 
-        const parentCol = wrapper.closest(".form-col") as HTMLElement | null;
-
-        if (isVisible) {
-            wrapperEl.style.display = "";
-            wrapperEl.removeAttribute("hidden");
-            wrapperEl.classList.remove("sf-hidden");
-            if (parentCol) {
-                parentCol.style.display = "";
-                parentCol.classList.remove("sf-hidden");
-            }
-        } else {
-            wrapperEl.style.display = "none";
-            wrapperEl.setAttribute("hidden", "");
-            wrapperEl.classList.add("sf-hidden");
-            if (parentCol) {
-                parentCol.style.display = "none";
-                parentCol.classList.add("sf-hidden");
-            }
+        setHidden(wrapperEl, !isVisible);
+        const parentCol = wrapper.closest<HTMLElement>("[data-sf-col]");
+        if (parentCol) {
+            setHidden(parentCol, !isVisible);
         }
 
         const existingRequired = wrapper.querySelector("[data-conditional-required]");
@@ -711,6 +696,12 @@ function evaluateAllConditions(form: HTMLFormElement) {
     });
 
     updatePageVisibility(form);
+}
+
+// The inline style keeps it hidden when a theme's classes set a display that would win over the hidden attribute
+function setHidden(element: HTMLElement, hidden: boolean) {
+    element.hidden = hidden;
+    element.style.display = hidden ? "none" : "";
 }
 
 window.SproutForms.submissionGuard.register("recaptchaV3", {
@@ -814,7 +805,7 @@ window.SproutForms.validation.register("maxDate", async (value, options) => {
 
 // Clears the errors inside root: the whole form, or a single page
 function clearErrors(root: ParentNode) {
-    root.querySelectorAll(".form-error").forEach(e => e.remove());
+    root.querySelectorAll("[data-sf-error]").forEach(e => e.remove());
     root.querySelectorAll("[aria-invalid]").forEach(el => {
         el.setAttribute("aria-invalid", "false");
     });
@@ -825,23 +816,19 @@ function clearErrors(root: ParentNode) {
 function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>) {
     for (const fieldId in errors) {
         const messages = errors[fieldId];
-        const input = form.querySelector(`[data-sf-field-id="${fieldId}"]`)
-            || form.querySelector(`[name="${fieldId}"]`);
+        const wrapper = form.querySelector(`[data-sf-field-id="${fieldId}"]`)
+            ?? form.querySelector(`[name="${fieldId}"]`)?.closest("[data-sf-field-id]");
 
-        if (!input) {
+        if (!wrapper) {
             messages.forEach(msg => {
                 applyGlobalError(form, msg);
             });
             continue;
         }
 
-        input.setAttribute("aria-invalid", "true");
+        wrapper.querySelectorAll("input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
 
-        const wrapper = input.closest(".form-group");
-        if (!wrapper) continue;
-
-        const errorContainer = document.createElement("div");
-        errorContainer.className = "form-error";
+        const errorContainer = createErrorElement();
 
         messages.forEach(msg => {
             const div = document.createElement("div");
@@ -856,19 +843,27 @@ function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>) {
 function applyGlobalError(form: HTMLFormElement, message: string) {
     const container = getOrCreateGlobalErrorContainer(form);
 
-    const div = document.createElement("div");
-    div.className = "form-error";
+    const div = createErrorElement();
     div.textContent = message;
 
     container.appendChild(div);
 }
 
+// forms.js finds errors by the data attribute, the class is only there for the default theme
+function createErrorElement(): HTMLDivElement {
+    const element = document.createElement("div");
+    element.className = "form-error";
+    element.setAttribute("data-sf-error", "");
+    return element;
+}
+
 function getOrCreateGlobalErrorContainer(form: HTMLFormElement): HTMLElement {
-    let container = form.querySelector(".form-global-errors") as HTMLElement | null;
+    let container = form.querySelector<HTMLElement>("[data-sf-global-errors]");
 
     if (!container) {
         container = document.createElement("div");
         container.className = "form-global-errors";
+        container.setAttribute("data-sf-global-errors", "");
         container.setAttribute("role", "alert");
         container.setAttribute("aria-live", "assertive");
         form.prepend(container);
@@ -922,7 +917,7 @@ function getSubmissionGuards(form: HTMLFormElement): GuardDefinition[] {
 window.SproutForms.outcomeHandlers.register("message", (form, outcomeData) => {
     const message = outcomeData.message as string;
     if (message) {
-        form.innerHTML = `<div class="form-success">${message}</div>`;
+        form.innerHTML = `<div class="form-success" data-sf-success role="status">${message}</div>`;
     }
 });
 

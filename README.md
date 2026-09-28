@@ -16,7 +16,7 @@ Installation is simple with just a few steps being required.
 
 1) Download the Nuget package `Install-Package SproutForms.Umbraco`
 2) Add the "SproutForms" section to the user/user groups that you want to have this functionality
-3) Add the following scripts to your <head> tag:
+3) Add `<render-form-dependencies></render-form-dependencies>` to your <head> tag (see [Styling](#styling)), or the tags themselves:
 ```
 <link rel="stylesheet" href="/forms/forms-layout.css" />
 <link rel="stylesheet" href="/forms/forms-default-theme.css" />
@@ -40,6 +40,91 @@ Settings go in a `SproutForms` section in `appsettings.json`. All of them are op
 
 - `StoreIpAddress` (default `false`) stores the visitor's IP address with each submission. An IP address is personal data under the GDPR, so only turn this on when you have a reason to keep it. Behind a proxy or load balancer, configure ASP.NET Core's forwarded headers middleware, or you store the proxy's address instead of the visitor's.
 - `LocalDiskFileStorage:RootPath` is where uploaded files are stored, relative to the site's content root.
+
+## Styling
+
+SproutForms ships three files: `forms-layout.css` (the grid, conditional fields and pages), `forms-default-theme.css` (the look) and `forms.js`. `<render-form-dependencies></render-form-dependencies>` renders all three. Leave out the ones you don't want:
+
+```
+<render-form-dependencies include-theme="false"></render-form-dependencies>
+```
+
+`include-layout`, `include-theme` and `include-scripts` all default to `true`.
+
+### Changing the default theme
+
+The default theme is built on CSS custom properties. Set them on `:root`, or on an element around a form to change only that form:
+
+```css
+:root {
+    --sf-color-accent: #2e7d32;
+    --sf-color-accent-hover: #1b5e20;
+    --sf-color-accent-subtle: #e8f5e9;
+    --sf-color-focus-ring: rgba(46, 125, 50, 0.2);
+    --sf-radius: 0;
+}
+```
+
+| Property | Default | Used for |
+|---|---|---|
+| `--sf-font-family` | `system-ui, ...` | All text in the form |
+| `--sf-font-size` / `--sf-font-size-small` | `1rem` / `0.875rem` | Inputs and buttons / errors and progress steps |
+| `--sf-radius` | `4px` | Inputs and buttons |
+| `--sf-control-height` | `2.5rem` | The minimum height of inputs, dropdowns and buttons |
+| `--sf-color-text` / `--sf-color-text-muted` | `#222` / `#666` | Text / upcoming progress steps |
+| `--sf-color-border` | `#ccc` | Input borders |
+| `--sf-color-background` | `#fff` | The Previous button |
+| `--sf-color-accent`, `-hover`, `-subtle` | `#1976d2`, `#155fa0`, `#e3f2fd` | Buttons, focus, current progress step |
+| `--sf-color-on-accent` | `#fff` | Text on buttons |
+| `--sf-color-focus-ring` | `rgba(25, 118, 210, 0.2)` | The ring around a focused input |
+| `--sf-color-error` | `#c62828` | Errors, invalid inputs and the required marker |
+| `--sf-color-disabled` | `#aaa` | Disabled buttons |
+| `--sf-input-padding` / `--sf-button-padding` | `0.5rem 0.6rem` / `0.6rem 1.2rem` | |
+| `--sf-progress-track`, `-complete`, `-current` | `#ddd`, `#90caf9`, the accent | Progress steps |
+| `--sf-gutter` | `0.5rem` | Space between columns (in `forms-layout.css`) |
+
+### Themes: your own markup
+
+A theme is a folder under `Views/Forms/Themes/` in your site that only holds the views it changes. Every view it doesn't have comes from the package, so a theme that only changes the text input is one file:
+
+```
+Views/Forms/Themes/Bootstrap/Fields/text.cshtml
+```
+
+Choose the theme where you render the form, or set a default for the whole site:
+
+```
+<vc:render-form form-alias="contact" theme="Bootstrap"></vc:render-form>
+```
+
+```json
+"SproutForms": {
+  "DefaultTheme": "Bootstrap"
+}
+```
+
+The views you can put in a theme are `Form`, `Rows`, `Field` and `Fields/{field type alias}`; copy the one you want to change from [`src/SproutForms.Umbraco.Core/Views/Forms`](src/SproutForms.Umbraco.Core/Views/Forms). Render other SproutForms views with `Html.SproutFormsPartialAsync("Field", model)` (from `SproutForms.Umbraco.Core.Helpers`) rather than `Html.PartialAsync`, so they fall back as well. The form root gets `data-sf-theme` with the theme's name, for CSS that belongs to one theme. A theme name can only hold letters, digits, `-` and `_`. The demo site has an example in `src/SproutForms.Site/Views/Forms/Themes/Example`.
+
+To change a view for every form, whatever the theme, put it at the same path as in the package instead, such as `Views/Forms/Fields/text.cshtml`.
+
+forms.js only relies on `data-sf-*` attributes, never on class names, so you can use any classes you like (Bootstrap, Tailwind, ...). Keep these attributes when you replace a view:
+
+- The `<form>`: `data-form-ajax`, `data-submission-guards`, `data-sf-paged`, and the hidden `data-sf-page-url` input.
+- A field's wrapper: the attributes `AttributesHelper.Build` renders (`data-sf-field-id`, `data-sf-validate`, ...) and `data-field-conditions`. Inputs are found by their `name`.
+- A column: `data-sf-col`, so a hidden field hides its column too.
+- Pages: `data-sf-page` and its labels and conditions, `data-sf-previous` and `data-sf-next` on the buttons, `data-sf-progress` on the progress list and `data-sf-progress-step` on its items.
+
+forms.js marks state with attributes you can style:
+
+| Attribute | On |
+|---|---|
+| `hidden` | A field and its column hidden by a condition, a page that isn't the current one |
+| `data-sf-skipped` | A page skipped by its conditions |
+| `aria-current="step"`, `data-sf-complete` | The current and completed progress steps |
+| `aria-invalid="true"` | An input with an error |
+| `data-sf-error` | An error message (it also has the `form-error` class) |
+| `data-sf-global-errors` | The errors that don't belong to a field, at the top of the form (also `form-global-errors`) |
+| `data-sf-success` | The confirmation message (also `form-success`) |
 
 ## Contents
 

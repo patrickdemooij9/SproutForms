@@ -16,17 +16,20 @@ namespace SproutForms.Umbraco.Core.TagHelpers
         private readonly IFormRepository _formRepository;
         private readonly IFormVersionRepository _formVersionRepository;
         private readonly FormRenderingService _formRenderingService;
+        private readonly FormThemeViewResolver _themeViewResolver;
         private readonly ILogger<RenderFormViewComponent> _logger;
 
-        public RenderFormViewComponent(IFormRepository formRepository, IFormVersionRepository formVersionRepository, FormRenderingService formRenderingService, ILogger<RenderFormViewComponent> logger)
+        public RenderFormViewComponent(IFormRepository formRepository, IFormVersionRepository formVersionRepository, FormRenderingService formRenderingService, FormThemeViewResolver themeViewResolver, ILogger<RenderFormViewComponent> logger)
         {
             _formRepository = formRepository;
             _formVersionRepository = formVersionRepository;
             _formRenderingService = formRenderingService;
+            _themeViewResolver = themeViewResolver;
             _logger = logger;
         }
 
-        public async Task<IViewComponentResult> InvokeAsync(string? formAlias = null, Guid? formId = null)
+        /// <param name="theme">A folder under ~/Views/Forms/Themes/ with the views to use instead of the default ones. Defaults to SproutForms:DefaultTheme.</param>
+        public async Task<IViewComponentResult> InvokeAsync(string? formAlias = null, Guid? formId = null, string? theme = null)
         {
             Form? form = null;
             if (!string.IsNullOrWhiteSpace(formAlias))
@@ -47,7 +50,10 @@ namespace SproutForms.Umbraco.Core.TagHelpers
             var formVersion = _formVersionRepository.GetPublished(form.Id);
 
             var model = _formRenderingService.Build(formVersion!);
-            return View("~/Views/Forms/Form.cshtml", model);
+            var resolvedTheme = _themeViewResolver.GetTheme(theme);
+            // The views' partials read the theme from here, so they fall back per file too
+            ViewData[FormThemeViewResolver.ViewDataKey] = resolvedTheme;
+            return View(_themeViewResolver.GetViewPath(resolvedTheme, "Form"), model);
         }
     }
 }

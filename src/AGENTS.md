@@ -54,6 +54,7 @@ Located in `SproutForms.Umbraco.Core/Descriptors/`:
 ### Services
 - `IFormSubmissionService` / `FormSubmissionService` - Handles form submissions
 - `FormRenderingService` - Renders forms to HTML
+- `FormThemeViewResolver` - Finds the view to render: `~/Views/Forms/Themes/{theme}/{view}.cshtml` when the theme has it, otherwise `~/Views/Forms/{view}.cshtml`. The theme is passed to the partials in `ViewData`, so the package's views render each other with `Html.SproutFormsPartialAsync("Rows", model)`, never with a hard-coded path
 - `FormRecycleBinService` - Deleting a form in the backoffice moves it to the recycle bin (`Form.TrashedAt`). A trashed form is treated as deleted everywhere but the bin: it doesn't render, takes no submissions, and its workflows pause. `FormDeletionService` deletes it for good from the bin, and `RecycleBinCleanupJob` does so after `SproutForms:RecycleBin:RetentionDays` (default 30, 0 keeps it)
 - `FormSubmissionRecycleBinService` - The same for submissions (`FormSubmission.TrashedAt`), with a recycle bin per form in its Submissions tab. `IFormSubmissionRepository.GetByForm` and `Count` leave trashed submissions out, `GetAllByForm` includes them. Each action is one entry in the form's history, however many submissions it covered
 

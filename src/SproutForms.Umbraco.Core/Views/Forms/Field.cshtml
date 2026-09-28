@@ -23,12 +23,13 @@
             </label>
     }
 
-    @await Html.PartialAsync($"~/Views/Forms/Fields/{Model.Type}.cshtml", Model)
+    @await Html.SproutFormsPartialAsync($"Fields/{Model.Type}", Model)
 
     @if (hasError)
     {
         <div id="@($"{Model.Alias}-error")"
              class="form-error"
+             data-sf-error
              role="alert">
             @foreach (var error in Model.Errors)
             {

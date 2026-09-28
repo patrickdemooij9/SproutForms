@@ -28,7 +28,7 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 - **Settings:** `appsettings.AiTest.json` also sets `SproutForms:StoreIpAddress` (`false`, the package default). Edits to it apply without a restart. Put it back when you're done.
 - **Test endpoints** (`src/SproutForms.Site/Controllers/AiTestController.cs`), which return 404 outside `AiTest`:
   - `GET /ai-test/forms` lists the forms, with alias and source.
-  - `GET /ai-test/forms/{alias}` renders one form on a bare page, with the real `forms.js` and CSS.
+  - `GET /ai-test/forms/{alias}` renders one form on a bare page, with the real `forms.js` and CSS. Add `?theme=Example` to render it with the example theme in `Views/Forms/Themes/Example` (it replaces `Field` and `Fields/text`, the rest falls back).
   - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values, the IP address and every workflow execution (status, attempts, last error).
   - `POST /ai-test/submissions/{submissionId}/workflows/{workflowAlias}/retry` and `DELETE /ai-test/forms/{alias}` call the same services as the backoffice's retry and permanent delete (the backoffice first moves a form to the recycle bin; this skips the bin), which need a signed-in user. Deleting a code-first form only lasts until the next start, when it is registered again.
 
@@ -41,7 +41,7 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 3. **Open the form:** navigate to `http://localhost:5970/ai-test/forms/testFormCode`, or to a form you added to `Code/` and registered in `Program.cs`.
 4. **Exercise it:**
    - Get refs from `read_page` with `filter: interactive`, fill fields with `form_input`, and click radios and Submit **by `ref`**. Coordinate clicks taken from a scaled screenshot miss.
-   - Read the result with `get_page_text` or `javascript_tool`. Errors render as `.form-error` next to the field and `.form-global-errors` at the top. Success replaces the form with the outcome message.
+   - Read the result with `get_page_text` or `javascript_tool`. Errors render as `[data-sf-error]` next to the field and `[data-sf-global-errors]` at the top. Success replaces the form with the outcome message.
    - Always cover **both** an invalid submit (missing required fields, bad input) and a valid one. Also cover whatever case the change is about.
 5. **Check what was stored:** wait about 10 seconds (the workflow worker runs every 10s), then `fetch('/ai-test/forms/{alias}/submissions')` from `javascript_tool`.
    - The submission should have the expected `values` and a `pageUrl`.

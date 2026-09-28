@@ -8,22 +8,41 @@ namespace SproutForms.Umbraco.Core.ViewComponents;
 [HtmlTargetElement("render-form-dependencies")]
 public class RenderFormDependenciesTagHelper : TagHelper
 {
+    /// <summary>
+    /// Renders the stylesheet for the grid, conditional fields and pages. Leave it out only when the site styles those itself.
+    /// </summary>
+    public bool IncludeLayout { get; set; } = true;
+
+    /// <summary>
+    /// Renders the default look. Turn it off to style the forms with the site's own CSS.
+    /// </summary>
+    public bool IncludeTheme { get; set; } = true;
+
+    /// <summary>
+    /// Renders forms.js, which adds validation, conditions, pages and submitting without a page reload.
+    /// </summary>
+    public bool IncludeScripts { get; set; } = true;
+
     public override void Process(TagHelperContext context, TagHelperOutput output)
     {
         // Suppress the tag itself - we only want to output the dependencies
         output.TagName = null;
         output.TagMode = TagMode.StartTagAndEndTag;
 
-        // Create the CSS link tags
-        var cssLinksHtml = @"<link rel=""stylesheet"" href=""/forms/forms-layout.css"" />
-        <link rel=""stylesheet"" href=""/forms/forms-default-theme.css"" />";
+        var tags = new List<string>();
+        if (IncludeLayout)
+        {
+            tags.Add(@"<link rel=""stylesheet"" href=""/forms/forms-layout.css"" />");
+        }
+        if (IncludeTheme)
+        {
+            tags.Add(@"<link rel=""stylesheet"" href=""/forms/forms-default-theme.css"" />");
+        }
+        if (IncludeScripts)
+        {
+            tags.Add(@"<script src=""/forms/forms.js""></script>");
+        }
 
-        // Create the JavaScript script tag
-        var scriptHtml = @"<script src=""/forms/forms.js""></script>";
-
-        // Combine and set the content
-        var html = $"{cssLinksHtml}{Environment.NewLine}        {scriptHtml}";
-        
-        output.Content.SetHtmlContent(html);
+        output.Content.SetHtmlContent(string.Join(Environment.NewLine, tags));
     }
 }
