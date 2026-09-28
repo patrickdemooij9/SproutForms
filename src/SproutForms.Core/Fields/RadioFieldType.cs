@@ -10,6 +10,9 @@ namespace SproutForms.Core.Fields
     {
         public override string Alias => "radio";
 
+        // A group of options is a fieldset with a legend, not one <label>
+        public override bool RendersOwnLabel => true;
+
         public override RadioFieldConfig DefaultConfiguration => new()
         {
             Options = []

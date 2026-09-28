@@ -5,19 +5,25 @@
     var config = (RadioFieldConfig)Model.Configuration;
 }
 
-<div>
+<fieldset class="form-choices">
+    <legend>
+        @Model.Label
+        @if (Model.Required)
+        {
+            <span class="required">*</span>
+        }
+    </legend>
     @foreach (var option in config.Options)
     {
         var id = $"{Model.Alias}_{option.Value}";
 
-        <label>
+        <label class="form-choice" for="@id">
             <input type="radio"
                    name="@Model.Alias"
                    id="@id"
                    value="@option.Value"
-                   class="form-control"
                    @(Equals(Model.Value, option.Value) ? "checked" : "") />
             <span>@option.Label</span>
         </label>
     }
-</div>
+</fieldset>

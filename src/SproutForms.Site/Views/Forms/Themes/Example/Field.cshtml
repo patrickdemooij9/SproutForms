@@ -1,0 +1,24 @@
+@using SproutForms.Umbraco.Core.Helpers
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+
+@* An example theme: it only has the views it changes, the others come from the package.
+   The classes are free, but keep the data-sf-* attributes: forms.js relies on them. *@
+@{
+    var hasError = Model.Errors.Any();
+    var conditionsJson = Model.Conditions != null ? Json.Serialize(Model.Conditions) : null;
+}
+
+<div class="example-field" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model)) @if (conditionsJson != null) { <text> data-field-conditions='@conditionsJson'</text> }>
+    @if (!Model.RendersOwnLabel)
+    {
+        <label class="example-label" for="@Model.Alias">@Model.Label@(Model.Required ? " (required)" : "")</label>
+    }
+
+    @await Html.SproutFormsPartialAsync($"Fields/{Model.Type}", Model)
+
+    @if (hasError)
+    {
+        <p id="@($"{Model.Alias}-error")" class="example-error" data-sf-error role="alert">@string.Join(" ", Model.Errors)</p>
+    }
+</div>

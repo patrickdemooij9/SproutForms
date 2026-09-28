@@ -1,6 +1,8 @@
 @model string
 @{
     Layout = null;
+    // ?theme=Example renders the form with a theme from Views/Forms/Themes/
+    string theme = Context.Request.Query["theme"].ToString();
 }
 
 <!DOCTYPE html>
@@ -12,6 +14,6 @@
         <script src="/examples/form-type-examples.js"></script>
     </head>
     <body>
-        <vc:render-form form-alias="@Model"></vc:render-form>
+        <vc:render-form form-alias="@Model" theme="@theme"></vc:render-form>
     </body>
 </html>

@@ -45,6 +45,7 @@ namespace SproutForms.Umbraco.Core.Startup
             });
 
             builder.Services.AddTransient<FormRenderingService>();
+            builder.Services.AddSingleton<FormThemeViewResolver>();
             builder.Services.AddSingleton<IFormSubmissionRepository, FormSubmissionRepository>();
             builder.Services.AddSingleton<IFormVersionRepository, FormVersionRepository>();
             builder.Services.AddSingleton<IFormRepository, FormRepository>();

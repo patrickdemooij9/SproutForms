@@ -1,0 +1,17 @@
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (TextFieldConfig)Model.Configuration;
+    var pattern = string.IsNullOrWhiteSpace(config.Regex) ? null : config.Regex;
+}
+
+<input type="text"
+       id="@Model.Alias"
+       name="@Model.Alias"
+       value="@Model.Value"
+       placeholder="@config.Placeholder"
+       class="example-input"
+       data-sf-min="@config.MinLength"
+       data-sf-max="@config.MaxLength"
+       data-sf-pattern="@pattern" />

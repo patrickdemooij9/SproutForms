@@ -11,6 +11,11 @@ namespace SproutForms.Core
         /// </summary>
         public bool StoreIpAddress { get; set; }
 
+        /// <summary>
+        /// The theme forms render with when the page doesn't choose one: a folder under ~/Views/Forms/Themes/. Empty uses the default views.
+        /// </summary>
+        public string? DefaultTheme { get; set; }
+
         public RecycleBinOptions RecycleBin { get; set; } = new();
     }
 

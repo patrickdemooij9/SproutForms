@@ -1,6 +1,9 @@
 /* ===========================
    Form Layout (structure only)
-   =========================== */
+   ===========================
+
+   Set --sf-gutter on the form or any ancestor to change the space between columns (default 0.5rem).
+*/
 
 .form-root {
     width: 100%;
@@ -9,12 +12,12 @@
 .form-row {
     display: flex;
     flex-wrap: wrap;
-    margin-left: -0.5rem;
-    margin-right: -0.5rem;
+    margin-left: calc(-1 * var(--sf-gutter, 0.5rem));
+    margin-right: calc(-1 * var(--sf-gutter, 0.5rem));
 }
 
 .form-col {
-    padding: 0.5rem;
+    padding: var(--sf-gutter, 0.5rem);
     box-sizing: border-box;
 }
 
@@ -74,9 +77,14 @@
     }
 }
 
+/* A hidden field shows nothing, so its column shouldn't take up space either */
+.form-col:has(> [data-sf-field-type="hidden"]) {
+    display: none;
+}
+
 /* Conditional field visibility */
-.form-col.sf-hidden,
-.form-group.sf-hidden {
+[data-sf-col][hidden],
+[data-sf-field-id][hidden] {
     display: none !important;
 }
 
