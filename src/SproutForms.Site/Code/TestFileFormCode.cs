@@ -27,7 +27,7 @@ namespace SproutForms.Site.Code
                 .Row(row => row
                     .Col(12, col => col
                         .File("file", "Test file")
-                        .Set(c => c.StorageProviderAlias = "local")
+                        .Set(c => c.StorageProviderAlias = "default")
                         .Set(c => c.AllowedExtensions = [".png"])
                         .Done()
                     )

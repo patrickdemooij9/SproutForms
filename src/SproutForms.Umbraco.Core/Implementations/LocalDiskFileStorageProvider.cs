@@ -14,7 +14,7 @@ namespace SproutForms.Core.Storage
         private readonly LocalDiskFileStorageOptions _options;
         private readonly IWebHostEnvironment _env;
 
-        public string Alias => "local";
+        public string Alias => "default";
 
         public LocalDiskFileStorageProvider(
             IOptions<LocalDiskFileStorageOptions> options,
