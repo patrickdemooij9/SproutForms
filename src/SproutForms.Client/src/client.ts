@@ -4,6 +4,9 @@ import type { FormErrors, FormValues } from './types';
 
 const apiPath = '/umbraco/sproutforms/delivery/api/v1';
 
+// The value that holds the page the form was on, next to the fields, as a Razor form posts it
+const pageUrlKey = 'sf_PageUrl';
+
 export interface SproutFormsClientOptions {
     // The Umbraco site, such as https://cms.example.com
     baseUrl: string;
@@ -18,7 +21,7 @@ export interface SubmitOptions {
     values: FormValues;
     // Where the form was filled in; defaults to the current page in a browser. Only stored when it is on an allowed origin
     pageUrl?: string;
-    // Added to what the form's submission guard handler returns
+    // Added to what the form's submission guard handler returns. It is sent with the values, like the page URL
     guard?: Record<string, string>;
     signal?: AbortSignal;
 }
@@ -137,31 +140,30 @@ export function createSproutFormsClient(options: SproutFormsClientOptions) {
          * sent. Returns the errors; none means the page is valid.
          */
         async validatePage(definition: FormClientModel, pageIndex: number, values: FormValues, init: { signal?: AbortSignal } = {}): Promise<FormErrors> {
-            const response = await postJson(`${baseUrl}/entries/${definition.id}/pages/${pageIndex}/validate`, { values: splitFiles(values).values }, init.signal);
+            const response = await postJson(`${baseUrl}/entries/${definition.id}/pages/${pageIndex}/validate`, splitFiles(values).values, init.signal);
             if (response.status === 400) return readErrors(response);
             if (!response.ok) return fail(response);
             return {};
         },
 
         /**
-         * Submits the form, with the values its submission guard needs. Sent as multipart/form-data when a value is a file, with
-         * each file as a part named by its field's path.
+         * Submits the form, with the page URL and the values its submission guard needs next to the fields. Sent as
+         * multipart/form-data when a value is a file: the values as a JSON part, and each file as a part named by its field's path.
          */
         async submit(definition: FormClientModel, submit: SubmitOptions): Promise<SubmitResult> {
-            const { values, files } = splitFiles(submit.values);
+            const split = splitFiles(submit.values);
             const guard = { ...await getSubmissionGuardValues(definition, submit.values), ...submit.guard };
             const pageUrl = submit.pageUrl ?? (globalThis as { location?: Location }).location?.href;
+            const values = { ...split.values, ...guard, ...(pageUrl ? { [pageUrlKey]: pageUrl } : {}) };
             const url = `${baseUrl}/entries/${definition.id}`;
 
             let response: Response;
-            if (files.length === 0) {
-                response = await postJson(url, { values, pageUrl, guard }, submit.signal);
+            if (split.files.length === 0) {
+                response = await postJson(url, values, submit.signal);
             } else {
                 const body = new FormData();
                 body.append('values', JSON.stringify(values));
-                body.append('guard', JSON.stringify(guard));
-                if (pageUrl) body.append('pageUrl', pageUrl);
-                for (const [path, file] of files) {
+                for (const [path, file] of split.files) {
                     body.append(path, file, file instanceof File ? file.name : path);
                 }
                 // No Content-Type: the browser sets it, with the multipart boundary

@@ -200,7 +200,7 @@ The headless API is off by default:
 ```
 
 - `Enabled`: turns on the endpoints. While it's off, they answer 404. Changing it needs a restart for CORS and the OpenAPI document.
-- `AllowedOrigins`: the front-ends that call the API from a browser. They're allowed by CORS. A submission's `pageUrl` is only stored when it's on this site or on one of these origins; otherwise it's dropped.
+- `AllowedOrigins`: the front-ends that call the API from a browser. They're allowed by CORS. A submission's page URL (`sf_PageUrl`) is only stored when it's on this site or on one of these origins; otherwise it's dropped.
 - `ApiKey`: when set, every request must send it in the `Api-Key` header. Only use it when your front-end calls the API from its own server. A key in browser code is public.
 
 The API has no antiforgery token, since the front-end runs on another origin. The submission guard keeps bots out instead. That's a honeypot field by default, or reCAPTCHA v3 with `builder.EnableSproutFormsRecaptchaV3()` and the `SproutForms:RecaptchaV3` settings. A bot can post to the API directly and leave the honeypot empty, so use reCAPTCHA for a form that attracts spam.
@@ -212,12 +212,12 @@ All routes start with `/umbraco/sproutforms/delivery/api/v1`. The OpenAPI docume
 | Endpoint | Does |
 |---|---|
 | `GET definitions/{idOrAlias}` | The published form: its pages, rows and columns, each column holding its field with its configuration, conditions and validation rules (the same shape as the Razor view model), the submission guard's settings and the default texts. The `ETag` is the published version, so a client can revalidate with `If-None-Match` (304). |
-| `POST entries/{id}` | Submits the form. The body is `{ "values": { "alias": value }, "pageUrl": "...", "guard": { ... } }` as JSON. With uploads, send `multipart/form-data` instead: `values` and `guard` as JSON parts, `pageUrl` as a text part, and each file as a part named after its field. Returns `{ "outcome": { "type", "data" } }`. |
-| `POST entries/{id}/pages/{index}/validate` | Checks one page of a paged form with `{ "values": { ... } }`, without saving anything. Returns 204 when the page is valid. |
+| `POST entries/{id}` | Submits the form. The body is its values as a JSON object, the same values a Razor form posts: `{ "alias": value, "sf_PageUrl": "...", ... }`, with what the submission guard checks next to the fields. A repeater's value is a list of entry objects, `[{ "alias": value }]`. With uploads, send `multipart/form-data` instead: the values as a JSON part named `values`, and each file as a part named by its field's path, such as `cv` or `people[0].cv`. Returns `{ "outcome": { "type", "data" } }`. |
+| `POST entries/{id}/pages/{index}/validate` | Checks one page of a paged form with the values entered so far, as the same JSON object, without saving anything. Returns 204 when the page is valid. |
 
 A rejected submission or page returns 400 as `application/problem+json`, with the errors keyed by field alias in `errors`. `submissionGuard`, and any other key that isn't a field, is about the whole form.
 
-`guard` holds what the submission guard checks: `{ "g-recaptcha-response": token }` for reCAPTCHA, or the honeypot's field (its name is in `submissionGuard.settings.fieldName`) with whatever that hidden input holds.
+The values also hold what the submission guard checks: `"g-recaptcha-response"` with the token for reCAPTCHA, or the honeypot's field (its name is in `submissionGuard.settings.fieldName`) with whatever that hidden input holds. The client adds them, and the page URL, for you.
 
 The outcome's `data` depends on its type:
 - `message` has `message`.

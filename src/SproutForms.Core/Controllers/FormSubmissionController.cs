@@ -44,7 +44,7 @@ namespace SproutForms.Core.Controllers
             if (formVersion is null)
                 return NotFound();
 
-            values.TryGetValue("sf_PageUrl", out var pageUrl);
+            values.TryGetValue(FormSubmissionRequest.PageUrlKey, out var pageUrl);
 
             if (_formSubmissionGuard != null)
             {

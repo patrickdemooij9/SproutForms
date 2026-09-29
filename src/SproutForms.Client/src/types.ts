@@ -13,9 +13,7 @@ export type {
     FormClientSubmissionGuard,
     FormClientTexts,
     HeadlessOutcome,
-    HeadlessSubmitRequest,
     HeadlessSubmitResponse,
-    HeadlessValidatePageRequest,
     ValidationProblemDetails,
     ValidationRule
 } from './api/types.gen';

@@ -215,7 +215,7 @@ function prefillRawRequest() {
     const guard = definition.submissionGuard?.alias === 'honeypot'
         ? { [String((definition.submissionGuard.settings as { fieldName?: string }).fieldName)]: '' }
         : {};
-    $<HTMLTextAreaElement>('#raw-body').value = JSON.stringify({ values, pageUrl: window.location.href, guard }, null, 2);
+    $<HTMLTextAreaElement>('#raw-body').value = JSON.stringify({ ...values, ...guard, sf_PageUrl: window.location.href }, null, 2);
     $<HTMLInputElement>('#raw-path').value = `entries/${definition.id}`;
 }
 
