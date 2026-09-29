@@ -13,14 +13,16 @@ namespace SproutForms.Core.Flows
     public class SlackWorkflowType : IFormWorkflowType
     {
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly WorkflowMessageResolver _messageResolver;
 
         public string Alias => "slack";
 
         public Type ConfigurationType => typeof(SlackWorkflowConfig);
 
-        public SlackWorkflowType(IHttpClientFactory httpClientFactory)
+        public SlackWorkflowType(IHttpClientFactory httpClientFactory, WorkflowMessageResolver messageResolver)
         {
             _httpClientFactory = httpClientFactory;
+            _messageResolver = messageResolver;
         }
 
         public async Task<WorkflowExecutionResult> ExecuteAsync(WorkflowContext context, CancellationToken ct)
@@ -30,7 +32,7 @@ namespace SproutForms.Core.Flows
             if (string.IsNullOrEmpty(config.WebhookUrl))
                 return new WorkflowExecutionResult(false, "Slack webhook URL is required");
 
-            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
+            var resolvedMessage = _messageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
 
             var payload = BuildSlackPayload(resolvedMessage, context.Submission, context.Version);
 

@@ -79,6 +79,9 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormFieldType, RadioFieldType>();
             builder.Services.AddSingleton<IFormFieldType, DateFieldType>();
             builder.Services.AddSingleton<IFormFieldType, FileFieldType>();
+            builder.Services.AddSingleton<IFormFieldType, RepeaterFieldType>();
+            builder.Services.AddSingleton<FormValueFormatter>();
+            builder.Services.AddSingleton<WorkflowMessageResolver>();
 
             builder.Services.AddSingleton<IFieldDescriptor, TextFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, TextAreaFieldDescriptor>();
@@ -88,6 +91,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFieldDescriptor, DateFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, SelectFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, RadioFieldDescriptor>();
+            builder.Services.AddSingleton<IFieldDescriptor, RepeaterFieldDescriptor>();
 
             builder.Services.AddSingleton<IOutcomeDescriptor, ShowMessageOutcomeDescriptor>();
             builder.Services.AddSingleton<IOutcomeDescriptor, RedirectUrlOutcomeDescriptor>();

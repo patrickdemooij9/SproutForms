@@ -53,7 +53,15 @@ export interface FormFieldDto {
   extension?: {
     [key: string]: unknown;
   } | null;
+  // Set for a field group such as a repeater: its own fields, and how one entry lays them out
+  fields?: Array<FormFieldDto> | null;
+  rows?: Array<FormRowDto> | null;
 }
+
+// Where a field's rows live: a page of the form, or a field group such as a repeater
+export type FieldContainer =
+  | { kind: "page"; pageIndex: number }
+  | { kind: "group"; groupId: string };
 
 export interface FormWorkflowDto {
   id: string;
@@ -117,6 +125,8 @@ export interface FormFieldTypeDto {
   displayName: string;
   icon: string;
   properties: Array<FormPropertyDto>;
+  // A field group, such as a repeater, holds fields of its own
+  isFieldGroup: boolean;
 }
 
 export interface FormFlowTypeDto {
@@ -136,6 +146,8 @@ export type SelectedState = {
   field: string | null;
   column: FormColumnDto | null;
   row: FormRowDto | null;
+  // The page or field group the row belongs to; the current page when not set
+  container?: FieldContainer;
   // The inspector shows the current page's settings instead of the field list
   pageSettings?: boolean;
 };

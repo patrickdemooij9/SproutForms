@@ -11,7 +11,7 @@ import {
 } from "@umbraco-cms/backoffice/external/lit";
 
 import "./formFieldSelector.element";
-import { FormDefinitionDto, FormDefinitionTypeDto, FormFieldDto, FormFieldTypeDto, SelectedState } from "../models";
+import { FieldContainer, FormDefinitionDto, FormDefinitionTypeDto, FormFieldDto, FormFieldTypeDto, SelectedState } from "../models";
 import {
   UmbPropertyValueData,
 } from "@umbraco-cms/backoffice/property";
@@ -57,9 +57,9 @@ export class FormInspector extends UmbElementMixin(LitElement) {
 
       context?.form.subscribe((form) => {
         this.definition = form.definition;
-        this.selectedField = form.definition.fields.find(
-          (item) => item.id === this.selectedState.field,
-        );
+        this.selectedField = this.selectedState.field
+          ? context?.getField(this.selectedState.field)
+          : undefined;
       });
     });
 
@@ -75,20 +75,22 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       if (!selectedState || !selectedState.field) {
         return;
       }
-      this.selectedField = this.definition.fields.find(
-        (item) => item.id === selectedState.field,
-      );
+      this.selectedField = this.context?.getField(selectedState.field);
     }
   }
 
-  // A field's conditions can use the fields on its own page and earlier pages
-  #getConditionFields(field: FormFieldDto) {
-    const pageIndex = this.context?.getPageIndexOfField(field.id) ?? -1;
-    return pageIndex === -1 ? [] : this.context!.getFieldsBeforePage(pageIndex, true);
+  // The page or field group the selected row is in, or a new row is added to
+  get #container(): FieldContainer {
+    return this.selectedState.container ?? {
+      kind: "page",
+      pageIndex: this.context?.getCurrentPageIndex() ?? 0,
+    };
   }
 
+  // A field inside a field group moves with its group
   #renderMoveToPage(field: FormFieldDto) {
     if (this.definition.pages.length < 2) return nothing;
+    if (this.context?.getFieldContainer(field.id)?.kind !== "page") return nothing;
 
     const pageIndex = this.context?.getPageIndexOfField(field.id) ?? -1;
     return html`
@@ -120,6 +122,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
           row,
           column: row?.columns.find((col) => col.fieldId === field.id),
           field,
+          container: { kind: "page", pageIndex },
         },
         bubbles: true,
         composed: true,
@@ -166,7 +169,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
                 <sf-inspector-field-type
                   .field=${this.selectedField}
                   .fieldType=${fieldType!}
-                  .fields=${this.#getConditionFields(this.selectedField)}
+                  .fields=${this.context?.getConditionFields(this.selectedField.id) ?? []}
                   .formType=${this.formType}
                   @field-change=${this.#handleFieldUpdate}>
                 </sf-inspector-field-type>
@@ -177,13 +180,12 @@ export class FormInspector extends UmbElementMixin(LitElement) {
                 <div class="panel-header">
                   <div class="panel-title">
                     <h3>Add a field</h3>
-                    <span>${this.selectedState.row
-                      ? "It is added to the selected row"
-                      : "It is added as a new row"}</span>
+                    <span>${this.#describeTarget()}</span>
                   </div>
                 </div>
                 <div class="inspector-content">
                   <form-field-selector
+                    .allowFieldGroups=${this.#container.kind !== "group"}
                     @add-field=${(e: any) => this.onAddField(e.detail)}
                   ></form-field-selector>
                 </div>
@@ -191,6 +193,15 @@ export class FormInspector extends UmbElementMixin(LitElement) {
         }
       </div>
     `;
+  }
+
+  #describeTarget() {
+    const container = this.#container;
+    const group = container.kind === "group" ? this.context?.getField(container.groupId) : undefined;
+    const where = group ? ` in ${group.label}` : "";
+    return this.selectedState.row
+      ? `It is added to the selected row${where}`
+      : `It is added as a new row${where}`;
   }
 
   #deselect() {
@@ -204,7 +215,6 @@ export class FormInspector extends UmbElementMixin(LitElement) {
   }
 
   private onAddField(fieldType: FormFieldTypeDto) {
-    const newDefinition = { ...this.definition };
     const configuration: Record<string, any> = {};
     fieldType.properties.forEach((prop) => {
       configuration[prop.alias] = prop.value;
@@ -217,6 +227,10 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       required: false,
       configuration: configuration,
     };
+    if (fieldType.isFieldGroup) {
+      newField.fields = [];
+      newField.rows = [];
+    }
     const extension = this.formType?.fieldExtensions.find(
       (it) => it.fieldTypeAlias === fieldType.alias,
     );
@@ -226,38 +240,19 @@ export class FormInspector extends UmbElementMixin(LitElement) {
         newField.extension![prop.alias] = prop.value ?? null;
       });
     }
-    // The rows in the workspace state are frozen, so place the field in a copy
-    const rows = structuredClone(this.context?.getCurrentPageRows() ?? []);
-    let row = rows.find((it) => it.id === this.selectedState.row?.id);
-    let column = row?.columns.find((it) => it.id === this.selectedState.column?.id);
-    if (column) {
-      column.fieldId = newField.id;
-    } else {
-      if (!row) {
-        row = { id: crypto.randomUUID(), columns: [] };
-        rows.push(row);
-      }
-      const rowSize = row.columns.reduce((a, b) => a + b.width, 0);
-      column = {
-        id: crypto.randomUUID(),
-        width: 12 - rowSize,
-        fieldId: newField.id,
-      };
-      row.columns.push(column);
-    }
-    newDefinition.fields = [...newDefinition.fields, newField];
-    this.context?.updateForm({
-      definition: this.context.withCurrentPageRows(newDefinition, rows),
-    });
+
+    const container = this.#container;
+    const placed = this.context?.addField(newField, container, this.selectedState.row?.id);
+    if (!placed) return;
 
     // Select the new field, using the row and column objects the canvas now renders
-    const newRow = this.context?.getCurrentPageRows().find((it) => it.id === row!.id);
     this.dispatchEvent(
       new CustomEvent("select-field", {
         detail: {
-          row: newRow,
-          column: newRow?.columns.find((it) => it.id === column!.id),
+          row: placed.row,
+          column: placed.column,
           field: newField,
+          container,
         },
         bubbles: true,
         composed: true,

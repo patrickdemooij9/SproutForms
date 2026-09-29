@@ -50,7 +50,7 @@ namespace SproutForms.Core.Services
                 errors.Add($"The settings of form type '{typeAlias}' must be a {formType.SettingsType.Name}.");
             }
 
-            foreach (var field in definition.Fields)
+            foreach (var field in definition.GetAllFields())
             {
                 var fieldType = _fieldTypes.FirstOrDefault(it => it.Alias == field.FieldTypeAlias);
                 if (fieldType != null && !IsAllowed(formType, fieldType))

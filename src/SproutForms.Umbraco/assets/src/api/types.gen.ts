@@ -156,6 +156,8 @@ export type FormFieldBackofficeModel = {
     extension?: {
         [key: string]: unknown;
     } | null;
+    fields?: Array<FormFieldBackofficeModel> | null;
+    rows?: Array<FormRowBackofficeModel> | null;
 };
 
 export type FormFieldExtensionBackofficeModel = {
@@ -168,6 +170,7 @@ export type FormFieldTypeBackofficeModel = {
     displayName: string;
     icon: string;
     properties: Array<FormPropertyBackofficeModel>;
+    isFieldGroup: boolean;
 };
 
 export type FormFlowTypeBackofficeModel = {
@@ -232,6 +235,11 @@ export type FormSubmissionBackofficeModel = {
     workflowStages: Array<WorkflowStageStatusModel>;
 };
 
+export type FormSubmissionEntryBackofficeModel = {
+    title: string;
+    values: Array<FormSubmissionValueBackofficeModel>;
+};
+
 export type FormSubmissionListItemBackofficeModel = {
     id: string;
     name: string;
@@ -245,6 +253,7 @@ export type FormSubmissionValueBackofficeModel = {
     fieldTypeAlias: string;
     name: string;
     value: string;
+    entries?: Array<FormSubmissionEntryBackofficeModel> | null;
 };
 
 export type FormTreeItemModel = {

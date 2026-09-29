@@ -7,10 +7,13 @@ import {
   nothing,
   property,
   state,
+  TemplateResult,
   when,
 } from "@umbraco-cms/backoffice/external/lit";
-import { FormColumnDto, FormDefinitionDto, FormFieldDto, FormFieldTypeDto, FormRowDto, SelectedResizeState, SelectedState } from "../models";
+import { FieldContainer, FormColumnDto, FormDefinitionDto, FormFieldDto, FormFieldTypeDto, FormRowDto, SelectedResizeState, SelectedState } from "../models";
 import SproutFormsWorkspaceContext, {
+  isFieldGroup,
+  isSameFieldContainer,
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
@@ -67,52 +70,73 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     });
   }
 
-  render() {
-    const hasFields = this.rows.some((row) => row.columns.length > 0);
-    const isNewRowSelected = !this.selectedState.row && !this.selectedState.column;
+  get #pageContainer(): FieldContainer {
+    return { kind: "page", pageIndex: this.currentPageIndex };
+  }
 
+  render() {
     return html`
       <div class="canvas">
         ${this.renderPages()}
-        ${this.rows.map((row) => {
-          const rowSize = row.columns.reduce(
-            (a, b) =>
-              a +
-              (this.resizeState?.column == b ? this.resizeState.size : b.width),
-            0
-          );
-          const isRowSlotSelected = this.selectedState.row == row && !this.selectedState.column;
-          return html`
-            <div class="row">
-              ${row.columns.map((column) => this.renderColumn(row, column))}
-              ${when(
-                rowSize < 12,
-                () => html`<button
-                  class="drop-zone ${isRowSlotSelected ? "selected" : ""}"
-                  style="flex:${12 - rowSize}"
-                  title="Add a field to this row"
-                  @click=${() => this.selectField(row, undefined, undefined)}
-                  @dragover=${this.onDragOver}
-                  @drop=${(event: DragEvent) => this.onDropOnEmpty(event, row)}
-                >
-                  <uui-icon name="icon-add"></uui-icon>
-                </button>`
-              )}
-            </div>
-          `;
-        })}
-        <button
-          class="drop-zone new-row ${isNewRowSelected ? "selected" : ""}"
-          @click=${() => this.selectField(undefined, undefined, undefined)}
-          @dragover=${this.onDragOver}
-          @drop=${(event: DragEvent) => this.onDropOnEmpty(event, undefined)}
-        >
-          <uui-icon name="icon-add"></uui-icon>
-          ${hasFields
-            ? "Add a row"
-            : "Pick a field from the panel to start building your form"}
-        </button>
+        ${this.renderRows(
+          this.#pageContainer,
+          this.rows,
+          this.definition.fields,
+          "Pick a field from the panel to start building your form",
+        )}
       </div>
+    `;
+  }
+
+  // The rows of a page or of a field group, which look and behave the same
+  private renderRows(
+    container: FieldContainer,
+    rows: FormRowDto[],
+    fields: FormFieldDto[],
+    emptyText: string
+  ): TemplateResult {
+    const hasFields = rows.some((row) => row.columns.length > 0);
+    const isNewRowSelected = !this.selectedState.row
+      && !this.selectedState.column
+      && isSameFieldContainer(this.selectedState.container ?? this.#pageContainer, container);
+
+    return html`
+      ${rows.map((row) => {
+        const rowSize = row.columns.reduce(
+          (a, b) =>
+            a +
+            (this.resizeState?.column == b ? this.resizeState.size : b.width),
+          0
+        );
+        const isRowSlotSelected = this.selectedState.row?.id === row.id && !this.selectedState.column;
+        return html`
+          <div class="row">
+            ${row.columns.map((column) => this.renderColumn(container, row, column, fields))}
+            ${when(
+              rowSize < 12,
+              () => html`<button
+                class="drop-zone ${isRowSlotSelected ? "selected" : ""}"
+                style="flex:${12 - rowSize}"
+                title="Add a field to this row"
+                @click=${() => this.selectField(container, row, undefined, undefined)}
+                @dragover=${(event: DragEvent) => this.onDragOver(event, this.#canDropIn(container))}
+                @drop=${(event: DragEvent) => this.onDropOnEmpty(event, container, row)}
+              >
+                <uui-icon name="icon-add"></uui-icon>
+              </button>`
+            )}
+          </div>
+        `;
+      })}
+      <button
+        class="drop-zone new-row ${isNewRowSelected ? "selected" : ""}"
+        @click=${() => this.selectField(container, undefined, undefined, undefined)}
+        @dragover=${(event: DragEvent) => this.onDragOver(event, this.#canDropIn(container))}
+        @drop=${(event: DragEvent) => this.onDropOnEmpty(event, container, undefined)}
+      >
+        <uui-icon name="icon-add"></uui-icon>
+        ${hasFields ? "Add a row" : emptyText}
+      </button>
     `;
   }
 
@@ -132,7 +156,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
               @click=${() => this.selectPage(index)}
               @dragstart=${(event: DragEvent) => this.onPageDragStart(event, index)}
               @dragend=${this.onDragEnd}
-              @dragover=${this.onDragOver}
+              @dragover=${(event: DragEvent) => this.onDragOver(event, this.#canDropOnPage())}
               @drop=${(event: DragEvent) => this.onDropOnPage(event, index)}
             >
               <span class="page-number">${index + 1}</span>
@@ -182,71 +206,123 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   private renderColumn(
+    container: FieldContainer,
     row: FormRowDto,
-    column: FormColumnDto
-  ) {
-    const field = this.definition.fields.find(
+    column: FormColumnDto,
+    fields: FormFieldDto[]
+  ): TemplateResult | undefined {
+    const field = fields.find(
       (f) => f.id === column.fieldId
     );
     if (!field) {
       return;
     }
 
-    const fieldType = this.fieldTypes.find((it) => it.alias === field.fieldTypeAlias);
     const isResizingThis = this.resizeState?.column == column;
     const width = isResizingThis ? this.resizeState!.size : column.width;
 
     return html`
       <div class="column-outer" style="flex:${width}">
-        <div
-          class="field ${this.selectedState.column == column
-            ? "selected"
-            : ""} ${this.draggedFieldId && this.draggedFieldId !== field.id ? 'drag-over' : ''} ${this.draggedFieldId === field.id ? 'dragging' : ''}"
-          draggable="${this.isResizing ? 'false' : 'true'}"
-          @dragstart=${(event: DragEvent) => this.onDragStart(event, field.id!)}
-          @dragend=${this.onDragEnd}
-          @dragover=${this.onDragOver}
-          @drop=${(event: DragEvent) => this.onDrop(event, row, column)}
-          @click=${() => this.selectField(row, column, field)}
-        >
-          <uui-icon class="grip" name="icon-grip"></uui-icon>
-          <span class="field-icon">
-            <umb-icon name=${fieldType?.icon ?? "icon-document"}></umb-icon>
-          </span>
-          <span class="field-text">
-            <span class="field-label">
-              ${field.label}
-              ${field.required ? html`<span class="required" title="Required">*</span>` : nothing}
-            </span>
-            <span class="field-type">${fieldType?.displayName ?? field.fieldTypeAlias}</span>
-          </span>
-          ${when(
-            // A condition whose rules were all removed is still stored, so look for rules
-            (field.conditions?.visibility?.rules?.length ?? 0) + (field.conditions?.required?.rules?.length ?? 0) > 0,
-            () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has conditions"></uui-icon>`,
-          )}
-          ${when(
-            isResizingThis,
-            () => html`<span class="width-badge">${width}/12</span>`,
-          )}
-          <button
-            class="delete-btn"
-            @click=${(event: MouseEvent) => this.deleteField(event, field.id!)}
-            title="Delete field"
-            aria-label="Delete field"
-          >
-            <uui-icon name="icon-trash"></uui-icon>
-          </button>
-        </div>
+        ${isFieldGroup(field)
+          ? html`
+              <div class="group">
+                ${this.renderField(container, row, column, field, isResizingThis, width)}
+                <div class="group-rows">
+                  ${this.renderRows(
+                    { kind: "group", groupId: field.id },
+                    field.rows ?? [],
+                    field.fields ?? [],
+                    "Drop fields here, or click to pick one from the panel",
+                  )}
+                </div>
+              </div>
+            `
+          : this.renderField(container, row, column, field, isResizingThis, width)}
         <div
           class="field-resizer ${isResizingThis ? "active" : ""}"
           draggable="false"
           title="Drag to resize"
           @mousedown=${(event: MouseEvent) =>
-            this.startResize(event, row, column)}
+            this.startResize(event, container, row, column)}
         ></div>
       </div>
     `;
+  }
+
+  private renderField(
+    container: FieldContainer,
+    row: FormRowDto,
+    column: FormColumnDto,
+    field: FormFieldDto,
+    isResizingThis: boolean,
+    width: number
+  ) {
+    const fieldType = this.fieldTypes.find((it) => it.alias === field.fieldTypeAlias);
+    const canSwap = this.#canSwapWith(container, field);
+
+    return html`
+      <div
+        class="field ${this.selectedState.column?.id === column.id
+          ? "selected"
+          : ""} ${canSwap ? 'drag-over' : ''} ${this.draggedFieldId === field.id ? 'dragging' : ''}"
+        draggable="${this.isResizing ? 'false' : 'true'}"
+        @dragstart=${(event: DragEvent) => this.onDragStart(event, field.id!)}
+        @dragend=${this.onDragEnd}
+        @dragover=${(event: DragEvent) => this.onDragOver(event, canSwap)}
+        @drop=${(event: DragEvent) => this.onDrop(event, container, row, column)}
+        @click=${() => this.selectField(container, row, column, field)}
+      >
+        <uui-icon class="grip" name="icon-grip"></uui-icon>
+        <span class="field-icon">
+          <umb-icon name=${fieldType?.icon ?? "icon-document"}></umb-icon>
+        </span>
+        <span class="field-text">
+          <span class="field-label">
+            ${field.label}
+            ${field.required ? html`<span class="required" title="Required">*</span>` : nothing}
+          </span>
+          <span class="field-type">${fieldType?.displayName ?? field.fieldTypeAlias}</span>
+        </span>
+        ${when(
+          // A condition whose rules were all removed is still stored, so look for rules
+          (field.conditions?.visibility?.rules?.length ?? 0) + (field.conditions?.required?.rules?.length ?? 0) > 0,
+          () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has conditions"></uui-icon>`,
+        )}
+        ${when(
+          isResizingThis,
+          () => html`<span class="width-badge">${width}/12</span>`,
+        )}
+        <button
+          class="delete-btn"
+          @click=${(event: MouseEvent) => this.deleteField(event, field.id!)}
+          title=${isFieldGroup(field) ? "Delete field and the fields inside it" : "Delete field"}
+          aria-label="Delete field"
+        >
+          <uui-icon name="icon-trash"></uui-icon>
+        </button>
+      </div>
+    `;
+  }
+
+  // Whether the dragged field may go into the page or group, as groups can't be nested
+  #canDropIn(container: FieldContainer): boolean {
+    if (!this.draggedFieldId || !this.context) return false;
+    return this.context.canPlaceField(this.context.getField(this.draggedFieldId), container);
+  }
+
+  // Swapping places each field in the other's container, so both have to be allowed there
+  #canSwapWith(container: FieldContainer, field: FormFieldDto): boolean {
+    if (!this.draggedFieldId || this.draggedFieldId === field.id || !this.context) return false;
+
+    const source = this.context.getFieldContainer(this.draggedFieldId);
+    if (!source || !this.#canDropIn(container)) return false;
+    return isSameFieldContainer(source, container) || this.context.canPlaceField(field, source);
+  }
+
+  // A tab takes a page, or a field that is placed on a page; a field inside a group moves with its group
+  #canDropOnPage(): boolean {
+    if (this.draggedPageIndex !== undefined) return true;
+    return !!this.draggedFieldId && this.context?.getFieldContainer(this.draggedFieldId)?.kind === "page";
   }
 
   private deleteField(event: MouseEvent, fieldId: string) {
@@ -256,6 +332,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
 
   private startResize(
     event: MouseEvent,
+    container: FieldContainer,
     row: FormRowDto,
     column: FormColumnDto
   ) {
@@ -291,7 +368,7 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
 
-      this.context?.setColumnSize(row, column, this.resizeState!.size);
+      this.context?.setColumnSize(container, row, column, this.resizeState!.size);
       this.resizeState = undefined;
       this.isResizing = false;
     };
@@ -301,13 +378,14 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
   }
 
   private selectField(
+    container: FieldContainer,
     row: FormRowDto | undefined,
     column: FormColumnDto | undefined,
     field: FormFieldDto | undefined
   ) {
     this.dispatchEvent(
       new CustomEvent("select-field", {
-        detail: { row, column, field },
+        detail: { row, column, field, container },
         bubbles: true,
         composed: true,
       })
@@ -328,26 +406,28 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     this.draggedPageIndex = undefined;
   }
 
-  private onDragOver(event: DragEvent) {
+  // Not preventing the default refuses the drop, and shows the editor it isn't allowed
+  private onDragOver(event: DragEvent, canDrop: boolean) {
+    if (!canDrop) return;
     event.preventDefault();
     if (event.dataTransfer) {
       event.dataTransfer.dropEffect = 'move';
     }
   }
 
-  private onDrop(event: DragEvent, targetRow: FormRowDto, targetColumn: FormColumnDto) {
+  private onDrop(event: DragEvent, container: FieldContainer, targetRow: FormRowDto, targetColumn: FormColumnDto) {
     event.preventDefault();
     if (!this.draggedFieldId) return;
 
-    this.context?.moveField(this.draggedFieldId, targetRow, targetColumn);
+    this.context?.moveField(this.draggedFieldId, container, targetRow, targetColumn);
     this.draggedFieldId = undefined;
   }
 
-  private onDropOnEmpty(event: DragEvent, targetRow: FormRowDto | undefined) {
+  private onDropOnEmpty(event: DragEvent, container: FieldContainer, targetRow: FormRowDto | undefined) {
     event.preventDefault();
     if (!this.draggedFieldId) return;
 
-    this.context?.moveField(this.draggedFieldId, targetRow);
+    this.context?.moveField(this.draggedFieldId, container, targetRow);
     this.draggedFieldId = undefined;
   }
 
@@ -626,8 +706,25 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
       }
     }
 
-    .column-outer:hover .field-resizer {
+    .column-outer:hover > .field-resizer {
       opacity: 1;
+    }
+
+    /* A field group shows its own rows below its card, like a small canvas */
+    .group {
+      display: flex;
+      flex-direction: column;
+      gap: var(--uui-size-space-3);
+      padding: var(--uui-size-space-3);
+      background: var(--uui-color-surface-alt);
+      border: 1px solid var(--uui-color-border);
+      border-radius: calc(var(--uui-border-radius) * 3);
+    }
+
+    .group-rows {
+      display: flex;
+      flex-direction: column;
+      gap: var(--uui-size-space-3);
     }
   `;
 }

@@ -102,3 +102,17 @@
 .form-actions button[hidden] {
     display: none !important;
 }
+
+/* Repeaters: forms.js shows the add and remove buttons the minimum and maximum number of entries allow */
+.form-repeater,
+.form-repeater-entry {
+    border: none;
+    margin: 0;
+    padding: 0;
+    min-width: 0;
+}
+
+.form-repeater-add[hidden],
+.form-repeater-remove[hidden] {
+    display: none !important;
+}

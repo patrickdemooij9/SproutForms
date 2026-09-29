@@ -37,10 +37,9 @@ namespace SproutForms.Core.Controllers
 
         [HttpPost("{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Submit(
-            Guid id,
-            [FromForm] Dictionary<string, string> values)
+        public async Task<IActionResult> Submit(Guid id)
         {
+            var values = GetPostedValues();
             var formVersion = GetPublishedVersion(id);
             if (formVersion is null)
                 return NotFound();
@@ -124,11 +123,9 @@ namespace SproutForms.Core.Controllers
         /// </summary>
         [HttpPost("{id}/pages/{pageIndex:int}/validate")]
         [ValidateAntiForgeryToken]
-        public IActionResult ValidatePage(
-            Guid id,
-            int pageIndex,
-            [FromForm] Dictionary<string, string> values)
+        public IActionResult ValidatePage(Guid id, int pageIndex)
         {
+            var values = GetPostedValues();
             var formVersion = GetPublishedVersion(id);
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
@@ -150,8 +147,14 @@ namespace SproutForms.Core.Controllers
         private FormVersion? GetPublishedVersion(Guid formId)
             => _forms.GetById(formId) is { IsTrashed: false } ? _formVersions.GetPublished(formId) : null;
 
+        // Read from the form itself: model binding would take the names of a repeater's inputs, such as "people[0].firstName", for its own
+        // dictionary syntax. A checkbox posts its value before the hidden "false" after it, so the first value is the one that counts
+        private Dictionary<string, string> GetPostedValues()
+            => Request.Form.ToDictionary(it => it.Key, it => it.Value.FirstOrDefault() ?? string.Empty);
+
+        // The inputs of a repeater's entries are named by their path, such as "people[0].firstName"
         private static Dictionary<string, JsonElement> GetFieldValues(FormVersion formVersion, Dictionary<string, string> values)
-            => SubmittedFieldValues.Filter(formVersion, values.Select(it => KeyValuePair.Create(it.Key, JsonSerializer.SerializeToElement(it.Value))));
+            => SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromPostedForm(values));
 
         /// <summary>
         /// Redirects to the page the form was posted from, but only to a page on this site; the posted page URL and the Referer header are both client-controlled.

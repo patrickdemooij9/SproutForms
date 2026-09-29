@@ -109,33 +109,46 @@ namespace SproutForms.Core.Services
                 var version = _formVersionRepository.Get(versionSubmissions.Key);
                 if (version is null) continue;
 
-                var fileFieldAliases = version.Definition.Fields
-                    .Where(f => f.Configuration is FileFieldConfig)
-                    .Select(f => f.Alias)
-                    .ToArray();
-
                 foreach (var submission in versionSubmissions)
                 {
-                    foreach (var alias in fileFieldAliases)
-                    {
-                        if (!submission.Values.TryGetValue(alias, out var value) || value.ValueKind != JsonValueKind.String)
-                            continue;
-
-                        try
-                        {
-                            var reference = JsonSerializer.Deserialize<StoredFileReference>(value.GetString()!);
-                            if (reference is not null)
-                                files.Add(reference);
-                        }
-                        catch (JsonException)
-                        {
-                            _logger.LogWarning("Submission {SubmissionId} has an unreadable file reference in field {FieldAlias}", submission.Id, alias);
-                        }
-                    }
+                    AddUploadedFiles(submission, version.Definition.Fields, submission.Values, files);
                 }
             }
 
             return files;
+        }
+
+        // The uploads of the form's file fields, and of the file fields in each entry of its field groups
+        private void AddUploadedFiles(FormSubmission submission, IReadOnlyList<FormField> fields, IReadOnlyDictionary<string, JsonElement> values, List<StoredFileReference> files)
+        {
+            foreach (var field in fields)
+            {
+                if (!values.TryGetValue(field.Alias, out var value))
+                    continue;
+
+                if (field.Configuration is IFormFieldGroupConfiguration group && value.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var entry in value.EnumerateArray().Where(entry => entry.ValueKind == JsonValueKind.Object))
+                    {
+                        AddUploadedFiles(submission, group.Fields, entry.EnumerateObject().ToDictionary(it => it.Name, it => it.Value), files);
+                    }
+                    continue;
+                }
+
+                if (field.Configuration is not FileFieldConfig || value.ValueKind != JsonValueKind.String)
+                    continue;
+
+                try
+                {
+                    var reference = JsonSerializer.Deserialize<StoredFileReference>(value.GetString()!);
+                    if (reference is not null)
+                        files.Add(reference);
+                }
+                catch (JsonException)
+                {
+                    _logger.LogWarning("Submission {SubmissionId} has an unreadable file reference in field {FieldAlias}", submission.Id, field.Alias);
+                }
+            }
         }
     }
 }

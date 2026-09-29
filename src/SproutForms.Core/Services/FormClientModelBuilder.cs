@@ -57,15 +57,18 @@ namespace SproutForms.Core.Services
                 NextLabel = string.IsNullOrWhiteSpace(page.NextLabel) ? FormTexts.Next : page.NextLabel,
                 PreviousLabel = string.IsNullOrWhiteSpace(page.PreviousLabel) ? FormTexts.Previous : page.PreviousLabel,
                 Visibility = page.Visibility,
-                Rows = page.Rows.Select(row => new FormClientRow
-                {
-                    Columns = row.Columns.Select(column => new FormClientColumn
-                    {
-                        Width = column.Width,
-                        Field = BuildField(version, version.Definition.Fields.First(field => field.Alias == column.FieldAlias), formType)
-                    }).ToList()
-                }).ToList()
+                Rows = BuildRows(version, page, version.Definition.Fields, formType)
             };
+
+        private List<FormClientRow> BuildRows(FormVersion version, IFormLayout layout, IReadOnlyList<FormField> fields, IFormDefinitionType? formType)
+            => layout.Rows.Select(row => new FormClientRow
+            {
+                Columns = row.Columns.Select(column => new FormClientColumn
+                {
+                    Width = column.Width,
+                    Field = BuildField(version, fields.First(field => field.Alias == column.FieldAlias), formType)
+                }).ToList()
+            }).ToList();
 
         private FormClientField BuildField(FormVersion version, FormField field, IFormDefinitionType? formType)
         {
@@ -83,7 +86,8 @@ namespace SproutForms.Core.Services
                 Configuration = fieldType.GetClientConfiguration(field.Configuration),
                 Conditions = field.Conditions,
                 ValidationRules = GetValidationRules(field, fieldType),
-                Extension = field.Extension is null ? null : formType?.GetClientFieldExtension(field)
+                Extension = field.Extension is null ? null : formType?.GetClientFieldExtension(field),
+                Rows = field.Configuration is IFormFieldGroupConfiguration group ? BuildRows(version, group, group.Fields, formType) : null
             };
         }
 

@@ -99,7 +99,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (request is null)
                 return Invalid(new Dictionary<string, List<string>> { ["body"] = ["The request body is not valid."] });
 
-            var values = SubmittedFieldValues.Filter(formVersion, ToSubmittedValues(request.Values));
+            var values = SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromJson(request.Values));
 
             if (_formSubmissionGuard is not null)
             {
@@ -149,7 +149,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
 
-            var errors = _submissionService.ValidatePage(formVersion, pageIndex, SubmittedFieldValues.Filter(formVersion, ToSubmittedValues(request.Values)));
+            var errors = _submissionService.ValidatePage(formVersion, pageIndex, SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromJson(request.Values)));
             return errors.Count == 0 ? NoContent() : Invalid(errors);
         }
 
@@ -185,24 +185,6 @@ namespace SproutForms.Umbraco.Core.Controllers
         {
             var raw = form[name].ToString();
             return string.IsNullOrWhiteSpace(raw) ? default : JsonSerializer.Deserialize<T>(raw, MultipartJsonOptions);
-        }
-
-        // Validation works on text, as a posted HTML form sends it, so JSON numbers and booleans become their text; lists and objects stay as they are
-        private static IEnumerable<KeyValuePair<string, JsonElement>> ToSubmittedValues(Dictionary<string, JsonElement> values)
-        {
-            foreach (var (alias, value) in values)
-            {
-                var submitted = value.ValueKind switch
-                {
-                    JsonValueKind.Null or JsonValueKind.Undefined => (JsonElement?)null,
-                    JsonValueKind.True => JsonSerializer.SerializeToElement("true"),
-                    JsonValueKind.False => JsonSerializer.SerializeToElement("false"),
-                    JsonValueKind.Number => JsonSerializer.SerializeToElement(value.GetRawText()),
-                    _ => value
-                };
-                if (submitted.HasValue)
-                    yield return KeyValuePair.Create(alias, submitted.Value);
-            }
         }
 
         private ObjectResult Invalid(IReadOnlyDictionary<string, List<string>> errors)

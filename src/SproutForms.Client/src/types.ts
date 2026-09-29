@@ -21,12 +21,20 @@ export type {
 } from './api/types.gen';
 
 /**
- * What the visitor entered, keyed by field alias. Texts, numbers and booleans are all fine; a File is sent as an upload.
+ * What the visitor entered, keyed by field alias. Texts, numbers and booleans are all fine; a File is sent as an upload. A field
+ * group, such as a repeater, holds a list of entries (see RepeaterValue).
  */
 export type FormValues = Record<string, unknown>;
 
 /**
- * Error messages keyed by field alias. A key that isn't a field, such as "submissionGuard", is about the whole form.
+ * The value of a field group such as a repeater: one object per entry, keyed by the alias of the fields in it, such as
+ * [{ firstName: "Ann" }, { firstName: "Bob" }]. An entry can hold a File and field groups of its own.
+ */
+export type RepeaterValue = FormValues[];
+
+/**
+ * Error messages keyed by field path: a field's alias, or for a field in a field group's entry, its path such as "people[0].email".
+ * A key that isn't a field, such as "submissionGuard", is about the whole form.
  */
 export type FormErrors = Record<string, string[]>;
 
@@ -75,6 +83,17 @@ export interface HiddenFieldConfiguration {
 
 export type CheckboxFieldConfiguration = Record<string, never>;
 
+export interface RepeaterFieldConfiguration {
+    minItems?: number | null;
+    maxItems?: number | null;
+    // The entries shown before the visitor adds any, already between minItems and maxItems
+    initialItems: number;
+    addLabel: string;
+    removeLabel: string;
+    // The heading of each entry, where {n} is its number; see getEntryTitle
+    itemTitle?: string | null;
+}
+
 /**
  * The configuration of each field type SproutForms ships. A custom field type's configuration is whatever its
  * GetClientConfiguration returns; narrow it yourself.
@@ -89,6 +108,7 @@ export interface BuiltInFieldConfigurations {
     file: FileFieldConfiguration;
     hidden: HiddenFieldConfiguration;
     checkbox: CheckboxFieldConfiguration;
+    repeater: RepeaterFieldConfiguration;
 }
 
 export type BuiltInFieldType = keyof BuiltInFieldConfigurations;

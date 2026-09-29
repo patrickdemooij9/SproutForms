@@ -59,6 +59,7 @@ export type FormClientField = {
     conditions?: FieldConditions | null;
     validationRules: Array<ValidationRule>;
     extension?: unknown;
+    rows?: Array<FormClientRow> | null;
 };
 
 export type FormClientModel = {

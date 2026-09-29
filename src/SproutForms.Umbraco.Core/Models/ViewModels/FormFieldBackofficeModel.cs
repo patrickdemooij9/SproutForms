@@ -19,6 +19,10 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         // The settings the form's type adds to this field's type, when it extends it
         public Dictionary<string, object?>? Extension { get; set; }
 
+        // For a field group such as a repeater: its own fields, and how each entry lays them out. Null for any other field
+        public List<FormFieldBackofficeModel>? Fields { get; set; }
+        public List<FormRowBackofficeModel>? Rows { get; set; }
+
         public FormFieldBackofficeModel(FormField field)
         {
             Alias = field.Alias;

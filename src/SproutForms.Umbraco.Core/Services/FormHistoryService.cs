@@ -210,7 +210,7 @@ namespace SproutForms.Umbraco.Core.Services
             if (!_formTypes.Any(it => it.Alias == formTypeAlias) || !_formTypeDescriptors.Any(it => it.FormTypeAlias == formTypeAlias))
                 errors.Add($"The form type '{formTypeAlias}' is no longer registered.");
 
-            foreach (var fieldTypeAlias in definition.Fields.Select(it => it.FieldTypeAlias).Distinct())
+            foreach (var fieldTypeAlias in definition.GetAllFields().Select(it => it.FieldTypeAlias).Distinct())
             {
                 if (!_fieldTypes.Any(it => it.Alias == fieldTypeAlias) || !_fieldDescriptors.Any(it => it.FieldTypeAlias == fieldTypeAlias))
                     errors.Add($"The field type '{fieldTypeAlias}' is no longer registered.");
@@ -239,13 +239,13 @@ namespace SproutForms.Umbraco.Core.Services
         // A field has submitted values when a submission was made with any version that has the field
         private List<string> GetRemovedFieldsWithSubmissions(Guid formId, FormDefinition current, FormDefinition version)
         {
-            var removed = current.Fields.Where(field => !version.Fields.Any(it => it.Alias.Equals(field.Alias, StringComparison.OrdinalIgnoreCase))).ToList();
+            var removed = current.GetAllFields().Where(field => !version.GetAllFields().Any(it => it.Alias.Equals(field.Alias, StringComparison.OrdinalIgnoreCase))).ToList();
             if (removed.Count == 0) return [];
 
             var versionIdsWithSubmissions = _formSubmissionRepository.GetVersionIdsWithSubmissions(formId).ToHashSet();
             var aliasesWithSubmissions = _formVersionRepository.GetAll(formId)
                 .Where(it => versionIdsWithSubmissions.Contains(it.Id))
-                .SelectMany(it => it.Definition.Fields.Select(field => field.Alias))
+                .SelectMany(it => it.Definition.GetAllFields().Select(field => field.Alias))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             return [.. removed.Where(field => aliasesWithSubmissions.Contains(field.Alias)).Select(field => field.Label)];

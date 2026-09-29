@@ -12,7 +12,12 @@ namespace SproutForms.Core
         public const string Invalid = "Invalid value.";
         public const string SubmitFailed = "Something went wrong. Please try again.";
         public const string SubmitSucceeded = "Thank you, your submission has been received.";
+        public const string AddItem = "Add";
+        public const string RemoveItem = "Remove";
+        public const string ItemTitle = "Item {n}";
 
         public static string Step(int pageIndex) => $"Step {pageIndex + 1}";
+        public static string MinItems(int count) => $"Add at least {count} {(count == 1 ? "entry" : "entries")}.";
+        public static string MaxItems(int count) => $"Add no more than {count} {(count == 1 ? "entry" : "entries")}.";
     }
 }

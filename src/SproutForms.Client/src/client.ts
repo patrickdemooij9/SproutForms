@@ -14,7 +14,7 @@ export interface SproutFormsClientOptions {
 }
 
 export interface SubmitOptions {
-    // Keyed by field alias; a File or Blob value is sent as an upload
+    // Keyed by field alias; a File or Blob value is sent as an upload, also in a field group's entries
     values: FormValues;
     // Where the form was filled in; defaults to the current page in a browser. Only stored when it is on an allowed origin
     pageUrl?: string;
@@ -39,6 +39,39 @@ export class SproutFormsApiError extends Error {
 
 function isFile(value: unknown): value is Blob {
     return typeof Blob !== 'undefined' && value instanceof Blob;
+}
+
+function isEntry(value: unknown): value is FormValues {
+    return value !== null && typeof value === 'object' && !Array.isArray(value) && !isFile(value);
+}
+
+export interface SplitValues {
+    // The values without the uploads, entries included
+    values: FormValues;
+    // Each upload by its field's path, such as "cv" or "people[0].cv": the name of its multipart part
+    files: [path: string, file: Blob][];
+}
+
+/**
+ * Takes the uploads out of the values, also those in a field group's entries, keyed by the path the server reads them from.
+ */
+export function splitFiles(values: FormValues, pathPrefix = ''): SplitValues {
+    const result: SplitValues = { values: {}, files: [] };
+    for (const [alias, value] of Object.entries(values)) {
+        const path = pathPrefix + alias;
+        if (isFile(value)) {
+            result.files.push([path, value]);
+        } else if (Array.isArray(value) && value.length > 0 && value.every(isEntry)) {
+            result.values[alias] = value.map((entry, index) => {
+                const split = splitFiles(entry, `${path}[${index}].`);
+                result.files.push(...split.files);
+                return split.values;
+            });
+        } else {
+            result.values[alias] = value;
+        }
+    }
+    return result;
 }
 
 // The ETag of a definition is its version
@@ -104,19 +137,18 @@ export function createSproutFormsClient(options: SproutFormsClientOptions) {
          * sent. Returns the errors; none means the page is valid.
          */
         async validatePage(definition: FormClientModel, pageIndex: number, values: FormValues, init: { signal?: AbortSignal } = {}): Promise<FormErrors> {
-            const textValues = Object.fromEntries(Object.entries(values).filter(([, value]) => !isFile(value)));
-            const response = await postJson(`${baseUrl}/entries/${definition.id}/pages/${pageIndex}/validate`, { values: textValues }, init.signal);
+            const response = await postJson(`${baseUrl}/entries/${definition.id}/pages/${pageIndex}/validate`, { values: splitFiles(values).values }, init.signal);
             if (response.status === 400) return readErrors(response);
             if (!response.ok) return fail(response);
             return {};
         },
 
         /**
-         * Submits the form, with the values its submission guard needs. Sent as multipart/form-data when a value is a file.
+         * Submits the form, with the values its submission guard needs. Sent as multipart/form-data when a value is a file, with
+         * each file as a part named by its field's path.
          */
         async submit(definition: FormClientModel, submit: SubmitOptions): Promise<SubmitResult> {
-            const files = Object.entries(submit.values).filter((entry): entry is [string, Blob] => isFile(entry[1]));
-            const values = Object.fromEntries(Object.entries(submit.values).filter(([, value]) => !isFile(value)));
+            const { values, files } = splitFiles(submit.values);
             const guard = { ...await getSubmissionGuardValues(definition, submit.values), ...submit.guard };
             const pageUrl = submit.pageUrl ?? (globalThis as { location?: Location }).location?.href;
             const url = `${baseUrl}/entries/${definition.id}`;
@@ -129,8 +161,8 @@ export function createSproutFormsClient(options: SproutFormsClientOptions) {
                 body.append('values', JSON.stringify(values));
                 body.append('guard', JSON.stringify(guard));
                 if (pageUrl) body.append('pageUrl', pageUrl);
-                for (const [alias, file] of files) {
-                    body.append(alias, file, file instanceof File ? file.name : alias);
+                for (const [path, file] of files) {
+                    body.append(path, file, file instanceof File ? file.name : path);
                 }
                 // No Content-Type: the browser sets it, with the multipart boundary
                 response = await fetchImpl(url, { method: 'POST', headers: headers(), body, signal: submit.signal });

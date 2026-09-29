@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+using SproutForms.Core.Services;
 using System.Text.Json;
 
 namespace SproutForms.Core.Models
@@ -18,5 +18,11 @@ namespace SproutForms.Core.Models
         /// so leave out settings only the server needs. Razor views still get the whole configuration.
         /// </summary>
         object? GetClientConfiguration(object configuration) => configuration;
+
+        /// <summary>
+        /// The text that shows a submitted value in workflows and the backoffice, or null when it was left empty. The formatter shows the values
+        /// of other fields, such as those in a field group's entries.
+        /// </summary>
+        string? GetDisplayValue(JsonElement value, object configuration, FormValueFormatter formatter) => FormValueFormatter.FormatText(value);
     }
 }

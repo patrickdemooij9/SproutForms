@@ -25,12 +25,15 @@ namespace SproutForms.Core.Builders
             Name = name;
         }
 
-        internal FormField RegisterField(FormField field)
+        private readonly HashSet<string> _aliases = [];
+
+        // A field goes into the form, or into the field group it was added to; either way its alias is unique across the form
+        internal FormField RegisterField(FormField field, List<FormField>? groupFields = null)
         {
-            if (_fields.Any(f => f.Alias == field.Alias))
+            if (!_aliases.Add(field.Alias))
                 throw new InvalidOperationException($"Duplicate field alias '{field.Alias}'.");
 
-            _fields.Add(field);
+            (groupFields ?? _fields).Add(field);
             return field;
         }
 
@@ -116,7 +119,7 @@ namespace SproutForms.Core.Builders
             {
                 definition.Type = _type;
             }
-            foreach (var field in _fields.Where(it => it.Extension != null))
+            foreach (var field in definition.GetAllFields().Where(it => it.Extension != null))
             {
                 field.Extension!.FormTypeAlias = definition.Type.TypeAlias;
             }

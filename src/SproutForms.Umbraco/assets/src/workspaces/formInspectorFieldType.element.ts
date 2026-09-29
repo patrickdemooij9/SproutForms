@@ -241,14 +241,20 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
                 val
               ></umb-property>
 
-              <umb-property
-                alias="required"
-                label="Is required"
-                description="Determines if the field is required"
-                property-editor-ui-alias="Umb.PropertyEditorUi.Toggle"
-                .appearance=${{ labelOnTop: true }}
-                val
-              ></umb-property>
+              ${when(
+                // A field group's minimum number of entries says whether it must be filled in
+                !this.fieldType?.isFieldGroup,
+                () => html`
+                  <umb-property
+                    alias="required"
+                    label="Is required"
+                    description="Determines if the field is required"
+                    property-editor-ui-alias="Umb.PropertyEditorUi.Toggle"
+                    .appearance=${{ labelOnTop: true }}
+                    val
+                  ></umb-property>
+                `,
+              )}
 
               ${repeat(
                 this.fieldType?.properties ?? [],
@@ -306,6 +312,7 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
               <sf-field-conditions-editor
                 .field=${this.field}
                 .fields=${this.fields}
+                .allowRequired=${!this.fieldType?.isFieldGroup}
                 @conditions-change=${this.#onConditionsChange}
               ></sf-field-conditions-editor>
             `,
