@@ -126,9 +126,9 @@ namespace SproutForms.Core.Services
                 if (!values.TryGetValue(field.Alias, out var value))
                     continue;
 
-                if (field.Configuration is IFormFieldGroupConfiguration group && value.ValueKind == JsonValueKind.Array)
+                if (field.Configuration is IFormFieldGroupConfiguration group)
                 {
-                    foreach (var entry in value.EnumerateArray().Where(entry => entry.ValueKind == JsonValueKind.Object))
+                    foreach (var entry in value.EnumerateArray())
                     {
                         AddUploadedFiles(submission, group.Fields, entry.EnumerateObject().ToDictionary(it => it.Name, it => it.Value), files);
                     }

@@ -4,6 +4,10 @@ using System.Text.Json;
 
 namespace SproutForms.Core.Services
 {
+    /// <summary>
+    /// Takes the values as the visitor submitted them, keyed by field alias. Only the form's own fields are kept, a repeater's value as its list of
+    /// entries, and JSON numbers and booleans are taken as text.
+    /// </summary>
     public interface IFormSubmissionService
     {
         /// <summary>

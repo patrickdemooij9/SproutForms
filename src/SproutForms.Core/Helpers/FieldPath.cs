@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -62,46 +61,22 @@ namespace SproutForms.Core.Helpers
         /// <summary>
         /// Puts the value at this path, adding the entries on the way that aren't there yet.
         /// </summary>
-        public void SetValue(Dictionary<string, JsonElement> values, JsonElement value)
+        public void SetValue(JsonObject values, JsonNode? value)
         {
-            if (!IsNested)
+            var target = values;
+            foreach (var (alias, index) in Entries)
             {
-                values[FieldAlias] = value;
-                return;
+                // A value posted under the group's own name, such as "people=x", makes way for its entries
+                if (target[alias] is not JsonArray entries)
+                {
+                    entries = [];
+                    target[alias] = entries;
+                }
+                while (entries.Count <= index)
+                    entries.Add(new JsonObject());
+                target = (JsonObject)entries[index]!;
             }
-
-            var (alias, index) = Entries[0];
-            var entries = values.TryGetValue(alias, out var existing) && existing.ValueKind == JsonValueKind.Array
-                ? JsonNode.Parse(existing.GetRawText())!.AsArray()
-                : [];
-            SetInEntries(entries, index, 1, value);
-            values[alias] = JsonSerializer.SerializeToElement(entries);
-        }
-
-        private void SetInEntries(JsonArray entries, int index, int depth, JsonElement value)
-        {
-            while (entries.Count <= index)
-                entries.Add(new JsonObject());
-
-            if (entries[index] is not JsonObject entry)
-            {
-                entry = [];
-                entries[index] = entry;
-            }
-
-            if (depth == Entries.Count)
-            {
-                entry[FieldAlias] = JsonNode.Parse(value.GetRawText());
-                return;
-            }
-
-            var (alias, childIndex) = Entries[depth];
-            if (entry[alias] is not JsonArray children)
-            {
-                children = [];
-                entry[alias] = children;
-            }
-            SetInEntries(children, childIndex, depth + 1, value);
+            target[FieldAlias] = value;
         }
     }
 }

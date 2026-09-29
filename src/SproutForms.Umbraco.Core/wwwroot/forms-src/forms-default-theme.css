@@ -29,6 +29,9 @@
     --sf-input-padding: 0.5rem 0.6rem;
     --sf-button-padding: 0.6rem 1.2rem;
 
+    --sf-repeater-entry-background: #fafafa;
+    --sf-repeater-gap: 0.75rem;
+
     --sf-progress-track: #ddd;
     --sf-progress-complete: #90caf9;
     /* --sf-progress-current is left out here: it falls back to the accent where it's used, so it follows an accent set on the form */
@@ -200,3 +203,91 @@ form[data-sf-paged] .form-actions {
             color: var(--sf-color-text);
             font-weight: 600;
         }
+
+/* Repeaters: each entry is a card with its title and remove button at the top, the add button below the entries */
+.form-repeater-title {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    padding: 0;
+}
+
+.form-repeater-entries {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sf-repeater-gap);
+}
+
+.form-repeater-entry {
+    position: relative;
+    padding: var(--sf-repeater-gap);
+    border: 1px solid var(--sf-color-border);
+    border-radius: var(--sf-radius);
+    background: var(--sf-repeater-entry-background);
+}
+
+    /* Floated so the card's padding sits under it, not around the legend's own line */
+    .form-repeater-entry-title {
+        float: left;
+        padding: 0;
+        color: var(--sf-color-text-muted);
+        font-size: var(--sf-font-size-small);
+        font-weight: 600;
+        line-height: 2rem;
+    }
+
+    .form-repeater-entry-title + * {
+        clear: both;
+    }
+
+.form-repeater-add,
+.form-repeater-remove {
+    box-sizing: border-box;
+    font-size: var(--sf-font-size-small);
+    border-radius: var(--sf-radius);
+    cursor: pointer;
+}
+
+.form-repeater-add {
+    margin-top: var(--sf-repeater-gap);
+    min-height: var(--sf-control-height);
+    padding: var(--sf-button-padding);
+    background: var(--sf-color-background);
+    color: var(--sf-color-accent);
+    border: 1px solid var(--sf-color-accent);
+}
+
+    .form-repeater-add::before {
+        content: "+ ";
+    }
+
+    .form-repeater-add:hover {
+        background: var(--sf-color-accent-subtle);
+    }
+
+.form-repeater-remove {
+    position: absolute;
+    top: var(--sf-repeater-gap);
+    right: var(--sf-repeater-gap);
+    min-height: 2rem;
+    padding: 0 0.75rem;
+    background: transparent;
+    color: var(--sf-color-text-muted);
+    border: 1px solid transparent;
+}
+
+    .form-repeater-remove:hover {
+        color: var(--sf-color-error);
+        border-color: var(--sf-color-error);
+    }
+
+.form-repeater-add:focus-visible,
+.form-repeater-remove:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--sf-color-focus-ring);
+}
+
+/* The repeater's own error, such as too few entries, under its add button */
+.form-group:has(> .form-repeater) > .form-error {
+    margin-top: 0.5rem;
+}
+

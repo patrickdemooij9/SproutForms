@@ -55,6 +55,7 @@ namespace SproutForms.Core.Fields
 
         public override string? GetDisplayValue(JsonElement value, object configuration, FormValueFormatter formatter)
         {
+            // A stored value that isn't a list of entries shows as it was stored, rather than failing the workflow or the view that shows it
             if (value.ValueKind != JsonValueKind.Array || configuration is not RepeaterFieldConfig config)
                 return FormValueFormatter.FormatText(value);
 

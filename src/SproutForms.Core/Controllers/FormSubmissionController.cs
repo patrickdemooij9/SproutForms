@@ -72,7 +72,7 @@ namespace SproutForms.Core.Controllers
 
             var request = new FormSubmissionRequest
             {
-                Values = GetFieldValues(formVersion, values),
+                Values = GetFieldValues(values),
                 PageUrl = pageUrl
             };
 
@@ -130,7 +130,7 @@ namespace SproutForms.Core.Controllers
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
 
-            var errors = _submissionService.ValidatePage(formVersion, pageIndex, GetFieldValues(formVersion, values));
+            var errors = _submissionService.ValidatePage(formVersion, pageIndex, GetFieldValues(values));
             if (errors.Count != 0)
             {
                 return BadRequest(new AjaxFormResponse
@@ -152,9 +152,9 @@ namespace SproutForms.Core.Controllers
         private Dictionary<string, string> GetPostedValues()
             => Request.Form.ToDictionary(it => it.Key, it => it.Value.FirstOrDefault() ?? string.Empty);
 
-        // The inputs of a repeater's entries are named by their path, such as "people[0].firstName"
-        private static Dictionary<string, JsonElement> GetFieldValues(FormVersion formVersion, Dictionary<string, string> values)
-            => SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromPostedForm(values));
+        // The inputs of a repeater's entries are named by their path, such as "people[0].firstName"; the submission service keeps the form's own fields
+        private static Dictionary<string, JsonElement> GetFieldValues(Dictionary<string, string> values)
+            => SubmittedFieldValues.FromPostedForm(values);
 
         /// <summary>
         /// Redirects to the page the form was posted from, but only to a page on this site; the posted page URL and the Referer header are both client-controlled.

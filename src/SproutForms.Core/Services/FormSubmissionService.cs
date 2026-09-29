@@ -55,7 +55,7 @@ namespace SproutForms.Core.Services
             IReadOnlyList<IFormFile> files)
         {
             var errors = new Dictionary<string, List<string>>();
-            var values = new Dictionary<string, JsonElement>(request.Values);
+            var values = SubmittedValues.Parse(formVersion.Definition.Fields, request.Values);
             var storedFiles = new List<StoredFileReference>();
 
             try
@@ -63,24 +63,26 @@ namespace SproutForms.Core.Services
                 await StoreFilesAsync(formVersion, files, values, storedFiles, errors);
                 ValidateFields(formVersion, formVersion.Definition.Fields, values, errors);
 
+                // What is stored, and what the form's type, workflows and outcome see
+                var storedValues = values.ToDictionary();
                 if (errors.Count != 0)
                 {
                     await DeleteStoredFilesAsync(storedFiles);
                     return new FormSubmissionResult
                     {
                         Errors = errors,
-                        Values = values
+                        Values = storedValues
                     };
                 }
 
-                var typeResult = await ProcessWithFormTypeAsync(formVersion, values);
+                var typeResult = await ProcessWithFormTypeAsync(formVersion, storedValues);
                 if (typeResult.Errors.Count != 0)
                 {
                     await DeleteStoredFilesAsync(storedFiles);
                     return new FormSubmissionResult
                     {
                         Errors = typeResult.Errors,
-                        Values = values
+                        Values = storedValues
                     };
                 }
 
@@ -90,7 +92,7 @@ namespace SproutForms.Core.Services
                     Id = Guid.NewGuid(),
                     FormVersionId = formVersion.Id,
                     SubmittedAt = DateTime.UtcNow,
-                    Values = values,
+                    Values = storedValues,
                     Results = typeResult.Results.ToDictionary(it => it.Key, it => JsonSerializer.SerializeToElement(it.Value)),
                     PageUrl = GetPageUrl(request.PageUrl, httpContext),
                     IpAddress = _options.CurrentValue.StoreIpAddress ? httpContext?.Connection.RemoteIpAddress?.ToString() : null
@@ -106,7 +108,7 @@ namespace SproutForms.Core.Services
 
                 return new FormSubmissionResult
                 {
-                    Values = values,
+                    Values = storedValues,
                     Submission = submission
                 };
             }
@@ -153,29 +155,31 @@ namespace SproutForms.Core.Services
             var fields = formVersion.Definition.Fields.Where(field => aliases.Contains(field.Alias));
 
             var errors = new Dictionary<string, List<string>>();
-            ValidateFields(formVersion, fields, new Dictionary<string, JsonElement>(values), errors, includeFiles: false);
+            ValidateFields(formVersion, fields, SubmittedValues.Parse(formVersion.Definition.Fields, values), errors, includeFiles: false);
             return errors;
         }
 
-        private void ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, Dictionary<string, JsonElement> values, Dictionary<string, List<string>> errors, bool includeFiles = true)
+        private void ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, SubmittedValues values, Dictionary<string, List<string>> errors, bool includeFiles = true)
         {
+            var conditionValues = values.ToDictionary();
+
             // The visitor skipped these pages, so their fields aren't validated, like a hidden field
             var skippedFieldAliases = formVersion.Definition.Pages
-                .Where(page => !_conditionEvaluator.IsVisible(page, values))
+                .Where(page => !_conditionEvaluator.IsVisible(page, conditionValues))
                 .SelectMany(page => page.Rows)
                 .SelectMany(row => row.Columns)
                 .Select(column => column.FieldAlias)
                 .ToHashSet();
 
             var scope = new ValidationScope(formVersion, errors, includeFiles);
-            ValidateScope(scope, fields.Where(field => !skippedFieldAliases.Contains(field.Alias)), values, values, string.Empty);
+            ValidateScope(scope, fields.Where(field => !skippedFieldAliases.Contains(field.Alias)), values, conditionValues, string.Empty);
         }
 
         /// <summary>
         /// Validates the fields of the form, or of one entry of a field group. An entry's values are what its own fields hold, and
         /// its conditions see those over the form's values, so a condition can use a field of the same entry or of the form.
         /// </summary>
-        private void ValidateScope(ValidationScope scope, IEnumerable<FormField> fields, Dictionary<string, JsonElement> values, Dictionary<string, JsonElement> conditionValues, string pathPrefix)
+        private void ValidateScope(ValidationScope scope, IEnumerable<FormField> fields, SubmittedValues values, Dictionary<string, JsonElement> conditionValues, string pathPrefix)
         {
             foreach (var field in fields)
             {
@@ -198,16 +202,21 @@ namespace SproutForms.Core.Services
                 // Fail closed: a field whose type is no longer registered can't be validated
                 var fieldType = GetFieldType(scope.FormVersion, field);
 
-                values.TryGetValue(field.Alias, out var rawValue);
-
+                JsonElement rawValue;
+                bool isEmpty;
                 if (field.Configuration is IFormFieldGroupConfiguration group)
                 {
                     // The entries the visitor left empty are dropped, and the rest are saved without them
-                    rawValue = JsonSerializer.SerializeToElement(ValidateEntries(scope, group, rawValue, conditionValues, path));
-                    values[field.Alias] = rawValue;
+                    var entries = ValidateEntries(scope, group, values.GetEntries(field.Alias), conditionValues, path);
+                    values.SetEntries(field.Alias, entries);
+                    rawValue = JsonSerializer.SerializeToElement(entries.Select(entry => entry.ToDictionary()));
+                    isEmpty = entries.Count == 0;
                 }
-
-                var isEmpty = IsEmpty(rawValue);
+                else
+                {
+                    values.TryGetValue(field.Alias, out rawValue);
+                    isEmpty = IsEmpty(rawValue);
+                }
                 if (isRequired && isEmpty)
                 {
                     AddError(scope.Errors, path, FormTexts.Required);
@@ -245,17 +254,13 @@ namespace SproutForms.Core.Services
         }
 
         // An entry's errors use its index as it was posted, so the front-end shows them on the entry the visitor sees
-        private List<Dictionary<string, JsonElement>> ValidateEntries(ValidationScope scope, IFormFieldGroupConfiguration group, JsonElement value, Dictionary<string, JsonElement> conditionValues, string path)
+        private List<SubmittedValues> ValidateEntries(ValidationScope scope, IFormFieldGroupConfiguration group, List<SubmittedValues> entries, Dictionary<string, JsonElement> conditionValues, string path)
         {
-            var entries = new List<Dictionary<string, JsonElement>>();
-            if (value.ValueKind != JsonValueKind.Array)
-                return entries;
-
-            var index = 0;
-            foreach (var item in value.EnumerateArray())
+            var kept = new List<SubmittedValues>();
+            for (var index = 0; index < entries.Count; index++)
             {
-                var entryPath = FieldPath.ForEntry(path, index++);
-                var entry = AsEntry(item);
+                var entry = entries[index];
+                var entryPath = FieldPath.ForEntry(path, index);
 
                 // A rejected upload leaves the entry without its value, but the visitor didn't leave the entry empty
                 var hasErrors = scope.Errors.Keys.Any(key => key.StartsWith(entryPath, StringComparison.Ordinal));
@@ -263,30 +268,24 @@ namespace SproutForms.Core.Services
                     continue;
 
                 var entryConditionValues = new Dictionary<string, JsonElement>(conditionValues);
-                foreach (var (alias, entryValue) in entry)
+                foreach (var (alias, entryValue) in entry.ToDictionary())
                     entryConditionValues[alias] = entryValue;
 
                 ValidateScope(scope, group.Fields, entry, entryConditionValues, entryPath);
-                entries.Add(entry);
+                kept.Add(entry);
             }
 
-            return entries;
+            return kept;
         }
 
-        private static Dictionary<string, JsonElement> AsEntry(JsonElement item)
-            => item.ValueKind == JsonValueKind.Object
-                ? item.EnumerateObject().ToDictionary(property => property.Name, property => property.Value)
-                : [];
-
         // A value that wouldn't do for a required field, such as an unticked checkbox, isn't something the visitor filled in
-        private bool IsBlankEntry(FormVersion formVersion, IFormFieldGroupConfiguration group, Dictionary<string, JsonElement> entry)
+        private bool IsBlankEntry(FormVersion formVersion, IFormFieldGroupConfiguration group, SubmittedValues entry)
             => group.Fields.All(field =>
             {
+                if (field.Configuration is IFormFieldGroupConfiguration childGroup)
+                    return entry.GetEntries(field.Alias).All(child => IsBlankEntry(formVersion, childGroup, child));
                 if (!entry.TryGetValue(field.Alias, out var value) || IsEmpty(value))
                     return true;
-                if (field.Configuration is IFormFieldGroupConfiguration childGroup)
-                    return value.ValueKind != JsonValueKind.Array
-                        || value.EnumerateArray().All(child => IsBlankEntry(formVersion, childGroup, AsEntry(child)));
                 return GetFieldType(formVersion, field) is IFormTypeRequiredHandler requiredHandler
                     && !requiredHandler.CheckForRequired(value.ToString() ?? string.Empty).IsValid;
             });
@@ -296,7 +295,6 @@ namespace SproutForms.Core.Services
             {
                 JsonValueKind.Undefined or JsonValueKind.Null => true,
                 JsonValueKind.String => string.IsNullOrWhiteSpace(value.GetString()),
-                JsonValueKind.Array => value.GetArrayLength() == 0,
                 _ => false
             };
 
@@ -319,7 +317,7 @@ namespace SproutForms.Core.Services
         private async Task StoreFilesAsync(
             FormVersion formVersion,
             IReadOnlyList<IFormFile> files,
-            Dictionary<string, JsonElement> values,
+            SubmittedValues values,
             List<StoredFileReference> storedFiles,
             Dictionary<string, List<string>> errors)
         {
@@ -358,7 +356,10 @@ namespace SproutForms.Core.Services
 
                 var reference = await storageProvider.SaveAsync(file, CancellationToken.None);
                 storedFiles.Add(reference);
-                path.SetValue(values, JsonSerializer.SerializeToElement(JsonSerializer.Serialize(reference)));
+                var target = values;
+                foreach (var (alias, index) in path.Entries)
+                    target = target.GetOrAddEntry(alias, index);
+                target.SetValue(path.FieldAlias, JsonSerializer.SerializeToElement(JsonSerializer.Serialize(reference)));
             }
         }
 

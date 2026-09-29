@@ -1,5 +1,5 @@
 using SproutForms.Core.Helpers;
-using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace SproutForms.Core.Tests
 {
@@ -28,23 +28,25 @@ namespace SproutForms.Core.Tests
         [Test]
         public void Setting_a_value_adds_the_entries_before_it()
         {
-            var values = new Dictionary<string, JsonElement>();
+            var values = new JsonObject();
             FieldPath.TryParse("people[2].firstName", out var path);
 
-            path!.SetValue(values, JsonSerializer.SerializeToElement("Ann"));
+            path!.SetValue(values, JsonValue.Create("Ann"));
 
-            Assert.That(values["people"].GetRawText(), Is.EqualTo("""[{},{},{"firstName":"Ann"}]"""));
+            Assert.That(values.ToJsonString(), Is.EqualTo("""{"people":[{},{},{"firstName":"Ann"}]}"""));
         }
 
         [Test]
         public void Setting_a_value_keeps_the_entry_other_values()
         {
-            var values = TestForms.Values(new { people = new[] { new { firstName = "Ann" } } });
-            FieldPath.TryParse("people[0].allergies", out var path);
+            var values = new JsonObject();
+            FieldPath.TryParse("people[0].firstName", out var first);
+            FieldPath.TryParse("people[0].allergies", out var second);
 
-            path!.SetValue(values, JsonSerializer.SerializeToElement("Nuts"));
+            first!.SetValue(values, JsonValue.Create("Ann"));
+            second!.SetValue(values, JsonValue.Create("Nuts"));
 
-            Assert.That(values["people"].GetRawText(), Is.EqualTo("""[{"firstName":"Ann","allergies":"Nuts"}]"""));
+            Assert.That(values.ToJsonString(), Is.EqualTo("""{"people":[{"firstName":"Ann","allergies":"Nuts"}]}"""));
         }
     }
 }

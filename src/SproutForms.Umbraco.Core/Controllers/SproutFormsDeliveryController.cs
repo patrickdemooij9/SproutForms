@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.SubmissionGuard;
@@ -99,12 +98,10 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (request is null)
                 return Invalid(new Dictionary<string, List<string>> { ["body"] = ["The request body is not valid."] });
 
-            var values = SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromJson(request.Values));
-
             if (_formSubmissionGuard is not null)
             {
                 // A guard reads what a posted HTML form would hold: every value as text, with its own fields
-                var postedValues = values
+                var postedValues = request.Values
                     .Where(it => it.Value.ValueKind == JsonValueKind.String)
                     .ToDictionary(it => it.Key, it => it.Value.GetString()!);
                 foreach (var (key, value) in request.Guard)
@@ -117,7 +114,7 @@ namespace SproutForms.Umbraco.Core.Controllers
 
             var result = await _submissionService.SubmitAsync(formVersion, new FormSubmissionRequest
             {
-                Values = values,
+                Values = request.Values,
                 PageUrl = request.PageUrl
             }, files);
 
@@ -149,7 +146,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
 
-            var errors = _submissionService.ValidatePage(formVersion, pageIndex, SubmittedFieldValues.Filter(formVersion, SubmittedFieldValues.FromJson(request.Values)));
+            var errors = _submissionService.ValidatePage(formVersion, pageIndex, request.Values);
             return errors.Count == 0 ? NoContent() : Invalid(errors);
         }
 

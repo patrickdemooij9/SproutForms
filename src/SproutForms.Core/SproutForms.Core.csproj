@@ -19,6 +19,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="SproutForms.Core.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Folder Include="Storage\" />
   </ItemGroup>
 

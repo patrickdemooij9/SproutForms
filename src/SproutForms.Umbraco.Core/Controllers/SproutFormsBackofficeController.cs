@@ -778,7 +778,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 }).ToList()
             }).ToList();
 
-        // A value can outlive its field when the stored submission predates the current definition; it isn't shown then
+        // A submission is stored with the values its own version's fields took, so a field group's value is always its entries
         private static FormSubmissionValueBackofficeModel[] MapValues(IReadOnlyDictionary<string, JsonElement> values, IReadOnlyList<FormField> fields)
             => values.Select(it =>
             {
@@ -789,9 +789,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                     FieldTypeAlias = field.FieldTypeAlias,
                     Name = field.Label,
                     Value = it.Value.ToString(),
-                    Entries = field.Configuration is IFormFieldGroupConfiguration group && it.Value.ValueKind == JsonValueKind.Array
+                    Entries = field.Configuration is IFormFieldGroupConfiguration group
                         ? [.. it.Value.EnumerateArray()
-                            .Where(entry => entry.ValueKind == JsonValueKind.Object)
                             .Select((entry, index) => new FormSubmissionEntryBackofficeModel
                             {
                                 Title = (group as RepeaterFieldConfig)?.GetItemTitle(index) ?? FormTexts.ItemTitle.Replace("{n}", (index + 1).ToString()),
