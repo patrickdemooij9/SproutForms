@@ -19,6 +19,7 @@ using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Extensions;
+using SproutForms.Umbraco.Core.Headless;
 using SproutForms.Umbraco.Core.Implementations;
 using SproutForms.Umbraco.Core.Repositories;
 using SproutForms.Umbraco.Core.Services;
@@ -44,6 +45,8 @@ namespace SproutForms.Umbraco.Core.Startup
                 });
             });
 
+            builder.Services.AddSingleton<FormClientModelBuilder>();
+            builder.Services.AddSingleton<FormSubmitOutcomeRunner>();
             builder.Services.AddTransient<FormRenderingService>();
             builder.Services.AddSingleton<FormThemeViewResolver>();
             builder.Services.AddSingleton<IFormSubmissionRepository, FormSubmissionRepository>();
@@ -118,6 +121,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormSubmissionGuard, HoneypotSubmissionGuard>();
 
             builder.Services.AddCodeFirstForms((it) => { });
+            builder.AddSproutFormsHeadless();
 
             //builder.EnableSproutFormsRecaptchaV3();
         }

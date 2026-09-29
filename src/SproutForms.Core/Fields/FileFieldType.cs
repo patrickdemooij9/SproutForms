@@ -10,6 +10,13 @@ namespace SproutForms.Core.Fields
 
         public override FileFieldConfig DefaultConfiguration => new();
 
+        protected override object? GetClientConfiguration(FileFieldConfig configuration)
+            => new FileFieldClientConfig
+            {
+                MaxFileSizeBytes = configuration.MaxFileSizeBytes,
+                AllowedExtensions = configuration.AllowedExtensions
+            };
+
         protected override ValidationResult Validate(StoredFileReference value, FileFieldConfig configuration)
         {
             return ValidationResult.Success();

@@ -1,36 +1,38 @@
 using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.SubmissionGuard;
 using SproutForms.Core.Models.ViewModels;
+using SproutForms.Core.Repositories;
+using SproutForms.Core.Services;
 using SproutForms.Umbraco.Core.Models.ViewModels;
-using System;
-using System.Collections.Generic;
-using System.Text;
 using System.Text.Json;
 
 namespace SproutForms.Umbraco.Core.Services
 {
+    /// <summary>
+    /// Builds the Razor view model of a form from its <see cref="FormClientModel"/>, nested for the views, with the values and errors
+    /// of a post without JavaScript that was sent back to the page.
+    /// </summary>
     public class FormRenderingService
     {
-        private const string DefaultSubmitLabel = "Submit";
-        private const string DefaultNextLabel = "Next";
-        private const string DefaultPreviousLabel = "Previous";
-
-        private readonly IFormFieldType[] _fieldTypes;
-        private readonly IFormSubmissionGuard _formSubmissionGuard;
+        private readonly FormClientModelBuilder _clientModelBuilder;
+        private readonly IFormRepository _forms;
+        private readonly IFormSubmissionGuard? _formSubmissionGuard;
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ITempDataDictionaryFactory _tempDataDictionaryFactory;
         private Dictionary<string, List<string>> _errors = [];
         private Dictionary<string, string> _values = [];
 
-        public FormRenderingService(IEnumerable<IFormFieldType> fieldTypes,
-            IFormSubmissionGuard formSubmissionGuard,
+        public FormRenderingService(FormClientModelBuilder clientModelBuilder,
+            IFormRepository forms,
+            IFormSubmissionGuard? formSubmissionGuard,
             IHttpContextAccessor httpContextAccessor,
             ITempDataDictionaryFactory tempDataDictionaryFactory)
         {
-            _fieldTypes = [.. fieldTypes];
+            _clientModelBuilder = clientModelBuilder;
+            _forms = forms;
             _formSubmissionGuard = formSubmissionGuard;
             _httpContextAccessor = httpContextAccessor;
             _tempDataDictionaryFactory = tempDataDictionaryFactory;
@@ -38,24 +40,33 @@ namespace SproutForms.Umbraco.Core.Services
 
         public RenderedFormViewModel Build(FormVersion version)
         {
+            var form = _forms.GetById(version.FormId)
+                ?? throw new InvalidOperationException($"Form version '{version.Id}' belongs to form '{version.FormId}', which doesn't exist.");
+            return Build(form, version);
+        }
+
+        public RenderedFormViewModel Build(Form form, FormVersion version)
+        {
             ReadFromTempData(version.FormId);
+            var clientModel = _clientModelBuilder.Build(form, version);
+
             var submissionGuards = new List<FormSubmissionGuardViewModel>();
-            if (_formSubmissionGuard is not null)
+            if (clientModel.SubmissionGuard is not null)
             {
                 submissionGuards.Add(new FormSubmissionGuardViewModel
                 {
-                    Alias = _formSubmissionGuard.Alias,
-                    Settings = _formSubmissionGuard.GetFrontendSettings(),
-                    PartialViewPath = _formSubmissionGuard.PartialViewPath
+                    Alias = clientModel.SubmissionGuard.Alias,
+                    Settings = clientModel.SubmissionGuard.Settings,
+                    PartialViewPath = _formSubmissionGuard?.PartialViewPath
                 });
             }
-            var fields = version.Definition.Fields.ToArray();
+
             return new RenderedFormViewModel
             {
-                Id = version.FormId,
-                Pages = version.Definition.Pages.Select((page, index) => BuildPage(page, index, fields)).ToList(),
-                SubmitLabel = string.IsNullOrWhiteSpace(version.Definition.SubmitLabel) ? DefaultSubmitLabel : version.Definition.SubmitLabel,
-                ShowProgress = version.Definition.ShowProgress,
+                Id = clientModel.Id,
+                Pages = clientModel.Pages.Select(page => BuildPage(page, version.Definition)).ToList(),
+                SubmitLabel = clientModel.SubmitLabel,
+                ShowProgress = clientModel.ShowProgress,
                 SubmissionGuards = submissionGuards,
                 HasErrors = _errors.Count > 0
             };
@@ -71,54 +82,38 @@ namespace SproutForms.Umbraco.Core.Services
                 _values = JsonSerializer.Deserialize<Dictionary<string, string>>(valuesRaw.ToString()!)!;
         }
 
-        private FormPageViewModel BuildPage(FormPage page, int index, FormField[] fields)
+        private FormPageViewModel BuildPage(FormClientPage page, FormDefinition definition)
             => new()
             {
-                Index = index,
+                Index = page.Index,
                 Title = page.Title,
-                Rows = page.Rows.Select(it => BuildRow(it, fields)).ToList(),
-                NextLabel = string.IsNullOrWhiteSpace(page.NextLabel) ? DefaultNextLabel : page.NextLabel,
-                PreviousLabel = string.IsNullOrWhiteSpace(page.PreviousLabel) ? DefaultPreviousLabel : page.PreviousLabel,
+                ProgressLabel = page.ProgressLabel,
+                Rows = page.Rows.Select(row => new FormRowViewModel
+                {
+                    Columns = row.Columns.Select(column => new FormColumnViewModel
+                    {
+                        Width = column.Width,
+                        // Razor views run on the server, so they get the whole configuration, not only what the browser may see
+                        Field = BuildField(column.Field, definition.Fields.First(field => field.Alias == column.Field.Alias))
+                    }).ToList()
+                }).ToList(),
+                NextLabel = page.NextLabel,
+                PreviousLabel = page.PreviousLabel,
                 Visibility = page.Visibility
             };
 
-        private FormRowViewModel BuildRow(FormRow row, FormField[] fields)
-            => new()
-            {
-                Columns = row.Columns.Select(it => BuildColumn(it, fields)).ToList()
-            };
-
-        // Required comes first, so an empty field shows the same message the server would
-        private static List<ValidationRule> GetValidationRules(FormField field, IFormFieldType fieldType)
+        private FormFieldViewModel BuildField(FormClientField clientField, FormField field)
         {
-            var rules = new List<ValidationRule>();
-            if (field.Required)
-            {
-                rules.Add(new ValidationRule
-                {
-                    Type = "required",
-                    Message = "Field is required."
-                });
-            }
-            rules.AddRange(fieldType.GetValidationRules(field.Configuration));
-            return rules;
-        }
-
-        private FormColumnViewModel BuildColumn(FormColumn column, FormField[] fields)
-        {
-            var field = fields.First(it => it.Alias == column.FieldAlias);
-            var fieldType = _fieldTypes.First(it => it.Alias == field.FieldTypeAlias);
-
             var fieldViewModel = new FormFieldViewModel
             {
-                Alias = field.Alias,
-                Label = field.Label,
-                Type = fieldType.Alias,
-                Required = field.Required,
-                RendersOwnLabel = fieldType.RendersOwnLabel,
+                Alias = clientField.Alias,
+                Label = clientField.Label,
+                Type = clientField.Type,
+                Required = clientField.Required,
+                RendersOwnLabel = clientField.RendersOwnLabel,
                 Configuration = field.Configuration,
-                Conditions = field.Conditions,
-                ValidationRules = GetValidationRules(field, fieldType),
+                Conditions = clientField.Conditions,
+                ValidationRules = clientField.ValidationRules,
             };
 
             if (_errors.TryGetValue(field.Alias, out var errors) is true)
@@ -130,11 +125,7 @@ namespace SproutForms.Umbraco.Core.Services
                 fieldViewModel.Value = value?.ToString();
             }
 
-            return new FormColumnViewModel
-            {
-                Width = column.Width,
-                Field = fieldViewModel
-            };
+            return fieldViewModel;
         }
     }
 }

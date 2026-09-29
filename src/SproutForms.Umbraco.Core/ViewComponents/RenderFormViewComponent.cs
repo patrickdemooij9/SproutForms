@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Components.RenderTree;
+using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Razor.TagHelpers;
 using Microsoft.Extensions.Logging;
@@ -49,7 +49,7 @@ namespace SproutForms.Umbraco.Core.TagHelpers
             }
             var formVersion = _formVersionRepository.GetPublished(form.Id);
 
-            var model = _formRenderingService.Build(formVersion!);
+            var model = _formRenderingService.Build(form, formVersion!);
             var resolvedTheme = _themeViewResolver.GetTheme(theme);
             // The views' partials read the theme from here, so they fall back per file too
             ViewData[FormThemeViewResolver.ViewDataKey] = resolvedTheme;

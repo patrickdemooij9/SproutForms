@@ -21,7 +21,16 @@ namespace SproutForms.Core.Models
 
         public ValidationResult Validate(JsonElement value, object configuration)
         {
-            var typedValue = ConvertValue(value);
+            TValue typedValue;
+            try
+            {
+                typedValue = ConvertValue(value);
+            }
+            // The headless API takes any JSON, such as a list for a field that holds one text
+            catch (Exception ex) when (ex is InvalidOperationException or FormatException or InvalidCastException or JsonException)
+            {
+                return ValidationResult.Fail(FormTexts.Invalid);
+            }
 
             return Validate(typedValue, (TConfig) configuration);
         }
@@ -42,6 +51,11 @@ namespace SproutForms.Core.Models
         {
             yield break;
         }
+
+        public object? GetClientConfiguration(object configuration)
+            => configuration is TConfig config ? GetClientConfiguration(config) : null;
+
+        protected virtual object? GetClientConfiguration(TConfig configuration) => configuration;
 
         protected abstract ValidationResult Validate(TValue value, TConfig configuration);
 

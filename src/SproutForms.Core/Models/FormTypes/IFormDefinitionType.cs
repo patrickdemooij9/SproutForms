@@ -23,5 +23,15 @@ namespace SproutForms.Core.Models.FormTypes
         /// quiz score, or errors that reject it.
         /// </summary>
         Task<FormTypeSubmissionResult> ProcessSubmissionAsync(FormTypeSubmissionContext context, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// The form settings of this type a front-end may see. Nothing by default, because they can hold what the visitor mustn't know.
+        /// </summary>
+        object? GetClientSettings(FormDefinition definition) => null;
+
+        /// <summary>
+        /// The extension settings of a field a front-end may see. Nothing by default: they can hold secrets such as a quiz's correct answer.
+        /// </summary>
+        object? GetClientFieldExtension(FormField field) => null;
     }
 }

@@ -179,6 +179,116 @@ A form built with only `Row` has a single page, and renders without page navigat
 document.addEventListener("sproutforms:pagechange", e => window.scrollTo({ top: e.target.offsetTop }));
 ```
 
+# Headless
+
+A front-end that isn't rendered by Umbraco, such as a Next.js, Nuxt or mobile app, can use SproutForms through its headless API. The API returns a published form's structure as JSON and accepts submissions. The front-end renders the form itself.
+
+> The headless API is new, and it may still change until SproutForms 1.0. Its routes are versioned (`/v1/`).
+
+## Turning it on
+
+The headless API is off by default:
+
+```json
+"SproutForms": {
+  "Headless": {
+    "Enabled": true,
+    "AllowedOrigins": [ "https://www.example.com" ],
+    "ApiKey": ""
+  }
+}
+```
+
+- `Enabled`: turns on the endpoints. While it's off, they answer 404. Changing it needs a restart for CORS and the OpenAPI document.
+- `AllowedOrigins`: the front-ends that call the API from a browser. They're allowed by CORS. A submission's `pageUrl` is only stored when it's on this site or on one of these origins; otherwise it's dropped.
+- `ApiKey`: when set, every request must send it in the `Api-Key` header. Only use it when your front-end calls the API from its own server. A key in browser code is public.
+
+The API has no antiforgery token, since the front-end runs on another origin. The submission guard keeps bots out instead. That's a honeypot field by default, or reCAPTCHA v3 with `builder.EnableSproutFormsRecaptchaV3()` and the `SproutForms:RecaptchaV3` settings. A bot can post to the API directly and leave the honeypot empty, so use reCAPTCHA for a form that attracts spam.
+
+## Endpoints
+
+All routes start with `/umbraco/sproutforms/delivery/api/v1`. The OpenAPI document is at `/umbraco/swagger/sproutforms-delivery/swagger.json`.
+
+| Endpoint | Does |
+|---|---|
+| `GET definitions/{idOrAlias}` | The published form: its pages, rows and columns, each column holding its field with its configuration, conditions and validation rules (the same shape as the Razor view model), the submission guard's settings and the default texts. The `ETag` is the published version, so a client can revalidate with `If-None-Match` (304). |
+| `POST entries/{id}` | Submits the form. The body is `{ "values": { "alias": value }, "pageUrl": "...", "guard": { ... } }` as JSON. With uploads, send `multipart/form-data` instead: `values` and `guard` as JSON parts, `pageUrl` as a text part, and each file as a part named after its field. Returns `{ "outcome": { "type", "data" } }`. |
+| `POST entries/{id}/pages/{index}/validate` | Checks one page of a paged form with `{ "values": { ... } }`, without saving anything. Returns 204 when the page is valid. |
+
+A rejected submission or page returns 400 as `application/problem+json`, with the errors keyed by field alias in `errors`. `submissionGuard`, and any other key that isn't a field, is about the whole form.
+
+`guard` holds what the submission guard checks: `{ "g-recaptcha-response": token }` for reCAPTCHA, or the honeypot's field (its name is in `submissionGuard.settings.fieldName`) with whatever that hidden input holds.
+
+The outcome's `data` depends on its type:
+- `message` has `message`.
+- `redirect` has `url`.
+- `redirectUmbracoPage` has `url`, `path` and `contentKey`, for your own router.
+
+When `outcome` is null, the submission was still saved. Show the form's `texts.submitSucceeded`.
+
+The definition never holds what a visitor mustn't see: the storage provider of an upload, workflows, the outcome's settings, or a form type's settings and field extensions (such as a quiz's correct answers). See [Showing settings to a headless front-end](#showing-settings-to-a-headless-front-end).
+
+## The JavaScript client
+
+[`@sproutforms/client`](src/SproutForms.Client) is a framework-agnostic client for the API, written in TypeScript. It doesn't render anything; it gives your components what they need:
+
+```ts
+import { createSproutFormsClient, validateForm, isFieldVisible, getNextPageIndex, handleOutcome, registerOutcomeHandler } from '@sproutforms/client';
+
+const client = createSproutFormsClient({ baseUrl: 'https://cms.example.com' });
+const form = await client.getDefinition('contact');
+
+// Render form.pages[i].rows[j].columns[k].field, the same shape as the Razor view model.
+// Hide a field while isFieldVisible(field, values) is false, and skip pages with getNextPageIndex(form, values, current).
+
+const errors = await validateForm(form, values);            // the same rules and conditions as the server
+if (Object.keys(errors).length === 0) {
+    const result = await client.submit(form, { values });   // adds the guard's values; uses multipart when a value is a File
+    if (!result.ok) showErrors(result.errors);
+    else if (!await handleOutcome(result.outcome, { definition: form })) showMessage(form.texts.submitSucceeded);
+}
+
+registerOutcomeHandler('redirectUmbracoPage', outcome => router.push(String(outcome.data.path)));
+```
+
+It also has:
+- `client.validatePage` for paged forms, and `client.revalidateDefinition` to check whether a copy you cached is out of date.
+- `isFieldOfType(field, 'select')`, which types a built-in field's `configuration`.
+- `registerValidator` for the validation rules of a custom field type. Rules without a validator are only checked by the server.
+- `registerSubmissionGuard` for a custom guard. The honeypot and reCAPTCHA v3 are built in; call `loadSubmissionGuard(form)` when the form shows.
+
+forms.js uses the same condition and validation code, so a Razor form and a headless form behave the same way.
+
+## Trying it out
+
+[`src/SproutForms.Client/example`](src/SproutForms.Client/example) is a playground for the headless API. It renders any form of the demo site with plain TypeScript, the way a front-end would (`src/form-renderer.ts`), and shows next to it:
+
+- **Requests**: every call to the API, with its headers and bodies.
+- **Definition**: what the definition endpoint returned.
+- **Stored submission**: the form's newest submission and its workflows.
+- **Raw request**: send any body to the API, such as a value the form can't produce.
+
+Switches in its header skip the validation in the browser, so you see the server's, or fill in the honeypot. It can also send an API key.
+
+Start the demo site and the playground together, which opens `http://localhost:5173`:
+
+```
+pwsh -File scripts/ai-test/run-headless-playground.ps1
+```
+
+`-Reset` starts from a clean database. The demo site's `AiTest` environment has the headless API on, with the playground's origin allowed.
+
+## Showing settings to a headless front-end
+
+A field type decides what the browser sees of its configuration with `GetClientConfiguration`. By default that's the whole configuration, so override it when yours holds something only the server needs:
+
+```csharp
+protected override object? GetClientConfiguration(FileFieldConfig configuration)
+    => new FileFieldClientConfig { MaxFileSizeBytes = configuration.MaxFileSizeBytes, AllowedExtensions = configuration.AllowedExtensions };
+```
+
+A form type shows nothing of its settings or field extensions unless it overrides `GetClientSettings(definition)` or `GetClientFieldExtension(field)`. Razor views still get the whole configuration.
+
 # Extending: form types
 
 A **form type** decides what kind of form something is: a standard form, a quiz, a poll, a product finder, or your own. Editors choose it when they create a form, and it can't be changed afterwards. A form type can:

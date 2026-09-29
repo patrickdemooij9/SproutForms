@@ -21,6 +21,10 @@ namespace SproutForms.Core.Models.FormTypes
         public virtual Task<FormTypeSubmissionResult> ProcessSubmissionAsync(FormTypeSubmissionContext context, CancellationToken cancellationToken)
             => Task.FromResult(FormTypeSubmissionResult.None);
 
+        public virtual object? GetClientSettings(FormDefinition definition) => null;
+
+        public virtual object? GetClientFieldExtension(FormField field) => null;
+
         /// <summary>
         /// The form's settings for this type, typed.
         /// </summary>
