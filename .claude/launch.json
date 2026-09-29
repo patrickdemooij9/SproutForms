@@ -13,6 +13,12 @@
       "runtimeArgs": ["-NoProfile", "-File", "scripts/ai-test/run-site.ps1", "-Reset", "-AdminPassword", "SproutForms-AiTest-1"],
       "port": 44370,
       "url": "https://localhost:44370"
+    },
+    {
+      "name": "sproutforms-headless-example",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "src/SproutForms.Client/example", "run", "dev"],
+      "port": 5173
     }
   ]
 }

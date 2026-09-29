@@ -1,3 +1,7 @@
+import { evaluateCondition } from "../../../SproutForms.Client/src/conditions";
+import { builtInValidators } from "../../../SproutForms.Client/src/validation";
+import type { ConditionDefinition } from "../../../SproutForms.Client/src/types";
+
 interface SubmissionGuard {
     load?: (form: HTMLFormElement, settings: Record<string, unknown>) => Promise<void>;
     beforeSubmit?: (form: HTMLFormElement, settings: Record<string, unknown>, payload: FormData) => Promise<void>;
@@ -120,54 +124,9 @@ window.SproutForms = {
                 this.registry = [];
             }
         },
+        // Shared with @sproutforms/client, so Razor and headless forms decide the same way as the server
         evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>): boolean {
-            if (!fieldConditions || !fieldConditions.rules || fieldConditions.rules.length === 0) {
-                return true;
-            }
-            const rules = fieldConditions.rules;
-            const operator = fieldConditions.operator || "All";
-
-            const results = rules.map(rule => {
-                const fieldValue = formValues[rule.fieldAlias];
-                const targetValue = rule.value;
-
-                switch (rule.comparison) {
-                    case "Equals":
-                        return String(fieldValue || "").toLowerCase() === String(targetValue || "").toLowerCase();
-                    case "NotEquals":
-                        return String(fieldValue || "").toLowerCase() !== String(targetValue || "").toLowerCase();
-                    case "Contains":
-                        return String(fieldValue || "").toLowerCase().includes(String(targetValue || "").toLowerCase());
-                    case "GreaterThan":
-                        return parseFloat(String(fieldValue)) > parseFloat(String(targetValue));
-                    case "LessThan":
-                        return parseFloat(String(fieldValue)) < parseFloat(String(targetValue));
-                    case "IsEmpty":
-                        return !fieldValue || String(fieldValue).trim() === "";
-                    case "IsNotEmpty":
-                        return fieldValue && String(fieldValue).trim() !== "";
-                    case "MatchesRegex":
-                        try {
-                            return new RegExp(String(targetValue)).test(String(fieldValue || ""));
-                        } catch {
-                            return false;
-                        }
-                    case "DoesNotMatchRegex":
-                        try {
-                            return !new RegExp(String(targetValue)).test(String(fieldValue || ""));
-                        } catch {
-                            return false;
-                        }
-                    default:
-                        return true;
-                }
-            });
-
-            if (operator === "All") {
-                return results.every(r => r === true);
-            } else {
-                return results.some(r => r === true);
-            }
+            return evaluateCondition(fieldConditions as ConditionDefinition | undefined, formValues);
         }
     },
     validation: {
@@ -722,85 +681,21 @@ window.SproutForms.submissionGuard.register("recaptchaV3", {
     }
 });
 
-window.SproutForms.validation.register("required", async (value) => {
-    if (!value) return false;
-    return value.trim().length > 0;
-});
-
-window.SproutForms.validation.register("minLength", async (value, options) => {
-    if (!value) return true;
-    return value.length >= parseInt(options.sfMinLength || "0");
-});
-
-window.SproutForms.validation.register("maxLength", async (value, options) => {
-    if (!value) return true;
-    return value.length <= parseInt(options.sfMaxLength || "999999");
-});
+// The built-in rules are shared with @sproutforms/client; forms.js reads a rule's value from the field's data attribute.
+// None of them look at the field or the other values, so they get an empty context
+const emptyValidatorContext = { field: { alias: "", label: "", type: "", required: false, rendersOwnLabel: false, validationRules: [] }, values: {} };
+for (const [type, validator] of Object.entries(builtInValidators)) {
+    window.SproutForms.validation.register(type, async (value, options) => {
+        if (!value) return type !== "required";
+        const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
+        return validator(value, { type, value: options[`sf${capitalizedType}`] }, emptyValidatorContext);
+    });
+}
 
 window.SproutForms.validation.register("sameAs", async (value, options, context) => {
     if (!context) return false;
     const other = context.querySelector(`[name="${options.sfOther}"]`) as HTMLInputElement | null;
     return other && value === other.value;
-});
-
-window.SproutForms.validation.register("regex", async (value, options) => {
-    if (!value) return true;
-
-    const pattern = options.sfRegex;
-    if (!pattern) return true;
-
-    let regex: RegExp;
-
-    try {
-        regex = new RegExp(pattern);
-    } catch (e) {
-        console.warn("Invalid regex pattern:", pattern);
-        return false;
-    }
-
-    return regex.test(value);
-});
-
-window.SproutForms.validation.register("minDate", async (value, options) => {
-    if (!value) return true;
-
-    const minDateValue = options.sfMinDate;
-    if (!minDateValue) return true;
-
-    const inputDate = new Date(value);
-    const minDate = new Date(minDateValue);
-
-    if (isNaN(inputDate.getTime()) || isNaN(minDate.getTime())) {
-        console.warn("Invalid date value in minDate validator.");
-        return true;
-    }
-
-    if (inputDate >= minDate) {
-        return true;
-    }
-
-    return false;
-});
-
-window.SproutForms.validation.register("maxDate", async (value, options) => {
-    if (!value) return true;
-
-    const maxDateValue = options.sfMaxDate;
-    if (!maxDateValue) return true;
-
-    const inputDate = new Date(value);
-    const maxDate = new Date(maxDateValue);
-
-    if (isNaN(inputDate.getTime()) || isNaN(maxDate.getTime())) {
-        console.warn("Invalid date value in maxDate validator.");
-        return true;
-    }
-
-    if (inputDate <= maxDate) {
-        return true;
-    }
-
-    return false;
 });
 
 // Clears the errors inside root: the whole form, or a single page

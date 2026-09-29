@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { minify as minifyJs } from 'terser';
 import cssnano from 'cssnano';
 import postcss from 'postcss';
-import { execSync } from 'child_process';
+import { build } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.join(__dirname, '../../../SproutForms.Umbraco.Core/wwwroot/forms-src');
@@ -18,23 +18,30 @@ const filesConfig = [
     { src: 'forms-default-theme.css', type: 'css' }
 ];
 
-function compileTypeScript(srcPath, outPath) {
+// forms.ts imports the conditions and validation of @sproutforms/client (src/SproutForms.Client), so it is bundled
+// into one script, not compiled on its own
+async function bundleTypeScript(srcPath, outPath) {
     try {
-        const assetsDir = path.join(__dirname, '..');
-        const tscPath = path.join(assetsDir, 'node_modules', '.bin', 'tsc');
-
-        let tscCmd;
-        if (fs.existsSync(tscPath)) {
-            tscCmd = `"${tscPath}"`;
-        } else {
-            tscCmd = 'npx tsc';
-        }
-
-        const cmd = `${tscCmd} "${srcPath}" --outDir "${path.dirname(outPath)}" --target ES2020 --module ESNext --moduleResolution node --strict false --esModuleInterop true --skipLibCheck true`;
-        execSync(cmd, { stdio: 'inherit' });
+        await build({
+            configFile: false,
+            logLevel: 'warn',
+            build: {
+                lib: {
+                    entry: srcPath,
+                    formats: ['iife'],
+                    name: 'SproutFormsBundle',
+                    fileName: () => path.basename(outPath)
+                },
+                outDir: path.dirname(outPath),
+                emptyOutDir: false,
+                minify: 'terser',
+                sourcemap: false,
+                target: 'es2020'
+            }
+        });
         return true;
     } catch (error) {
-        console.error('✗ TypeScript compilation error:', error.message);
+        console.error('✗ TypeScript bundling error:', error.message);
         return false;
     }
 }
@@ -53,22 +60,12 @@ async function minifyFile(config) {
         const content = fs.readFileSync(srcPath, 'utf-8');
 
         if (config.type === 'ts') {
-            const compiledPath = path.join(path.dirname(srcPath), path.basename(config.src, '.ts') + '.js');
-            
-            const success = compileTypeScript(srcPath, compiledPath);
+            const success = await bundleTypeScript(srcPath, outPath);
             if (!success) {
-                console.error(`✗ Failed to compile TypeScript: ${config.src}`);
-                return;
+                console.error(`✗ Failed to bundle TypeScript: ${config.src}`);
+                process.exit(1);
             }
-
-            if (fs.existsSync(compiledPath)) {
-                let compiledContent = fs.readFileSync(compiledPath, 'utf-8');
-                compiledContent = compiledContent.replace(/export \{\};/g, '');
-                const result = await minifyJs(compiledContent);
-                fs.writeFileSync(outPath, result.code);
-                fs.unlinkSync(compiledPath);
-                console.log(`✓ Compiled and minified: ${config.src} -> ${outName}`);
-            }
+            console.log(`✓ Bundled and minified: ${config.src} -> ${outName}`);
         } else if (config.type === 'js') {
             const result = await minifyJs(content);
             fs.writeFileSync(outPath, result.code);

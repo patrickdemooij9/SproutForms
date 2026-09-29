@@ -29,7 +29,7 @@
                 <ol class="form-progress" data-sf-progress hidden>
                     @foreach (var formPage in Model.Pages)
                     {
-                        <li class="form-progress-step" data-sf-progress-step="@formPage.Index">@(string.IsNullOrWhiteSpace(formPage.Title) ? $"Step {formPage.Index + 1}" : formPage.Title)</li>
+                        <li class="form-progress-step" data-sf-progress-step="@formPage.Index">@formPage.ProgressLabel</li>
                     }
                 </ol>
             }

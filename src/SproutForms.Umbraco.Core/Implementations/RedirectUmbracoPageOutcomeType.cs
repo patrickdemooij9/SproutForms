@@ -1,4 +1,5 @@
 using SproutForms.Core.Models.Outcomes;
+using Umbraco.Cms.Core.Models.PublishedContent;
 using Umbraco.Cms.Core.Web;
 using Umbraco.Extensions;
 
@@ -26,12 +27,16 @@ namespace SproutForms.Umbraco.Core.Implementations
         {
             var config = (RedirectUmbracoPageOutcomeConfig)context.Configuration;
             using var ctx = _umbracoContextFactory.EnsureUmbracoContext();
+            var page = ctx.UmbracoContext.Content.GetById(config.NodeKey!.Value);
             return Task.FromResult(new OutcomeResult
             {
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
-                    ["url"] = ctx.UmbracoContext.Content.GetById(config.NodeKey!.Value)?.Url()
+                    ["url"] = page?.Url(),
+                    // A headless front-end has its own routing, so it gets the page itself too
+                    ["contentKey"] = page?.Key,
+                    ["path"] = page?.Url(mode: UrlMode.Relative)
                 }
             });
         }

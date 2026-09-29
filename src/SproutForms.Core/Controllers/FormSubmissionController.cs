@@ -1,7 +1,5 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
-using SproutForms.Core.Fields.Configs;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Outcomes;
@@ -20,24 +18,21 @@ namespace SproutForms.Core.Controllers
         private readonly IFormRepository _forms;
         private readonly IFormVersionRepository _formVersions;
         private readonly IFormSubmissionService _submissionService;
-        private readonly IEnumerable<IFormSubmitOutcomeType> _outcomeTypes;
+        private readonly FormSubmitOutcomeRunner _outcomeRunner;
         private readonly IFormSubmissionGuard? _formSubmissionGuard;
-        private readonly ILogger<FormSubmissionController> _logger;
 
         public FormSubmissionController(
             IFormRepository forms,
             IFormVersionRepository formVersions,
             IFormSubmissionService submissionService,
-            IEnumerable<IFormSubmitOutcomeType> outcomeTypes,
-            IFormSubmissionGuard? formSubmissionGuard,
-            ILogger<FormSubmissionController> logger)
+            FormSubmitOutcomeRunner outcomeRunner,
+            IFormSubmissionGuard? formSubmissionGuard)
         {
             _forms = forms;
             _formVersions = formVersions;
             _submissionService = submissionService;
-            _outcomeTypes = outcomeTypes;
+            _outcomeRunner = outcomeRunner;
             _formSubmissionGuard = formSubmissionGuard;
-            _logger = logger;
         }
 
         [HttpPost("{id}")]
@@ -101,30 +96,7 @@ namespace SproutForms.Core.Controllers
                 return RedirectBack(pageUrl);
             }
 
-            // The submission is saved at this point, so a broken outcome must not turn it into an error the visitor would resubmit
-            var outcomeType = _outcomeTypes.FirstOrDefault(it => it.Alias == formVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
-            OutcomeResult? outcomeResult = null;
-            if (outcomeType is null)
-            {
-                _logger.LogError("Form {FormId} uses submit outcome type {OutcomeTypeAlias}, which is not registered", formVersion.FormId, formVersion.Definition.SubmitOutcome.OutcomeTypeAlias);
-            }
-            else
-            {
-                try
-                {
-                    outcomeResult = await outcomeType.HandleAsync(new FormSubmitOutcomeContext
-                    {
-                        Configuration = formVersion.Definition.SubmitOutcome.Configuration,
-                        Submission = result.Submission!,
-                        Version = formVersion
-                    }, HttpContext.RequestAborted);
-                    outcomeResult.OutcomeTypeAlias = outcomeType.Alias;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Submit outcome type {OutcomeTypeAlias} of form {FormId} failed for submission {SubmissionId}", outcomeType.Alias, formVersion.FormId, result.Submission!.Id);
-                }
-            }
+            var outcomeResult = await _outcomeRunner.RunAsync(formVersion, result.Submission!, HttpContext.RequestAborted);
 
             if (IsAjaxRequest(Request))
             {
@@ -178,11 +150,8 @@ namespace SproutForms.Core.Controllers
         private FormVersion? GetPublishedVersion(Guid formId)
             => _forms.GetById(formId) is { IsTrashed: false } ? _formVersions.GetPublished(formId) : null;
 
-        // Only the form's own fields, and file field values only from an actual upload, never from a posted text value
         private static Dictionary<string, JsonElement> GetFieldValues(FormVersion formVersion, Dictionary<string, string> values)
-            => values
-                .Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key && f.Configuration is not FileFieldConfig))
-                .ToDictionary(kvp => kvp.Key, kvp => JsonSerializer.SerializeToElement(kvp.Value));
+            => SubmittedFieldValues.Filter(formVersion, values.Select(it => KeyValuePair.Create(it.Key, JsonSerializer.SerializeToElement(it.Value))));
 
         /// <summary>
         /// Redirects to the page the form was posted from, but only to a page on this site; the posted page URL and the Referer header are both client-controlled.
@@ -200,7 +169,5 @@ namespace SproutForms.Core.Controllers
             return request.Headers["X-Requested-With"] == "XMLHttpRequest"
                 || request.Headers["Accept"].Any(x => x?.Contains("application/json") == true);
         }
-
-        //TODO: Add endpoint for headless use
     }
 }

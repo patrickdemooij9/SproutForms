@@ -92,7 +92,7 @@ namespace SproutForms.Core.Services
                     SubmittedAt = DateTime.UtcNow,
                     Values = values,
                     Results = typeResult.Results.ToDictionary(it => it.Key, it => JsonSerializer.SerializeToElement(it.Value)),
-                    PageUrl = httpContext is null ? null : SameHostUrl.GetOrNull(request.PageUrl, httpContext.Request),
+                    PageUrl = GetPageUrl(request.PageUrl, httpContext),
                     IpAddress = _options.CurrentValue.StoreIpAddress ? httpContext?.Connection.RemoteIpAddress?.ToString() : null
                 };
 
@@ -115,6 +115,17 @@ namespace SproutForms.Core.Services
                 await DeleteStoredFilesAsync(storedFiles);
                 throw;
             }
+        }
+
+        // The page URL is posted by the client, so it is only kept when it is on this site or on a front-end the headless API allows
+        private string? GetPageUrl(string? pageUrl, HttpContext? httpContext)
+        {
+            if (httpContext is null)
+                return null;
+
+            var headless = _options.CurrentValue.Headless;
+            return SameHostUrl.GetOrNull(pageUrl, httpContext.Request)
+                ?? (headless.Enabled ? AllowedOriginUrl.GetOrNull(pageUrl, headless.AllowedOrigins) : null);
         }
 
         // A form whose type is no longer registered is still accepted, without the type's processing
@@ -175,7 +186,7 @@ namespace SproutForms.Core.Services
                 var isEmpty = string.IsNullOrWhiteSpace(rawValue.ToString());
                 if (isRequired && isEmpty)
                 {
-                    AddError(errors, field.Alias, "Field is required.");
+                    AddError(errors, field.Alias, FormTexts.Required);
                     continue;
                 }
 

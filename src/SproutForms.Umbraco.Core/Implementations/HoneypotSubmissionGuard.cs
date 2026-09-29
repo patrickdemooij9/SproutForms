@@ -19,9 +19,10 @@ namespace SproutForms.Umbraco.Core.Implementations
             return Task.FromResult(new SubmissionGuardResult { Allowed = true });
         }
 
+        // A headless front-end renders the field itself, so it needs its name
         public object? GetFrontendSettings()
         {
-            return null;
+            return new { FieldName };
         }
     }
 }

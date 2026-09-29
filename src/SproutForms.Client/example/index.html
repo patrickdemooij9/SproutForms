@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SproutForms Headless Playground</title>
+    <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+    <header>
+        <h1>SproutForms headless playground</h1>
+        <div class="settings">
+            <label>Form <select id="form-select"></select></label>
+            <button type="button" id="reload">Reload</button>
+            <label>Site <input id="base-url" type="url" /></label>
+            <label>API key <input id="api-key" type="password" placeholder="only when configured" /></label>
+            <label class="toggle"><input id="skip-validation" type="checkbox" /> Skip browser validation</label>
+            <label class="toggle"><input id="fill-honeypot" type="checkbox" /> Fill in the honeypot</label>
+        </div>
+    </header>
+    <main>
+        <section class="panel">
+            <h2>Form</h2>
+            <p class="muted">Rendered from the definition by <code>src/form-renderer.ts</code>, like your front-end would.</p>
+            <div id="form"></div>
+        </section>
+        <section class="panel">
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" data-tab="requests">Requests <span id="requests-count" class="badge">0</span></button>
+                <button type="button" role="tab" data-tab="definition">Definition</button>
+                <button type="button" role="tab" data-tab="submission">Stored submission</button>
+                <button type="button" role="tab" data-tab="raw">Raw request</button>
+            </div>
+            <div data-panel="requests">
+                <div class="panel-actions"><button type="button" id="clear-requests">Clear</button></div>
+                <div id="requests"></div>
+            </div>
+            <div data-panel="definition" hidden>
+                <p class="muted">What <code>GET definitions/{idOrAlias}</code> returned.</p>
+                <pre id="definition"></pre>
+            </div>
+            <div data-panel="submission" hidden>
+                <div class="panel-actions">
+                    <span class="muted">The form's newest submission and its workflows. The worker runs every 10 seconds.</span>
+                    <button type="button" id="refresh-submission">Refresh</button>
+                </div>
+                <pre id="submission"></pre>
+            </div>
+            <div data-panel="raw" hidden>
+                <p class="muted">Send anything to the API, such as values the renderer can't produce.</p>
+                <div class="raw-line">
+                    <select id="raw-method"><option>POST</option><option>GET</option></select>
+                    <input id="raw-path" type="text" aria-label="Path after /umbraco/sproutforms/delivery/api/v1/" />
+                    <select id="raw-type" aria-label="Content type"><option>application/json</option><option>text/plain</option></select>
+                </div>
+                <textarea id="raw-body" rows="14" spellcheck="false" aria-label="Body"></textarea>
+                <div class="panel-actions">
+                    <button type="button" id="raw-reset">Reset body</button>
+                    <button type="button" id="raw-send">Send</button>
+                </div>
+                <pre id="raw-response"></pre>
+            </div>
+        </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
