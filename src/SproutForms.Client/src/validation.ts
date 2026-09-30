@@ -1,15 +1,18 @@
 import type { FormClientField, FormClientModel, FormClientTexts, ValidationRule } from './api/types.gen';
-import { isFieldRequired, isFieldVisible, isPageVisible, toConditionText } from './conditions';
-import { getPageFields } from './pages';
+import { getEntryScope, isFieldRequired, isFieldVisible, isPageVisible, toConditionText } from './conditions';
+import { getEntries, getEntryPrefix, getGroupFields, getPageFields, isFieldGroup } from './pages';
 import type { FormErrors, FormValues } from './types';
 
 export interface ValidatorContext {
     field: FormClientField;
+    // For a field in a field group's entry, the entry's values over the form's (see getEntryScope)
     values: FormValues;
 }
 
 /**
- * Checks one validation rule. The value is never empty: an empty field only fails "required".
+ * Checks one validation rule. The value is never empty: an empty field only fails "required". A field group, such as a
+ * repeater, is the exception: its value is the number of entries the visitor filled in (see toFieldText), empty for none, and
+ * its rules run for none too.
  */
 export type Validator = (value: string, rule: ValidationRule, context: ValidatorContext) => boolean | Promise<boolean>;
 
@@ -19,6 +22,11 @@ function checkDate(value: string, limit: unknown, check: (input: Date, limit: Da
     // A date that can't be read is left to the server
     if (isNaN(input.getTime()) || isNaN(limitDate.getTime())) return true;
     return check(input, limitDate);
+}
+
+// A field group's value: the number of entries filled in, where an empty value is none
+function toItemCount(value: string | null | undefined): number {
+    return Number(value || 0);
 }
 
 /**
@@ -37,7 +45,9 @@ export const builtInValidators: Readonly<Record<string, Validator>> = {
         }
     },
     minDate: (value, rule) => checkDate(value, rule.value, (input, min) => input >= min),
-    maxDate: (value, rule) => checkDate(value, rule.value, (input, max) => input <= max)
+    maxDate: (value, rule) => checkDate(value, rule.value, (input, max) => input <= max),
+    minItems: (value, rule) => toItemCount(value) >= Number(rule.value ?? 0),
+    maxItems: (value, rule) => rule.value === null || rule.value === undefined || toItemCount(value) <= Number(rule.value)
 };
 
 const validators = new Map<string, Validator>(Object.entries(builtInValidators));
@@ -50,23 +60,46 @@ export function registerValidator(type: string, validator: Validator): void {
 }
 
 /**
- * The text a field submits: a checkbox counts as filled in only when it is checked, and an upload by its file name.
+ * The text a field submits: a checkbox counts as filled in only when it is checked, and an upload by its file name. A field
+ * group counts its filled-in entries, and is empty without any.
  */
 export function toFieldText(field: FormClientField, value: unknown): string {
     if (field.type === 'checkbox') return value === true || value === 'true' ? 'true' : '';
+    if (isFieldGroup(field)) {
+        const count = countFilledEntries(field, value);
+        return count === 0 ? '' : String(count);
+    }
     return toConditionText(value);
 }
 
 /**
+ * An entry the visitor left empty: none of its fields is filled in, with an unticked checkbox counting as empty. The server drops
+ * these entries before validating, so they aren't validated and don't count towards minItems and maxItems.
+ */
+export function isBlankEntry(field: FormClientField, entry: FormValues): boolean {
+    return getGroupFields(field).every(child => toFieldText(child, entry[child.alias]).trim() === '');
+}
+
+/**
+ * The entries of a field group's value that aren't blank.
+ */
+export function countFilledEntries(field: FormClientField, value: unknown): number {
+    return getEntries(value).filter(entry => !isBlankEntry(field, entry)).length;
+}
+
+/**
  * The first error of a field, or undefined when it is valid. Rule types without a registered validator are skipped: the server
- * checks every rule again.
+ * checks every rule again. For a field in a field group's entry, pass the entry's scope (see getEntryScope) as values. A field
+ * group's own rules are checked, not its entries: validateForm does those.
  */
 export async function validateField(field: FormClientField, values: FormValues, texts: FormClientTexts): Promise<string | undefined> {
     const value = toFieldText(field, values[field.alias]);
     const requiredRule = field.validationRules.find(rule => rule.type === 'required');
 
     if (value.trim() === '') {
-        return isFieldRequired(field, values) ? requiredRule?.message ?? texts.required : undefined;
+        if (isFieldRequired(field, values)) return requiredRule?.message ?? texts.required;
+        // A field group without entries still has too few of them, as on the server
+        if (!isFieldGroup(field)) return undefined;
     }
 
     for (const rule of field.validationRules) {
@@ -89,19 +122,37 @@ export interface ValidateFormOptions {
 
 /**
  * Validates the fields the visitor can see: fields hidden by their conditions and fields on skipped pages aren't validated,
- * on the server either.
+ * on the server either. The fields in a field group's entries are validated too, except in blank entries, and their errors are
+ * keyed by path, such as "people[2].email", with the index as submitted.
  */
 export async function validateForm(definition: FormClientModel, values: FormValues, options: ValidateFormOptions = {}): Promise<FormErrors> {
     const errors: FormErrors = {};
     const pages = definition.pages.filter(page => options.pageIndex === undefined ? isPageVisible(page, values) : page.index === options.pageIndex);
 
     for (const page of pages) {
-        for (const field of getPageFields(page)) {
-            if (!isFieldVisible(field, values)) continue;
-
-            const error = await validateField(field, values, definition.texts);
-            if (error) errors[field.alias] = [error];
-        }
+        await validateFields(getPageFields(page), values, values, '', definition.texts, errors);
     }
     return errors;
+}
+
+/**
+ * Validates the fields of the form, or of one entry of a field group: its own values, and the scope its conditions see.
+ */
+async function validateFields(fields: FormClientField[], values: FormValues, scope: FormValues, pathPrefix: string, texts: FormClientTexts, errors: FormErrors): Promise<void> {
+    for (const field of fields) {
+        if (!isFieldVisible(field, scope)) continue;
+
+        const path = pathPrefix + field.alias;
+        if (isFieldGroup(field)) {
+            const entries = getEntries(values[field.alias]);
+            for (let index = 0; index < entries.length; index++) {
+                const entry = entries[index];
+                if (isBlankEntry(field, entry)) continue;
+                await validateFields(getGroupFields(field), entry, getEntryScope(entry, scope), getEntryPrefix(path, index), texts, errors);
+            }
+        }
+
+        const error = await validateField(field, scope, texts);
+        if (error) errors[path] = [error];
+    }
 }

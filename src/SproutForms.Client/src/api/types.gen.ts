@@ -59,6 +59,7 @@ export type FormClientField = {
     conditions?: FieldConditions | null;
     validationRules: Array<ValidationRule>;
     extension?: unknown;
+    rows?: Array<FormClientRow> | null;
 };
 
 export type FormClientModel = {
@@ -107,24 +108,8 @@ export type HeadlessOutcome = {
     };
 };
 
-export type HeadlessSubmitRequest = {
-    values: {
-        [key: string]: unknown;
-    };
-    pageUrl?: string | null;
-    guard: {
-        [key: string]: string;
-    };
-};
-
 export type HeadlessSubmitResponse = {
     outcome?: HeadlessOutcome | null;
-};
-
-export type HeadlessValidatePageRequest = {
-    values: {
-        [key: string]: unknown;
-    };
 };
 
 export type NotificationHeaderModel = {
@@ -179,7 +164,9 @@ export type GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses = 
 export type GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponse = GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses[keyof GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses];
 
 export type PostUmbracoSproutformsDeliveryApiV1EntriesByIdData = {
-    body: HeadlessSubmitRequest;
+    body: {
+        [key: string]: unknown;
+    };
     path: {
         id: string;
     };
@@ -214,7 +201,9 @@ export type PostUmbracoSproutformsDeliveryApiV1EntriesByIdResponses = {
 export type PostUmbracoSproutformsDeliveryApiV1EntriesByIdResponse = PostUmbracoSproutformsDeliveryApiV1EntriesByIdResponses[keyof PostUmbracoSproutformsDeliveryApiV1EntriesByIdResponses];
 
 export type PostUmbracoSproutformsDeliveryApiV1EntriesByIdPagesByPageIndexValidateData = {
-    body?: HeadlessValidatePageRequest;
+    body?: {
+        [key: string]: unknown;
+    };
     path: {
         id: string;
         pageIndex: number;

@@ -18,5 +18,8 @@ namespace SproutForms.Core.Models.ClientModels
 
         // From IFormDefinitionType.GetClientFieldExtension; nothing unless the form type shares it
         public object? Extension { get; init; }
+
+        // The layout of each entry of a field group, such as a repeater; null for any other field
+        public IReadOnlyList<FormClientRow>? Rows { get; init; }
     }
 }

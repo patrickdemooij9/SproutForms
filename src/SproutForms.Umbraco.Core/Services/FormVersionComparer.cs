@@ -50,10 +50,10 @@ namespace SproutForms.Umbraco.Core.Services
                     i < version.Pages.Count ? DescribePage(version.Pages[i], version) : null);
             }
 
-            foreach (var alias in MatchByAlias(current.Fields.Select(it => it.Alias), version.Fields.Select(it => it.Alias)))
+            foreach (var alias in MatchByAlias(current.GetAllFields().Select(it => it.Alias), version.GetAllFields().Select(it => it.Alias)))
             {
-                var currentField = current.Fields.FirstOrDefault(it => it.Alias == alias);
-                var versionField = version.Fields.FirstOrDefault(it => it.Alias == alias);
+                var currentField = current.FindField(alias);
+                var versionField = version.FindField(alias);
                 var label = versionField?.Label ?? currentField!.Label;
                 AddChange(changes, FormChangeSection.Field, ItemName(label, alias),
                     currentField is null ? null : DescribeField(currentField, formTypeDescriptor),
@@ -138,22 +138,23 @@ namespace SproutForms.Umbraco.Core.Services
 
         private static Dictionary<string, string?> DescribePage(FormPage page, FormDefinition definition)
         {
-            // The layout reads like the canvas: columns side by side, rows below each other
-            var layout = string.Join(" / ", page.Rows.Select(row => string.Join(" + ", row.Columns.Select(column =>
-            {
-                var label = definition.Fields.FirstOrDefault(it => it.Alias == column.FieldAlias)?.Label ?? column.FieldAlias;
-                return $"{label} ({column.Width})";
-            }))));
-
             return new Dictionary<string, string?>
             {
                 ["Title"] = page.Title,
-                ["Fields"] = layout,
+                ["Fields"] = DescribeLayout(page, definition.Fields),
                 ["Next button label"] = page.NextLabel,
                 ["Previous button label"] = page.PreviousLabel,
                 ["Visibility"] = page.Visibility is null ? null : JsonSerializer.Serialize(page.Visibility)
             };
         }
+
+        // The layout reads like the canvas: columns side by side, rows below each other
+        private static string DescribeLayout(IFormLayout layout, IReadOnlyList<FormField> fields)
+            => string.Join(" / ", layout.Rows.Select(row => string.Join(" + ", row.Columns.Select(column =>
+            {
+                var label = fields.FirstOrDefault(it => it.Alias == column.FieldAlias)?.Label ?? column.FieldAlias;
+                return $"{label} ({column.Width})";
+            }))));
 
         private Dictionary<string, string?> DescribeField(FormField field, IFormDefinitionTypeDescriptor? formTypeDescriptor)
         {
@@ -165,6 +166,10 @@ namespace SproutForms.Umbraco.Core.Services
                 ["Required"] = Format(field.Required)
             };
             AddProperties(description, descriptor is null ? null : descriptor.FromConfig, field.Configuration, "Configuration");
+            if (field.Configuration is IFormFieldGroupConfiguration group)
+            {
+                description["Fields"] = DescribeLayout(group, group.Fields);
+            }
 
             description["Conditions"] = field.Conditions is null ? null : JsonSerializer.Serialize(field.Conditions);
 

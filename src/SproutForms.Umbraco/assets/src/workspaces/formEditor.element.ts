@@ -9,7 +9,7 @@ import {
 
 import "./formCanvas.element";
 import "./formInspector.element";
-import { FormColumnDto, FormFieldDto, FormRowDto, SelectedState } from "../models";
+import { FieldContainer, FormColumnDto, FormFieldDto, FormRowDto, SelectedState } from "../models";
 
 @customElement("form-editor")
 export class FormEditorElement extends UmbElementMixin(LitElement) {
@@ -43,12 +43,14 @@ export class FormEditorElement extends UmbElementMixin(LitElement) {
       row: FormRowDto;
       column: FormColumnDto;
       field: FormFieldDto;
+      container?: FieldContainer;
     }>
   ) {
     this.selectedState = {
       row: e.detail.row,
       field: e.detail.field?.id,
       column: e.detail.column,
+      container: e.detail.container,
     };
   }
 

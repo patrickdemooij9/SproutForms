@@ -1,17 +1,23 @@
-using SproutForms.Core.Fields.Configs;
-using SproutForms.Core.Models;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace SproutForms.Core.Helpers
 {
     public static class SubmittedFieldValues
     {
         /// <summary>
-        /// Only the form's own fields, and no value for a file field: that only comes from an actual upload, never from a posted value.
+        /// The values of a posted HTML form. The inputs of a field group's entries are named by their path, such as "people[0].firstName",
+        /// and come together in the group's list of entries. Which of them the form's fields take is up to the submission service.
         /// </summary>
-        public static Dictionary<string, JsonElement> Filter(FormVersion formVersion, IEnumerable<KeyValuePair<string, JsonElement>> values)
-            => values
-                .Where(it => formVersion.Definition.Fields.Any(f => f.Alias == it.Key && f.Configuration is not FileFieldConfig))
-                .ToDictionary(it => it.Key, it => it.Value);
+        public static Dictionary<string, JsonElement> FromPostedForm(IEnumerable<KeyValuePair<string, string>> values)
+        {
+            var result = new JsonObject();
+            foreach (var (name, value) in values)
+            {
+                if (FieldPath.TryParse(name, out var path))
+                    path.SetValue(result, JsonValue.Create(value));
+            }
+            return result.ToDictionary(it => it.Key, it => JsonSerializer.SerializeToElement(it.Value));
+        }
     }
 }

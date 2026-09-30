@@ -92,6 +92,22 @@ namespace SproutForms.Core.Builders
             return column.Field<FileFieldConfig, string>(alias, label, fieldType, fieldType.DefaultConfiguration);
         }
 
+        /// <summary>
+        /// A group of fields the visitor can fill in more than once, laid out in rows like a page.
+        /// </summary>
+        public static FieldBuilder<RepeaterFieldConfig, List<Dictionary<string, JsonElement>>> Repeater(
+            this ColumnBuilder column,
+            string alias,
+            string label,
+            Action<FieldGroupBuilder> configure)
+        {
+            var fieldType = new RepeaterFieldType();
+            var config = fieldType.DefaultConfiguration;
+            var field = column.Field<RepeaterFieldConfig, List<Dictionary<string, JsonElement>>>(alias, label, fieldType, config);
+            configure(new FieldGroupBuilder(column.Form, config));
+            return field;
+        }
+
         public static FieldBuilder<TConfig, TValue> Field<TConfig, TValue>(
         this ColumnBuilder column,
         string alias,
@@ -107,7 +123,7 @@ namespace SproutForms.Core.Builders
                 Configuration = config,
             };
 
-            column.Form.RegisterField(field);
+            column.Form.RegisterField(field, column.GroupFields);
 
             return new FieldBuilder<TConfig, TValue>(
                 column, field, config);

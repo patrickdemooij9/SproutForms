@@ -10,5 +10,8 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public string DisplayName { get; set; }
         public string Icon { get; set; }
         public FormPropertyBackofficeModel[] Properties { get; set; }
+
+        // A field group, such as a repeater, holds fields of its own
+        public bool IsFieldGroup { get; set; }
     }
 }

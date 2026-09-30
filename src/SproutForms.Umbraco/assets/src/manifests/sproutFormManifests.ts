@@ -49,6 +49,7 @@ import { SUBMISSION_ENTITY_TYPE, TRASHED_FORM_ENTITY_TYPE, TRASHED_SUBMISSION_EN
 import { ManifestEntityAction } from "@umbraco-cms/backoffice/entity-action";
 import { SubmissionFieldManifest } from "./submissionFieldManifest";
 import FileSubmissionFieldElement from "../workspaces/submissionEditors/fileSubmissionField.element";
+import RepeaterSubmissionFieldElement from "../workspaces/submissionEditors/repeaterSubmissionField.element";
 import { FormFieldConfigManifest } from "./formFieldConfigManifest";
 import KeyValuePairProperty from "../workspaces/fieldEditors/keyValuePairProperty.element";
 import FieldOptionPickerProperty from "../workspaces/fieldEditors/fieldOptionPickerProperty.element";
@@ -578,6 +579,14 @@ const FileFieldSubmissionField: SubmissionFieldManifest = {
   fieldTypeAlias: "file",
 };
 
+const RepeaterFieldSubmissionField: SubmissionFieldManifest = {
+  type: "submissionField",
+  alias: "sproutForms.submissionField.repeater",
+  name: "Repeater Field Submission Field",
+  element: RepeaterSubmissionFieldElement,
+  fieldTypeAlias: "repeater",
+};
+
 const KeyValuePairFieldConfigProperty: FormFieldConfigManifest = {
   type: "formFieldConfig",
   alias: "sproutForms.fieldConfig.keyValuePair",
@@ -659,6 +668,7 @@ export const SproutFormManifests = [
   FormRollbackModal,
   WorkflowTemplateModal,
   FileFieldSubmissionField,
+  RepeaterFieldSubmissionField,
   KeyValuePairFieldConfigProperty,
   FieldOptionPickerFieldConfigProperty,
   FormsPickerPropertyEditor,

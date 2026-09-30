@@ -1,14 +1,24 @@
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using SproutForms.Core.Models;
 
 namespace SproutForms.Core.Services
 {
+    /// <summary>
+    /// Fills in the tokens of a workflow's message: {alias} for a field's value and {AllValues} for all of them.
+    /// A field group such as a repeater has one token for all its entries; the fields inside it have none.
+    /// </summary>
     public class WorkflowMessageResolver
     {
         private static readonly Regex TokenPattern = new Regex(@"\{([^}]+)\}", RegexOptions.Compiled);
 
-        public static string ResolveTokens(string template, FormSubmission submission, FormVersion formVersion)
+        private readonly FormValueFormatter _formatter;
+
+        public WorkflowMessageResolver(FormValueFormatter formatter)
+        {
+            _formatter = formatter;
+        }
+
+        public string ResolveTokens(string template, FormSubmission submission, FormVersion formVersion)
         {
             if (string.IsNullOrEmpty(template))
                 return template;
@@ -20,44 +30,21 @@ namespace SproutForms.Core.Services
             });
         }
 
-        /// <summary>
-        /// The text to show for a submitted value, or null when the field was left empty.
-        /// </summary>
-        public static string? GetDisplayValue(JsonElement value)
+        private string GetFieldValue(string fieldAlias, FormSubmission submission, FormVersion formVersion)
         {
-            var text = value.ValueKind switch
-            {
-                JsonValueKind.Null or JsonValueKind.Undefined => null,
-                JsonValueKind.String => value.GetString(),
-                _ => value.GetRawText()
-            };
-
-            return string.IsNullOrEmpty(text) ? null : text;
-        }
-
-        private static string GetFieldValue(string fieldAlias, FormSubmission submission, FormVersion formVersion)
-        {
+            var fields = formVersion.Definition.Fields;
             if (fieldAlias.Equals("AllValues", StringComparison.InvariantCultureIgnoreCase))
             {
-                var fields = submission.Values
-                    .Select(v => (Alias: v.Key, Value: GetDisplayValue(v.Value)))
-                    .Where(v => v.Value is not null)
-                    .Select(v => $"*{GetLabel(v.Alias, formVersion)}:*\n{v.Value}")
-                    .ToList();
-                return string.Join("\r\n", fields);
+                var values = _formatter.FormatAll(submission.Values, fields)
+                    .Select(it => $"*{it.Label}:*\n{it.Value}");
+                return string.Join("\r\n", values);
             }
             if (submission.Values.TryGetValue(fieldAlias, out var jsonElement))
             {
-                return GetDisplayValue(jsonElement) ?? string.Empty;
+                return _formatter.Format(fields.FirstOrDefault(it => it.Alias == fieldAlias), jsonElement) ?? string.Empty;
             }
 
             return $"[{fieldAlias}]";
-        }
-
-        // A value can outlive its field when the stored submission predates the current definition
-        private static string GetLabel(string fieldAlias, FormVersion formVersion)
-        {
-            return formVersion.Definition.Fields.FirstOrDefault(it => it.Alias == fieldAlias)?.Label ?? fieldAlias;
         }
     }
 }

@@ -23,5 +23,28 @@ namespace SproutForms.Core.Models
         /// </summary>
         public int FindPageIndex(string fieldAlias)
             => Pages.FindIndex(page => page.Rows.Any(row => row.Columns.Any(column => column.FieldAlias == fieldAlias)));
+
+        /// <summary>
+        /// Every field of the form, with the fields inside field groups such as a repeater right after their group.
+        /// </summary>
+        public IEnumerable<FormField> GetAllFields() => Flatten(Fields);
+
+        /// <summary>
+        /// The field with this alias, at any depth, or null when the form doesn't have it.
+        /// </summary>
+        public FormField? FindField(string alias) => GetAllFields().FirstOrDefault(field => field.Alias == alias);
+
+        private static IEnumerable<FormField> Flatten(IEnumerable<FormField> fields)
+        {
+            foreach (var field in fields)
+            {
+                yield return field;
+                if (field.Configuration is IFormFieldGroupConfiguration group)
+                {
+                    foreach (var child in Flatten(group.Fields))
+                        yield return child;
+                }
+            }
+        }
     }
 }

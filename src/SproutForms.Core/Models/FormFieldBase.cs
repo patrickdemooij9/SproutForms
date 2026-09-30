@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Reflection;
-using System.Text;
+using SproutForms.Core.Services;
 using System.Text.Json;
 
 namespace SproutForms.Core.Models
@@ -57,12 +53,19 @@ namespace SproutForms.Core.Models
 
         protected virtual object? GetClientConfiguration(TConfig configuration) => configuration;
 
+        public virtual string? GetDisplayValue(JsonElement value, object configuration, FormValueFormatter formatter)
+            => FormValueFormatter.FormatText(value);
+
         protected abstract ValidationResult Validate(TValue value, TConfig configuration);
 
         private static TValue ConvertValue(JsonElement value)
         {
             if (typeof(TValue) == typeof(string))
                 return (TValue)(object)value.GetString()!;
+
+            // A list or an object, such as a field group's entries
+            if (value.ValueKind is JsonValueKind.Array or JsonValueKind.Object)
+                return JsonSerializer.Deserialize<TValue>(value.GetRawText())!;
 
             var valueAsString = value.ToString();
             if (valueAsString.StartsWith('{'))

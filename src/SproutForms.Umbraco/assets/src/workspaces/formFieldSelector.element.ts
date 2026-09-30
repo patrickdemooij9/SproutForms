@@ -1,12 +1,16 @@
 import { UmbElementMixin } from "@umbraco-cms/backoffice/element-api";
 import { css, html, LitElement } from "lit";
-import { customElement, repeat, state } from "@umbraco-cms/backoffice/external/lit";
+import { customElement, property, repeat, state } from "@umbraco-cms/backoffice/external/lit";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { FormDefinitionTypeDto, FormFieldTypeDto } from "../models";
 import { SF_FORM_DETAIL_TOKEN_CONTEXT } from "./sproutFormsWorkspaceContext";
 
 @customElement("form-field-selector")
 export class FormFieldSelector extends UmbElementMixin(LitElement) {
+
+    // False when adding to a field group, as groups can't be nested
+    @property({ type: Boolean })
+    allowFieldGroups = true;
 
     @state()
     private fieldTypes: FormFieldTypeDto[] = [];
@@ -33,7 +37,9 @@ export class FormFieldSelector extends UmbElementMixin(LitElement) {
         const formType = this.formType;
         if (!formType) return [];
 
-        return this.fieldTypes.filter(fieldType => formType.allowedFieldTypeAliases.includes(fieldType.alias));
+        return this.fieldTypes.filter(fieldType =>
+            formType.allowedFieldTypeAliases.includes(fieldType.alias)
+            && (this.allowFieldGroups || !fieldType.isFieldGroup));
     }
 
     render() {

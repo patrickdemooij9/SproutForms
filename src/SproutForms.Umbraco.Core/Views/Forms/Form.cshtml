@@ -1,3 +1,4 @@
+@using SproutForms.Core.Models
 @using SproutForms.Umbraco.Core.Helpers
 @using SproutForms.Umbraco.Core.Models.ViewModels
 @model RenderedFormViewModel
@@ -19,7 +20,7 @@
     {
         <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)' @if (isPaged) { <text> data-sf-paged="true"</text> }>
             @Html.AntiForgeryToken()
-            <input type="hidden" name="sf_PageUrl" value="" data-sf-page-url="true" />
+            <input type="hidden" name="@FormSubmissionRequest.PageUrlKey" value="" data-sf-page-url="true" />
             @foreach (var guard in Model.SubmissionGuards.Where(it => it.PartialViewPath is not null))
             {
                 @await Html.PartialAsync(guard.PartialViewPath!)

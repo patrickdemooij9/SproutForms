@@ -12,21 +12,23 @@ namespace SproutForms.Core.Flows
     public class EmailWorkflowType : IFormWorkflowType
     {
         private readonly IEmailSender _emailSender;
+        private readonly FormValueFormatter _formatter;
 
         public string Alias => "email";
 
         public Type ConfigurationType => typeof(EmailWorkflowConfig);
 
-        public EmailWorkflowType(IEmailSender emailSender)
+        public EmailWorkflowType(IEmailSender emailSender, FormValueFormatter formatter)
         {
             _emailSender = emailSender;
+            _formatter = formatter;
         }
 
         public async Task<WorkflowExecutionResult> ExecuteAsync(WorkflowContext context, CancellationToken ct)
         {
             var config = (EmailWorkflowConfig)context.Workflow.Configuration;
 
-            var body = BuildBody(context.Submission);
+            var body = BuildBody(context.Submission, context.Version);
 
             try
             {
@@ -45,17 +47,18 @@ namespace SproutForms.Core.Flows
             return new WorkflowExecutionResult(true);
         }
 
-        private static string BuildBody(FormSubmission submission)
+        private string BuildBody(FormSubmission submission, FormVersion version)
         {
             var sb = new StringBuilder();
 
             sb.AppendLine("New form submission:");
             sb.AppendLine("<br/>");
 
-            foreach (var field in submission.Values)
+            // A field group's entries take more than one line
+            foreach (var (label, value) in _formatter.FormatAll(submission.Values, version.Definition.Fields))
             {
-                var value = WorkflowMessageResolver.GetDisplayValue(field.Value) ?? string.Empty;
-                sb.AppendLine($"{WebUtility.HtmlEncode(field.Key)}: {WebUtility.HtmlEncode(value)}");
+                var html = WebUtility.HtmlEncode(value).Replace("\n", "<br/>");
+                sb.AppendLine($"{WebUtility.HtmlEncode(label)}: {html}");
                 sb.AppendLine("<br/>");
             }
 

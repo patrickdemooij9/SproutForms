@@ -139,7 +139,7 @@ window.SproutForms = {
         async validateField(fieldContainer: Element): Promise<ValidationResult> {
             const rules = (fieldContainer.getAttribute("data-sf-validate") || "").split(",");
             // A condition can make a field required that isn't required on its own
-            if (fieldContainer.querySelector("[data-conditional-required]") && !rules.includes("required")) {
+            if (getOwnElements(fieldContainer, "[data-conditional-required]").length > 0 && !rules.includes("required")) {
                 rules.unshift("required");
             }
             const value = getFieldValue(fieldContainer);
@@ -243,9 +243,16 @@ document.addEventListener("submit", async function (e) {
     showFallbackSuccess(form);
 });
 
-// The value the field submits: the checked radio, a checkbox only when it's checked, and the file name of an upload
+// The value the field submits: the checked radio, a checkbox only when it's checked, and the file name of an upload.
+// A repeater's value is the number of entries the visitor filled in, as the server counts them
 function getFieldValue(fieldContainer: Element): string | undefined {
-    const inputs = Array.from(fieldContainer.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>("input, textarea, select"));
+    const repeater = getOwnElements<HTMLElement>(fieldContainer, "[data-sf-repeater]")[0];
+    if (repeater) {
+        const count = getEntries(repeater).filter(entry => !isBlankEntry(entry)).length;
+        return count === 0 ? undefined : String(count);
+    }
+
+    const inputs = getOwnElements<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(fieldContainer, "input, textarea, select");
     const first = inputs[0];
     if (!first) return undefined;
 
@@ -274,10 +281,143 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initForm(form: Element) {
     initFormGuards(form as HTMLFormElement);
+    initRepeaters(form as HTMLFormElement);
     initConditionalFields(form as HTMLFormElement);
     initPageUrl(form as HTMLFormElement);
     initValidation(form as HTMLFormElement);
     initPages(form as HTMLFormElement);
+}
+
+// The elements of a field itself, not those of the fields inside it, such as the fields in a repeater's entries
+function getOwnElements<T extends Element = Element>(field: Element, selector: string): T[] {
+    return Array.from(field.querySelectorAll<T>(selector)).filter(element => element.closest("[data-sf-field-id]") === field);
+}
+
+// Repeaters: the visitor adds and removes entries, whose inputs are named after their index, such as "people[0].firstName".
+// The server reports an entry's errors by the same index, so the entries are renumbered whenever one is removed
+const renumberedAttributes = ["name", "id", "for", "data-sf-field-id", "data-field-id", "aria-describedby", "data-sf-entry-prefix", "data-sf-repeater"];
+const indexPlaceholder = "__index__";
+
+function initRepeaters(form: HTMLFormElement) {
+    form.querySelectorAll<HTMLElement>("[data-sf-repeater]").forEach(updateRepeater);
+
+    form.addEventListener("click", event => {
+        const target = event.target as Element;
+        const addButton = target.closest("[data-sf-repeater-add]");
+        if (addButton) {
+            addEntry(form, addButton.closest<HTMLElement>("[data-sf-repeater]")!);
+            return;
+        }
+        const removeButton = target.closest("[data-sf-repeater-remove]");
+        if (removeButton) {
+            removeEntry(form, removeButton.closest<HTMLElement>("[data-sf-repeater-entry]")!);
+        }
+    });
+}
+
+function getEntries(repeater: HTMLElement): HTMLElement[] {
+    const container = repeater.querySelector(":scope > [data-sf-repeater-entries]");
+    return container ? Array.from(container.querySelectorAll<HTMLElement>(":scope > [data-sf-repeater-entry]")) : [];
+}
+
+// An entry whose fields are all empty isn't sent on by the server, so it isn't validated here either
+function isBlankEntry(entry: HTMLElement): boolean {
+    return Array.from(entry.querySelectorAll("[data-sf-field-id]"))
+        .filter(field => field.closest("[data-sf-repeater-entry]") === entry)
+        .every(field => !getFieldValue(field)?.trim());
+}
+
+function isInBlankEntry(element: Element): boolean {
+    for (let entry = element.closest<HTMLElement>("[data-sf-repeater-entry]"); entry; entry = entry.parentElement?.closest<HTMLElement>("[data-sf-repeater-entry]") ?? null) {
+        if (isBlankEntry(entry)) return true;
+    }
+    return false;
+}
+
+function addEntry(form: HTMLFormElement, repeater: HTMLElement) {
+    const template = repeater.querySelector<HTMLTemplateElement>(":scope > [data-sf-repeater-template]");
+    const container = repeater.querySelector(":scope > [data-sf-repeater-entries]");
+    if (!template || !container) return;
+
+    const fragment = template.content.cloneNode(true) as DocumentFragment;
+    const entry = fragment.querySelector<HTMLElement>("[data-sf-repeater-entry]");
+    if (!entry) return;
+
+    container.appendChild(fragment);
+    updateRepeater(repeater);
+    initFieldConditions(entry);
+    evaluateAllConditions(form);
+
+    const field = repeater.closest<HTMLElement>("[data-sf-field-id]");
+    if (field) clearFieldError(field);
+    focusFirstInput(entry);
+}
+
+function removeEntry(form: HTMLFormElement, entry: HTMLElement) {
+    const repeater = entry.closest<HTMLElement>("[data-sf-repeater]");
+    if (!repeater) return;
+
+    const index = getEntries(repeater).indexOf(entry);
+    entry.remove();
+    updateRepeater(repeater);
+    evaluateAllConditions(form);
+
+    // Focus stays in the repeater: on the entry that took this one's place, the one before it, or the add button
+    const remaining = getEntries(repeater);
+    const next = remaining[index] ?? remaining[index - 1];
+    if (next) {
+        focusFirstInput(next);
+    } else {
+        repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]")?.focus();
+    }
+}
+
+function focusFirstInput(root: HTMLElement) {
+    root.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
+}
+
+// Numbers the entries in order, titles them, and shows the add and remove buttons the minimum and maximum allow
+function updateRepeater(repeater: HTMLElement) {
+    const alias = repeater.dataset.sfRepeater ?? "";
+    const titleTemplate = repeater.dataset.sfItemTitle ?? "";
+    const min = parseInt(repeater.dataset.sfRepeaterMin ?? "", 10);
+    const max = parseInt(repeater.dataset.sfRepeaterMax ?? "", 10);
+    const entries = getEntries(repeater);
+
+    entries.forEach((entry, index) => {
+        renumberEntry(entry, alias, index);
+        const title = entry.querySelector(":scope > [data-sf-entry-title]");
+        if (title) title.textContent = titleTemplate.replace(/\{n\}/g, String(index + 1));
+        const removeButton = entry.querySelector<HTMLElement>(":scope > [data-sf-repeater-remove]");
+        if (removeButton) removeButton.hidden = !isNaN(min) && entries.length <= min;
+    });
+
+    const addButton = repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]");
+    if (addButton) addButton.hidden = !isNaN(max) && entries.length >= max;
+}
+
+function renumberEntry(entry: HTMLElement, alias: string, index: number) {
+    const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`(^|\\s)${escapedAlias}\\[(?:\\d+|${indexPlaceholder})\\]`, "g");
+    const replacement = `$1${alias}[${index}]`;
+
+    const rename = (element: Element) => {
+        for (const attribute of renumberedAttributes) {
+            const value = element.getAttribute(attribute);
+            if (value) element.setAttribute(attribute, value.replace(pattern, replacement));
+        }
+    };
+
+    // Including the templates of the repeaters inside the entry, so the entries added to them get this entry's index too
+    const renameAll = (root: Element | DocumentFragment) => {
+        root.querySelectorAll("*").forEach(element => {
+            rename(element);
+            if (element instanceof HTMLTemplateElement) renameAll(element.content);
+        });
+    };
+
+    rename(entry);
+    renameAll(entry);
 }
 
 const pageStates = new WeakMap<HTMLFormElement, PageState>();
@@ -496,20 +636,26 @@ function initPageUrl(form: HTMLFormElement) {
     }
 }
 
+// Listens on the form, so the fields of a repeater entry added later are validated too
 function initValidation(form: HTMLFormElement) {
-    const validateGroups = form.querySelectorAll("[data-sf-validate]");
-
-    validateGroups.forEach(group => {
-        const inputs = group.querySelectorAll("input, select, textarea");
-
-        inputs.forEach(input => {
-            input.addEventListener("blur", async () => await validateGroup(group as HTMLElement));
-        });
-
-        inputs.forEach(input => {
-            input.addEventListener("input", () => clearFieldError(group as HTMLElement));
-        });
+    form.addEventListener("focusout", async event => {
+        const group = getFieldOfInput(event.target);
+        if (group?.hasAttribute("data-sf-validate")) {
+            await validateGroup(group);
+        }
     });
+
+    form.addEventListener("input", event => {
+        const group = getFieldOfInput(event.target);
+        if (group?.hasAttribute("data-sf-validate")) {
+            clearFieldError(group);
+        }
+    });
+}
+
+function getFieldOfInput(target: EventTarget | null): HTMLElement | null {
+    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return null;
+    return target.closest<HTMLElement>("[data-sf-field-id]");
 }
 
 async function validateGroup(group: HTMLElement): Promise<boolean> {
@@ -525,13 +671,8 @@ async function validateGroup(group: HTMLElement): Promise<boolean> {
 }
 
 function showFieldError(group: HTMLElement, message?: string) {
-    const inputs = group.querySelectorAll("input, select, textarea");
-    inputs.forEach(input => input.setAttribute("aria-invalid", "true"));
-
-    const existingError = group.querySelector("[data-sf-error]");
-    if (existingError) {
-        existingError.remove();
-    }
+    getOwnElements(group, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
+    getOwnElements(group, "[data-sf-error]").forEach(error => error.remove());
 
     const errorContainer = createErrorElement();
     errorContainer.setAttribute("role", "alert");
@@ -541,13 +682,8 @@ function showFieldError(group: HTMLElement, message?: string) {
 }
 
 function clearFieldError(group: HTMLElement) {
-    const inputs = group.querySelectorAll("input, select, textarea");
-    inputs.forEach(input => input.setAttribute("aria-invalid", "false"));
-
-    const existingError = group.querySelector("[data-sf-error]");
-    if (existingError) {
-        existingError.remove();
-    }
+    getOwnElements(group, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "false"));
+    getOwnElements(group, "[data-sf-error]").forEach(error => error.remove());
 }
 
 // Validates the fields inside root: the whole form, or a single page
@@ -558,11 +694,17 @@ async function validateAllFields(root: ParentNode): Promise<boolean> {
 
     for (const group of groups) {
         const groupEl = group as HTMLElement;
-        if (groupEl.hidden) {
+        // Also the fields inside a hidden repeater
+        if (groupEl.closest("[data-sf-field-id][hidden], [data-sf-col][hidden]")) {
             continue;
         }
         // A skipped page's fields aren't validated, on the server either
         if (groupEl.closest("[data-sf-skipped]")) {
+            continue;
+        }
+        // Neither are the fields of a repeater entry the visitor left empty
+        if (isInBlankEntry(groupEl)) {
+            clearFieldError(groupEl);
             continue;
         }
 
@@ -575,8 +717,18 @@ async function validateAllFields(root: ParentNode): Promise<boolean> {
     return isValid;
 }
 
+// Listens on the form, so the fields of a repeater entry added later are evaluated too
 function initConditionalFields(form: HTMLFormElement) {
-    const formFields = form.querySelectorAll("[data-field-conditions]");
+    initFieldConditions(form);
+
+    form.addEventListener("input", () => evaluateAllConditions(form));
+    form.addEventListener("change", () => evaluateAllConditions(form));
+
+    evaluateAllConditions(form);
+}
+
+function initFieldConditions(root: ParentNode) {
+    const formFields = root.querySelectorAll("[data-field-conditions]");
 
     formFields.forEach(wrapper => {
         const fieldAlias = wrapper.getAttribute("data-sf-field-id");
@@ -592,14 +744,6 @@ function initConditionalFields(form: HTMLFormElement) {
             console.error("Failed to parse field conditions:", e);
         }
     });
-
-    const allInputs = form.querySelectorAll("input, select, textarea");
-    allInputs.forEach(input => {
-        input.addEventListener("input", () => evaluateAllConditions(form));
-        input.addEventListener("change", () => evaluateAllConditions(form));
-    });
-
-    evaluateAllConditions(form);
 }
 
 function getFormValues(form: HTMLFormElement): Record<string, unknown> {
@@ -619,6 +763,23 @@ function getFormValues(form: HTMLFormElement): Record<string, unknown> {
     return values;
 }
 
+function getScopedValues(element: Element, formValues: Record<string, unknown>): Record<string, unknown> {
+    const entries: HTMLElement[] = [];
+    for (let entry = element.closest<HTMLElement>("[data-sf-repeater-entry]"); entry; entry = entry.parentElement?.closest<HTMLElement>("[data-sf-repeater-entry]") ?? null) {
+        entries.unshift(entry);
+    }
+    if (entries.length === 0) return formValues;
+
+    const values = { ...formValues };
+    for (const entry of entries) {
+        const prefix = entry.dataset.sfEntryPrefix ?? "";
+        for (const [name, value] of Object.entries(formValues)) {
+            if (name.startsWith(prefix)) values[name.slice(prefix.length)] = value;
+        }
+    }
+    return values;
+}
+
 function evaluateAllConditions(form: HTMLFormElement) {
     const formValues = getFormValues(form);
     const fields = form.querySelectorAll("[data-condition-field]");
@@ -631,7 +792,9 @@ function evaluateAllConditions(form: HTMLFormElement) {
         const visibilityCondition = conditions.visibility;
         const requiredCondition = conditions.required;
 
-        const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, formValues);
+        // Inside a repeater entry, a condition sees the entry's own fields by their alias, over the form's
+        const values = getScopedValues(wrapperEl, formValues);
+        const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, values);
 
         setHidden(wrapperEl, !isVisible);
         const parentCol = wrapper.closest<HTMLElement>("[data-sf-col]");
@@ -639,14 +802,14 @@ function evaluateAllConditions(form: HTMLFormElement) {
             setHidden(parentCol, !isVisible);
         }
 
-        const existingRequired = wrapper.querySelector("[data-conditional-required]");
-        if (existingRequired) {
+        getOwnElements(wrapper, "[data-conditional-required]").forEach(existingRequired => {
             existingRequired.removeAttribute("data-conditional-required");
             existingRequired.removeAttribute("required");
-        }
+        });
 
-        if (isVisible && requiredCondition && window.SproutForms.conditions.evaluate(requiredCondition, formValues)) {
-            const input = wrapper.querySelector("input, select, textarea") as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
+        if (isVisible && requiredCondition && window.SproutForms.conditions.evaluate(requiredCondition, values)) {
+            // A repeater marks itself, since its inputs belong to its entries' fields
+            const input = getOwnElements(wrapper, "input, select, textarea, [data-sf-repeater]")[0];
             if (input) {
                 input.setAttribute("data-conditional-required", "true");
                 input.setAttribute("required", "");
@@ -692,6 +855,10 @@ for (const [type, validator] of Object.entries(builtInValidators)) {
     });
 }
 
+// A repeater's value is the number of entries the visitor filled in; without any, it has no value
+window.SproutForms.validation.register("minItems", async (value, options) => Number(value ?? 0) >= Number(options.sfMinItems));
+window.SproutForms.validation.register("maxItems", async (value, options) => Number(value ?? 0) <= Number(options.sfMaxItems));
+
 window.SproutForms.validation.register("sameAs", async (value, options, context) => {
     if (!context) return false;
     const other = context.querySelector(`[name="${options.sfOther}"]`) as HTMLInputElement | null;
@@ -721,7 +888,7 @@ function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>) {
             continue;
         }
 
-        wrapper.querySelectorAll("input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
+        getOwnElements(wrapper, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
 
         const errorContainer = createErrorElement();
 

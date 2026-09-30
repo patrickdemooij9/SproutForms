@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ViewFeatures;
+using SproutForms.Core;
+using SproutForms.Core.Fields.Configs;
+using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.SubmissionGuard;
@@ -23,7 +26,7 @@ namespace SproutForms.Umbraco.Core.Services
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly ITempDataDictionaryFactory _tempDataDictionaryFactory;
         private Dictionary<string, List<string>> _errors = [];
-        private Dictionary<string, string> _values = [];
+        private Dictionary<string, JsonElement> _values = [];
 
         public FormRenderingService(FormClientModelBuilder clientModelBuilder,
             IFormRepository forms,
@@ -79,7 +82,7 @@ namespace SproutForms.Umbraco.Core.Services
             if (tempData.TryGetValue($"{formId}:FormErrors", out var errorsRaw) && errorsRaw != null)
                 _errors = JsonSerializer.Deserialize<Dictionary<string, List<string>>>(errorsRaw.ToString()!)!;
             if (tempData.TryGetValue($"{formId}:FormValues", out var valuesRaw) && valuesRaw != null)
-                _values = JsonSerializer.Deserialize<Dictionary<string, string>>(valuesRaw.ToString()!)!;
+                _values = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(valuesRaw.ToString()!)!;
         }
 
         private FormPageViewModel BuildPage(FormClientPage page, FormDefinition definition)
@@ -88,25 +91,29 @@ namespace SproutForms.Umbraco.Core.Services
                 Index = page.Index,
                 Title = page.Title,
                 ProgressLabel = page.ProgressLabel,
-                Rows = page.Rows.Select(row => new FormRowViewModel
-                {
-                    Columns = row.Columns.Select(column => new FormColumnViewModel
-                    {
-                        Width = column.Width,
-                        // Razor views run on the server, so they get the whole configuration, not only what the browser may see
-                        Field = BuildField(column.Field, definition.Fields.First(field => field.Alias == column.Field.Alias))
-                    }).ToList()
-                }).ToList(),
+                Rows = BuildRows(page.Rows, definition.Fields, string.Empty),
                 NextLabel = page.NextLabel,
                 PreviousLabel = page.PreviousLabel,
                 Visibility = page.Visibility
             };
 
-        private FormFieldViewModel BuildField(FormClientField clientField, FormField field)
+        private List<FormRowViewModel> BuildRows(IReadOnlyList<FormClientRow> rows, IReadOnlyList<FormField> fields, string prefix)
+            => rows.Select(row => new FormRowViewModel
+            {
+                Columns = row.Columns.Select(column => new FormColumnViewModel
+                {
+                    Width = column.Width,
+                    // Razor views run on the server, so they get the whole configuration, not only what the browser may see
+                    Field = BuildField(column.Field, fields.First(field => field.Alias == column.Field.Alias), prefix)
+                }).ToList()
+            }).ToList();
+
+        private FormFieldViewModel BuildField(FormClientField clientField, FormField field, string prefix)
         {
+            var path = prefix + field.Alias;
             var fieldViewModel = new FormFieldViewModel
             {
-                Alias = clientField.Alias,
+                Alias = path,
                 Label = clientField.Label,
                 Type = clientField.Type,
                 Required = clientField.Required,
@@ -114,18 +121,33 @@ namespace SproutForms.Umbraco.Core.Services
                 Configuration = field.Configuration,
                 Conditions = clientField.Conditions,
                 ValidationRules = clientField.ValidationRules,
+                Entries = field.Configuration is RepeaterFieldConfig repeater && clientField.Rows is { } rows
+                    ? [.. Enumerable.Range(0, repeater.GetInitialItemCount()).Select(index => BuildEntry(repeater, rows, FieldPath.ForEntry(path, index), repeater.GetItemTitle(index)))]
+                    : [],
+                EntryTemplate = field.Configuration is RepeaterFieldConfig template && clientField.Rows is { } templateRows
+                    ? BuildEntry(template, templateRows, $"{path}[{FormFieldGroupEntryViewModel.IndexPlaceholder}].", null)
+                    : null
             };
 
-            if (_errors.TryGetValue(field.Alias, out var errors) is true)
+            if (_errors.TryGetValue(path, out var errors) is true)
             {
                 fieldViewModel.Errors = errors?.ToArray() ?? [];
             }
-            if (_values.TryGetValue(field.Alias, out var value) is true)
+            if (prefix.Length == 0 && _values.TryGetValue(field.Alias, out var value) && value.ValueKind == JsonValueKind.String)
             {
-                fieldViewModel.Value = value?.ToString();
+                fieldViewModel.Value = value.GetString();
             }
 
             return fieldViewModel;
         }
+
+        private FormFieldGroupEntryViewModel BuildEntry(RepeaterFieldConfig repeater, IReadOnlyList<FormClientRow> rows, string prefix, string? title)
+            => new()
+            {
+                Prefix = prefix,
+                Title = title,
+                RemoveLabel = string.IsNullOrWhiteSpace(repeater.RemoveLabel) ? FormTexts.RemoveItem : repeater.RemoveLabel,
+                Rows = BuildRows(rows, repeater.Fields, prefix)
+            };
     }
 }

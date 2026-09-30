@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.SubmissionGuard;
@@ -76,7 +75,8 @@ namespace SproutForms.Umbraco.Core.Controllers
         }
 
         /// <summary>
-        /// Submits a form: as application/json, or as multipart/form-data when it has uploads (see <see cref="HeadlessSubmitRequest"/>).
+        /// Submits a form: its values as a JSON object, or as multipart/form-data when it has uploads (see <see cref="HeadlessSubmitRequestBodyAttribute"/>).
+        /// The values hold the form's fields, the page URL under "sf_PageUrl" and what the submission guard checks, as a Razor form posts them.
         /// A rejected submission is a 400 with the errors per field alias; "submissionGuard" and aliases that aren't fields are about the whole form.
         /// </summary>
         [HttpPost("entries/{id:guid}")]
@@ -95,20 +95,16 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (!Request.HasFormContentType && !Request.HasJsonContentType())
                 return StatusCode(StatusCodes.Status415UnsupportedMediaType);
 
-            var (request, files) = await ReadSubmitRequestAsync();
-            if (request is null)
+            var (values, files) = await ReadSubmitRequestAsync();
+            if (values is null)
                 return Invalid(new Dictionary<string, List<string>> { ["body"] = ["The request body is not valid."] });
-
-            var values = SubmittedFieldValues.Filter(formVersion, ToSubmittedValues(request.Values));
 
             if (_formSubmissionGuard is not null)
             {
-                // A guard reads what a posted HTML form would hold: every value as text, with its own fields
+                // A guard reads what a posted HTML form would hold: every value as text, its own among them
                 var postedValues = values
                     .Where(it => it.Value.ValueKind == JsonValueKind.String)
                     .ToDictionary(it => it.Key, it => it.Value.GetString()!);
-                foreach (var (key, value) in request.Guard)
-                    postedValues[key] = value;
 
                 var guardResult = await _formSubmissionGuard.EvaluateAsync(postedValues);
                 if (!guardResult.Allowed)
@@ -118,7 +114,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             var result = await _submissionService.SubmitAsync(formVersion, new FormSubmissionRequest
             {
                 Values = values,
-                PageUrl = request.PageUrl
+                PageUrl = values.TryGetValue(FormSubmissionRequest.PageUrlKey, out var pageUrl) && pageUrl.ValueKind == JsonValueKind.String ? pageUrl.GetString() : null
             }, files);
 
             if (!result.IsValid)
@@ -137,19 +133,20 @@ namespace SproutForms.Umbraco.Core.Controllers
 
         /// <summary>
         /// Validates one page of a form before the visitor moves on to the next, so rules only the server checks show on the page they
-        /// belong to. Nothing is saved, and uploads are left to the final submit.
+        /// belong to. The body is the values entered so far, from every page, since conditions can depend on earlier pages. Nothing is
+        /// saved, and uploads are left to the final submit.
         /// </summary>
         [HttpPost("entries/{id:guid}/pages/{pageIndex:int}/validate")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType<ValidationProblemDetails>(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult ValidatePage(Guid id, int pageIndex, [FromBody] HeadlessValidatePageRequest request)
+        public IActionResult ValidatePage(Guid id, int pageIndex, [FromBody] Dictionary<string, JsonElement> values)
         {
             var formVersion = GetPublishedVersion(_forms.GetById(id));
             if (formVersion is null || pageIndex < 0 || pageIndex >= formVersion.Definition.Pages.Count)
                 return NotFound();
 
-            var errors = _submissionService.ValidatePage(formVersion, pageIndex, SubmittedFieldValues.Filter(formVersion, ToSubmittedValues(request.Values)));
+            var errors = _submissionService.ValidatePage(formVersion, pageIndex, values);
             return errors.Count == 0 ? NoContent() : Invalid(errors);
         }
 
@@ -157,51 +154,24 @@ namespace SproutForms.Umbraco.Core.Controllers
         private FormVersion? GetPublishedVersion(Form? form)
             => form is { IsTrashed: false } ? _formVersions.GetPublished(form.Id) : null;
 
-        private async Task<(HeadlessSubmitRequest? Request, IReadOnlyList<IFormFile> Files)> ReadSubmitRequestAsync()
+        // With uploads, the values are a JSON part named "values", next to a part per file named by its field's path
+        private async Task<(Dictionary<string, JsonElement>? Values, IReadOnlyList<IFormFile> Files)> ReadSubmitRequestAsync()
         {
             try
             {
                 if (Request.HasFormContentType)
                 {
                     var form = await Request.ReadFormAsync(HttpContext.RequestAborted);
-                    return (new HeadlessSubmitRequest
-                    {
-                        Values = ReadJsonPart<Dictionary<string, JsonElement>>(form, "values") ?? [],
-                        PageUrl = form["pageUrl"].ToString(),
-                        Guard = ReadJsonPart<Dictionary<string, string>>(form, "guard") ?? []
-                    }, [.. form.Files]);
+                    var raw = form["values"].ToString();
+                    var values = string.IsNullOrWhiteSpace(raw) ? [] : JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(raw, MultipartJsonOptions);
+                    return (values, [.. form.Files]);
                 }
 
-                var request = await JsonSerializer.DeserializeAsync<HeadlessSubmitRequest>(Request.Body, MultipartJsonOptions, HttpContext.RequestAborted);
-                return (request, []);
+                return (await JsonSerializer.DeserializeAsync<Dictionary<string, JsonElement>>(Request.Body, MultipartJsonOptions, HttpContext.RequestAborted), []);
             }
             catch (JsonException)
             {
                 return (null, []);
-            }
-        }
-
-        private static T? ReadJsonPart<T>(IFormCollection form, string name)
-        {
-            var raw = form[name].ToString();
-            return string.IsNullOrWhiteSpace(raw) ? default : JsonSerializer.Deserialize<T>(raw, MultipartJsonOptions);
-        }
-
-        // Validation works on text, as a posted HTML form sends it, so JSON numbers and booleans become their text; lists and objects stay as they are
-        private static IEnumerable<KeyValuePair<string, JsonElement>> ToSubmittedValues(Dictionary<string, JsonElement> values)
-        {
-            foreach (var (alias, value) in values)
-            {
-                var submitted = value.ValueKind switch
-                {
-                    JsonValueKind.Null or JsonValueKind.Undefined => (JsonElement?)null,
-                    JsonValueKind.True => JsonSerializer.SerializeToElement("true"),
-                    JsonValueKind.False => JsonSerializer.SerializeToElement("false"),
-                    JsonValueKind.Number => JsonSerializer.SerializeToElement(value.GetRawText()),
-                    _ => value
-                };
-                if (submitted.HasValue)
-                    yield return KeyValuePair.Create(alias, submitted.Value);
             }
         }
 

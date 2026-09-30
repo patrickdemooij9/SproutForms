@@ -19,6 +19,7 @@ import {
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import {
+  FieldContainer,
   FormColumnDto,
   FormDefinitionDto,
   FormDefinitionTypeDto,
@@ -182,9 +183,14 @@ export default class SproutFormsWorkspaceContext
     this.#form.update(form);
   }
 
+  // Finds the field at any depth, so also the fields inside a field group
+  getField(fieldId: string): FormFieldDto | undefined {
+    return findField(this.#form.value.definition.fields, fieldId);
+  }
+
   updateField(updatedField: Partial<FormFieldDto>) {
     const clonedFields = structuredClone(this.#form.value.definition.fields);
-    const field = clonedFields.find((f) => f.id === updatedField.id);
+    const field = findField(clonedFields, updatedField.id!);
     if (field) {
       Object.assign(field, updatedField);
       this.#form.update({
@@ -290,130 +296,181 @@ export default class SproutFormsWorkspaceContext
     return this.#form.value.definition.fields.filter((field) => fieldIds.has(field.id));
   }
 
+  // The fields a condition of the field may use. Inside a field group those are the other fields of its entry
+  // and the fields the group's own conditions may use; a group's fields are never available outside it
+  getConditionFields(fieldId: string): FormFieldDto[] {
+    const container = this.getFieldContainer(fieldId);
+    if (!container) return [];
+    if (container.kind === "page") {
+      return container.pageIndex === -1 ? [] : this.getFieldsBeforePage(container.pageIndex, true);
+    }
+
+    const pageIndex = this.getPageIndexOfField(container.groupId);
+    const outerFields = pageIndex === -1
+      ? []
+      : this.getFieldsBeforePage(pageIndex, true).filter((field) => field.id !== container.groupId);
+    return [...this.getContainerFields(container), ...outerFields];
+  }
+
   getCurrentPageRows(): FormRowDto[] {
     return this.#form.value.definition.pages[this.#currentPageIndex.getValue()]?.rows ?? [];
   }
 
-  // Returns a copy of the definition with the rows of the current page replaced
-  withCurrentPageRows(definition: FormDefinitionDto, rows: FormRowDto[]): FormDefinitionDto {
-    const index = this.#currentPageIndex.getValue();
-    return {
-      ...definition,
-      pages: definition.pages.map((page, i) => (i === index ? { ...page, rows } : page)),
+  // The page the field is placed on, or the field group it is in
+  getFieldContainer(fieldId: string): FieldContainer | undefined {
+    const definition = this.#form.value.definition;
+    if (definition.fields.some((field) => field.id === fieldId)) {
+      return { kind: "page", pageIndex: this.getPageIndexOfField(fieldId) };
+    }
+    const group = definition.fields.find((field) => field.fields?.some((child) => child.id === fieldId));
+    return group ? { kind: "group", groupId: group.id } : undefined;
+  }
+
+  getContainerRows(container: FieldContainer): FormRowDto[] {
+    return rowsOf(this.#form.value.definition, container) ?? [];
+  }
+
+  getContainerFields(container: FieldContainer): FormFieldDto[] {
+    return fieldsOf(this.#form.value.definition, container) ?? [];
+  }
+
+  // Field groups only go one level deep, so a group can't be placed inside another
+  canPlaceField(field: FormFieldDto | undefined, container: FieldContainer): boolean {
+    return !!field && !(isFieldGroup(field) && container.kind === "group");
+  }
+
+  // Adds the field to the row, or to a new row at the end, and returns the row and column the canvas now renders
+  addField(field: FormFieldDto, container: FieldContainer, rowId?: string) {
+    if (!this.canPlaceField(field, container)) return undefined;
+
+    // The workspace state is frozen, so change a copy
+    const definition = structuredClone(this.#form.value.definition);
+    const rows = rowsOf(definition, container);
+    const fields = fieldsOf(definition, container);
+    if (!rows || !fields) return undefined;
+
+    let row = rows.find((it) => it.id === rowId);
+    if (!row) {
+      row = { id: crypto.randomUUID(), columns: [] };
+      rows.push(row);
+    }
+    const column: FormColumnDto = {
+      id: crypto.randomUUID(),
+      width: 12 - row.columns.reduce((a, b) => a + b.width, 0),
+      fieldId: field.id,
     };
+    row.columns.push(column);
+    fields.push(field);
+    this.#form.update({ definition });
+
+    const addedRow = this.getContainerRows(container).find((it) => it.id === row.id);
+    return { row: addedRow, column: addedRow?.columns.find((it) => it.id === column.id) };
   }
 
   setColumnSize(
+    container: FieldContainer,
     row: FormRowDto,
     column: FormColumnDto,
     newSize: number
   ) {
-    const rows = this.getCurrentPageRows();
-    const rowIndex = rows.findIndex((r) => r === row);
-    if (rowIndex === -1) return;
+    const definition = structuredClone(this.#form.value.definition);
+    const updatedColumn = rowsOf(definition, container)
+      ?.find((r) => r.id === row.id)
+      ?.columns.find((c) => c.id === column.id);
+    if (!updatedColumn) return;
 
-    const columnIndex = rows[rowIndex].columns.findIndex((c) => c === column);
-    if (columnIndex === -1) return;
-
-    const updatedRows = structuredClone(rows);
-    updatedRows[rowIndex].columns[columnIndex].width = newSize;
-
-    this.#form.update({
-      definition: this.withCurrentPageRows(this.#form.value.definition, updatedRows),
-    });
+    updatedColumn.width = newSize;
+    this.#form.update({ definition });
   }
 
+  // Moves the field within its page or group, or into another one, such as from the page into a repeater
   moveField(
     fieldId: string,
+    target: FieldContainer,
     targetRow?: FormRowDto,
     targetColumn?: FormColumnDto
   ) {
-    const rows = this.getCurrentPageRows();
-    const sourceRowIndex = rows.findIndex(row => 
-      row.columns.some(col => col.fieldId === fieldId)
-    );
-    if (sourceRowIndex === -1) return;
+    const source = this.getFieldContainer(fieldId);
+    if (!source) return;
 
-    const sourceRow = rows[sourceRowIndex];
-    const sourceColumnIndex = sourceRow.columns.findIndex(col => col.fieldId === fieldId);
-    if (sourceColumnIndex === -1) return;
+    const definition = structuredClone(this.#form.value.definition);
+    const sourceRows = rowsOf(definition, source);
+    const targetRows = rowsOf(definition, target);
+    const sourceFields = fieldsOf(definition, source);
+    const targetFields = fieldsOf(definition, target);
+    if (!sourceRows || !targetRows || !sourceFields || !targetFields) return;
 
-    const updatedRows = structuredClone(rows);
-    
+    const sourceRow = sourceRows.find((row) => row.columns.some((col) => col.fieldId === fieldId));
+    const sourceColumn = sourceRow?.columns.find((col) => col.fieldId === fieldId);
+    if (!sourceRow || !sourceColumn) return;
+
+    const isSameContainer = isSameFieldContainer(source, target);
+    const field = findField(definition.fields, fieldId);
+
     // Switch existing column with new field
     if (targetRow && targetColumn) {
-      const targetRowIndex = updatedRows.findIndex(r => r.id === targetRow.id);
-      if (targetRowIndex !== -1) {
-        const targetColumnIndex = updatedRows[targetRowIndex].columns.findIndex(c => c.id === targetColumn.id);
-        if (targetColumnIndex !== -1) {
-          const sourceColumn = updatedRows[sourceRowIndex].columns[sourceColumnIndex];
-          const targetColumnRef = updatedRows[targetRowIndex].columns[targetColumnIndex];
+      const column = targetRows.find((r) => r.id === targetRow.id)?.columns.find((c) => c.id === targetColumn.id);
+      if (!column || column.fieldId === fieldId) return;
 
-          const tempFieldId = sourceColumn.fieldId;
-          sourceColumn.fieldId = targetColumnRef.fieldId;
-          targetColumnRef.fieldId = tempFieldId;
-        }
+      if (!isSameContainer) {
+        // The other field takes the dragged field's place, so it changes container too
+        const otherField = column.fieldId ? findField(definition.fields, column.fieldId) : undefined;
+        if (!this.canPlaceField(field, target) || (otherField && !this.canPlaceField(otherField, source))) return;
+
+        moveBetween(sourceFields, targetFields, fieldId);
+        if (otherField) moveBetween(targetFields, sourceFields, otherField.id);
       }
-    } else if (targetRow) { // Only row means that we are adding it to the left over space in the row
-      const targetRowIndex = updatedRows.findIndex(r => r.id === targetRow.id);
-      if (targetRowIndex !== -1) {
-        const spaceLeft = 12 - updatedRows[targetRowIndex].columns.reduce((prev, cur) => prev + cur.width, 0);
-        const newColumn: FormColumnDto = {
+      sourceColumn.fieldId = column.fieldId;
+      column.fieldId = fieldId;
+    } else {
+      if (!this.canPlaceField(field, target)) return;
+
+      const row = targetRow ? targetRows.find((r) => r.id === targetRow.id) : undefined;
+      if (targetRow && !row) return;
+
+      if (row) { // Only row means that we are adding it to the left over space in the row
+        const spaceLeft = 12 - row.columns.reduce((prev, cur) => prev + cur.width, 0);
+        row.columns.push({ id: crypto.randomUUID(), width: spaceLeft, fieldId });
+      } else { // Completely new row
+        targetRows.push({
           id: crypto.randomUUID(),
-          width: spaceLeft,
-          fieldId: fieldId
-        }
-        updatedRows[targetRowIndex].columns.push(newColumn);
-        updatedRows[sourceRowIndex].columns.splice(sourceColumnIndex, 1);
-
-        if (updatedRows[sourceRowIndex].columns.length === 0) {
-          updatedRows.splice(sourceRowIndex, 1);
-        }
+          columns: [{ id: crypto.randomUUID(), fieldId, width: 12 }],
+        });
       }
-    } else { // Completely new row
-      const newRow: FormRowDto = {
-        id: crypto.randomUUID(),
-        columns: [
-          {
-            id: crypto.randomUUID(),
-            fieldId: fieldId,
-            width: 12,
-          },
-        ],
-      };
-      updatedRows.push(newRow);
-      updatedRows[sourceRowIndex].columns.splice(sourceColumnIndex, 1);
 
-      if (updatedRows[sourceRowIndex].columns.length === 0) {
-        updatedRows.splice(sourceRowIndex, 1);
+      sourceRow.columns.splice(sourceRow.columns.indexOf(sourceColumn), 1);
+      if (sourceRow.columns.length === 0) {
+        sourceRows.splice(sourceRows.indexOf(sourceRow), 1);
+      }
+      if (!isSameContainer) {
+        moveBetween(sourceFields, targetFields, fieldId);
       }
     }
 
-    this.#form.update({
-      definition: this.withCurrentPageRows(this.#form.value.definition, updatedRows),
-    });
+    this.#form.update({ definition });
   }
 
+  // Removing a field group removes the fields inside it too
   removeField(fieldId: string) {
-    const updatedPages = this.#form.value.definition.pages.map(page => ({
-      ...page,
-      rows: page.rows.map(row => ({
-        ...row,
-        columns: row.columns.filter(col => col.fieldId !== fieldId)
-      })).filter(row => row.columns.length > 0),
-    }));
+    const container = this.getFieldContainer(fieldId);
+    if (!container) return;
 
-    const updatedFields = this.#form.value.definition.fields.filter(f => f.id !== fieldId);
+    const definition = structuredClone(this.#form.value.definition);
+    const withoutField = (rows: FormRowDto[]) => rows
+      .map(row => ({ ...row, columns: row.columns.filter(col => col.fieldId !== fieldId) }))
+      .filter(row => row.columns.length > 0);
 
-    this.#form.update({
-      definition: {
-        ...this.#form.value.definition,
-        pages: updatedPages,
-        fields: updatedFields,
-      },
-    });
+    if (container.kind === "page") {
+      definition.pages = definition.pages.map(page => ({ ...page, rows: withoutField(page.rows) }));
+      definition.fields = definition.fields.filter(f => f.id !== fieldId);
+    } else {
+      const group = findField(definition.fields, container.groupId)!;
+      group.rows = withoutField(group.rows ?? []);
+      group.fields = (group.fields ?? []).filter(f => f.id !== fieldId);
+    }
+
+    this.#form.update({ definition });
   }
-
   removeWorkflow(workflowId: string) {
     const updatedWorkflows = this.#form.value.definition.workflows.filter(w => w.id !== workflowId);
 
@@ -473,3 +530,41 @@ export const SF_FORM_DETAIL_TOKEN_CONTEXT =
   new UmbContextToken<SproutFormsWorkspaceContext>(
     "sproutFormsWorkspaceContext"
   );
+
+// A field group, such as a repeater, holds fields of its own
+export function isFieldGroup(field: FormFieldDto): boolean {
+  return Array.isArray(field.fields);
+}
+
+export function isSameFieldContainer(a: FieldContainer | undefined, b: FieldContainer | undefined): boolean {
+  if (!a || !b) return a === b;
+  return a.kind === "page"
+    ? b.kind === "page" && a.pageIndex === b.pageIndex
+    : b.kind === "group" && a.groupId === b.groupId;
+}
+
+// Groups only go one level deep, so a field is either top-level or inside a top-level group
+function findField(fields: FormFieldDto[], fieldId: string): FormFieldDto | undefined {
+  for (const field of fields) {
+    if (field.id === fieldId) return field;
+    const child = field.fields?.find((it) => it.id === fieldId);
+    if (child) return child;
+  }
+  return undefined;
+}
+
+// The container's own arrays, so changing them changes the definition. A field group always has both
+function rowsOf(definition: FormDefinitionDto, container: FieldContainer): FormRowDto[] | undefined {
+  if (container.kind === "page") return definition.pages[container.pageIndex]?.rows;
+  return definition.fields.find((field) => field.id === container.groupId)?.rows ?? undefined;
+}
+
+function fieldsOf(definition: FormDefinitionDto, container: FieldContainer): FormFieldDto[] | undefined {
+  if (container.kind === "page") return definition.fields;
+  return definition.fields.find((field) => field.id === container.groupId)?.fields ?? undefined;
+}
+
+function moveBetween(from: FormFieldDto[], to: FormFieldDto[], fieldId: string) {
+  const index = from.findIndex((field) => field.id === fieldId);
+  if (index !== -1) to.push(...from.splice(index, 1));
+}

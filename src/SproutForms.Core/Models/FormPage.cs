@@ -2,7 +2,7 @@ using SproutForms.Core.Models.Conditions;
 
 namespace SproutForms.Core.Models
 {
-    public class FormPage
+    public class FormPage : IFormLayout
     {
         public string? Title { get; set; }
         public List<FormRow> Rows { get; set; } = [];

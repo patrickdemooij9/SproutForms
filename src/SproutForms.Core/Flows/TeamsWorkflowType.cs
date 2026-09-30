@@ -13,14 +13,16 @@ namespace SproutForms.Core.Flows
     public class TeamsWorkflowType : IFormWorkflowType
     {
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly WorkflowMessageResolver _messageResolver;
 
         public string Alias => "teams";
 
         public Type ConfigurationType => typeof(TeamsWorkflowConfig);
 
-        public TeamsWorkflowType(IHttpClientFactory httpClientFactory)
+        public TeamsWorkflowType(IHttpClientFactory httpClientFactory, WorkflowMessageResolver messageResolver)
         {
             _httpClientFactory = httpClientFactory;
+            _messageResolver = messageResolver;
         }
 
         public async Task<WorkflowExecutionResult> ExecuteAsync(WorkflowContext context, CancellationToken ct)
@@ -30,7 +32,7 @@ namespace SproutForms.Core.Flows
             if (string.IsNullOrEmpty(config.WebhookUrl))
                 return new WorkflowExecutionResult(false, "Teams webhook URL is required");
 
-            var resolvedMessage = WorkflowMessageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
+            var resolvedMessage = _messageResolver.ResolveTokens(config.Message, context.Submission, context.Version);
 
             var payload = BuildTeamsPayload(resolvedMessage, context.Submission);
 

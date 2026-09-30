@@ -70,6 +70,14 @@ export function evaluateCondition(condition: ConditionDefinition | null | undefi
         : results.some(it => it);
 }
 
+/**
+ * The values the conditions of a field in a field group's entry see: the entry's own values over the form's, so a rule on an alias
+ * uses the field of the same entry, or else the form's field. For an entry of a nested group, pass the outer entry's scope as values.
+ */
+export function getEntryScope(entry: FormValues, values: FormValues): FormValues {
+    return { ...values, ...entry };
+}
+
 export function isFieldVisible(field: FormClientField, values: FormValues): boolean {
     return evaluateCondition(field.conditions?.visibility, values);
 }

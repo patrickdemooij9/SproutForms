@@ -48,7 +48,7 @@ npm run build
 
 ### Descriptors (Umbraco Backoffice)
 Located in `SproutForms.Umbraco.Core/Descriptors/`:
-- **Fields**: `TextFieldDescriptor`, `EmailFieldDescriptor`, `TextAreaFieldDescriptor`, `SelectFieldDescriptor`, `RadioFieldDescriptor`, `DateFieldDescriptor`, `FileFieldDescriptor`, `HiddenFieldDescriptor`
+- **Fields**: `TextFieldDescriptor`, `EmailFieldDescriptor`, `TextAreaFieldDescriptor`, `SelectFieldDescriptor`, `RadioFieldDescriptor`, `DateFieldDescriptor`, `FileFieldDescriptor`, `HiddenFieldDescriptor`, `RepeaterFieldDescriptor`
 - **Workflows**: `EmailWorkflowDescriptor`
 - **Outcomes**: `RedirectUrlOutcomeDescriptor`, `ShowMessageOutcomeDescriptor`, `RedirectUmbracoPageOutcomeDescriptor`
 
@@ -82,7 +82,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 
 ## Headless API
 
-`SproutFormsDeliveryController` (`/umbraco/sproutforms/delivery/api/v1`, OpenAPI document `sproutforms-delivery`) serves `FormClientModel`s and takes submissions as JSON or multipart, without antiforgery. It is off unless `SproutForms:Headless:Enabled`; `HeadlessApiAccessAttribute` answers 404 then, and checks `SproutForms:Headless:ApiKey`. `AddSproutFormsHeadless` (`Headless/`) registers its CORS policy (`SproutForms:Headless:AllowedOrigins`), the CORS middleware and the OpenAPI document, only when enabled at startup. The Razor `FormSubmissionController` (`/api/forms`) stays as it is; both call `IFormSubmissionService` and `FormSubmitOutcomeRunner`.
+`SproutFormsDeliveryController` (`/umbraco/sproutforms/delivery/api/v1`, OpenAPI document `sproutforms-delivery`) serves `FormClientModel`s and takes submissions as JSON or multipart, without antiforgery. A submission's body is one values object, the same values a Razor form posts: the fields, `sf_PageUrl` (`FormSubmissionRequest.PageUrlKey`) and the guard's own keys; each consumer takes the values it reads, and the submission service keeps only the form's fields. It is off unless `SproutForms:Headless:Enabled`; `HeadlessApiAccessAttribute` answers 404 then, and checks `SproutForms:Headless:ApiKey`. `AddSproutFormsHeadless` (`Headless/`) registers its CORS policy (`SproutForms:Headless:AllowedOrigins`), the CORS middleware and the OpenAPI document, only when enabled at startup. The Razor `FormSubmissionController` (`/api/forms`) stays as it is; both call `IFormSubmissionService` and `FormSubmitOutcomeRunner`.
 
 `src/SproutForms.Client` holds the conditions and validation rules in TypeScript. `forms.ts` imports them, so `npm run minify:forms` bundles them into `forms.js`; keep them in step with `ConditionEvaluator` and the field types' `Validate`. After changing the API's models, regenerate `src/api/types.gen.ts` with `npm run generate` in `src/SproutForms.Client` while the `AiTest` site runs.
 
@@ -93,6 +93,16 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 3. Create view in `SproutForms.Umbraco.Core/Views/Forms/Fields/`
 4. Override `GetClientConfiguration` when the config holds settings the browser mustn't see, and add its config to `BuiltInFieldConfigurations` in `src/SproutForms.Client/src/types.ts`
 5. Register in `SproutFormComposer.cs`
+
+## Field Groups (repeaters)
+
+A field type whose configuration implements `IFormFieldGroupConfiguration` holds fields of its own, laid out in rows like a page (`IFormLayout`, which `FormPage` implements too). `RepeaterFieldType` (`repeater`) is the only one: the visitor fills in its entries as often as its min and max allow.
+
+- Its fields live in the group's configuration, not in `FormDefinition.Fields`; `GetAllFields()` and `FindField(alias)` see every depth. Aliases are unique across the whole form. `FormDefinitionStructureValidator` checks the group's own layout, allows one level (`MaxFieldGroupDepth`), and only lets a child's conditions use its siblings and the fields its group may use; nothing outside a group may use a child.
+- The value is a list of entries, each an object keyed by child alias. Razor inputs, uploads and errors are named by path, such as `people[0].firstName` (`FieldPath`); `SubmittedFieldValues.FromPostedForm` builds the entries from a posted form. `FormSubmissionService` parses what was submitted once into `SubmittedValues`, which keeps only the form's own fields (a group's value as its entries, never a posted value for an upload) and is the only place that checks the shape of submitted JSON; it is turned back into JSON once, to store.
+- `FormSubmissionService` validates each entry with its conditions seeing the entry's values over the form's, drops the entries the visitor left empty (a value that fails a required check, like an unticked checkbox, counts as empty), keeps the posted index in error keys, and saves the rest. The group's own type only checks the number of entries, even when there are none.
+- `IFormFieldType.GetDisplayValue` shows a value as text for workflows through `FormValueFormatter`; `WorkflowMessageResolver` and the email workflow use it. A group has one `{alias}` token; its children have none.
+- The client model and the backoffice model carry a group's `rows` (and, in the backoffice, `fields`). The Razor view is `Fields/repeater.cshtml` with `RepeaterEntry.cshtml`; forms.js clones its `<template>` and renumbers the entries.
 
 ## Form Definition Types
 
@@ -113,4 +123,4 @@ A form type (`IFormDefinitionType`, in `SproutForms.Core/Models/FormTypes/`) say
 
 ## Testing
 
-There is no automated test project yet. To verify a change end-to-end in a running site (throwaway SQLite database, emails captured to disk), follow the `verify-in-site` skill in `.claude/skills/verify-in-site/SKILL.md`. It uses the `AiTest` launch profile of `SproutForms.Site`.
+`SproutForms.Core.Tests` (NUnit, NSubstitute) covers Core: run `dotnet test src/SproutForms.Core.Tests`. To verify a change end-to-end in a running site (throwaway SQLite database, emails captured to disk), follow the `verify-in-site` skill in `.claude/skills/verify-in-site/SKILL.md`. It uses the `AiTest` launch profile of `SproutForms.Site`.

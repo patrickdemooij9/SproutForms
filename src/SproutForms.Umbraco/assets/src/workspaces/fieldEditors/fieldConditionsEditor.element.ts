@@ -11,9 +11,13 @@ export class FieldConditionsEditor extends LitElement {
   @property({ type: Object })
   public field!: FormFieldDto;
 
-  // The fields its conditions can use: those on the field's own page and earlier pages
+  // The fields its conditions can use: those on the field's own page and earlier pages, and inside a field group the other fields of its entry
   @property({ type: Array })
   public fields: FormFieldDto[] = [];
+
+  // False for a field that can't be required, such as a field group
+  @property({ type: Boolean })
+  public allowRequired = true;
 
   @state()
   private _conditions: FieldConditions = {};
@@ -61,12 +65,14 @@ export class FieldConditionsEditor extends LitElement {
           .fields=${availableFields}
           @condition-change=${(e: ConditionChangeEvent) => this.#onConditionChange("visibility", e)}
         ></sf-condition-editor>
-        <sf-condition-editor
-          label="Make required when"
-          .condition=${this._conditions.required}
-          .fields=${availableFields}
-          @condition-change=${(e: ConditionChangeEvent) => this.#onConditionChange("required", e)}
-        ></sf-condition-editor>
+        ${this.allowRequired
+          ? html`<sf-condition-editor
+              label="Make required when"
+              .condition=${this._conditions.required}
+              .fields=${availableFields}
+              @condition-change=${(e: ConditionChangeEvent) => this.#onConditionChange("required", e)}
+            ></sf-condition-editor>`
+          : null}
       </div>
     `;
   }

@@ -1,4 +1,4 @@
-import { createSproutFormsClient, getFields, loadSubmissionGuard, SproutFormsApiError, type FormClientModel, type SproutFormsClient } from '@sproutforms/client';
+import { createSproutFormsClient, getFields, isFieldGroup, loadSubmissionGuard, SproutFormsApiError, type FormClientModel, type SproutFormsClient } from '@sproutforms/client';
 import { element, mountForm } from './form-renderer';
 
 interface LoggedRequest {
@@ -211,11 +211,11 @@ async function loadSubmission() {
 
 function prefillRawRequest() {
     if (!definition) return;
-    const values = Object.fromEntries(getFields(definition).filter(field => field.type !== 'file').map(field => [field.alias, '']));
+    const values = Object.fromEntries(getFields(definition).filter(field => field.type !== 'file').map(field => [field.alias, isFieldGroup(field) ? [] : '']));
     const guard = definition.submissionGuard?.alias === 'honeypot'
         ? { [String((definition.submissionGuard.settings as { fieldName?: string }).fieldName)]: '' }
         : {};
-    $<HTMLTextAreaElement>('#raw-body').value = JSON.stringify({ values, pageUrl: window.location.href, guard }, null, 2);
+    $<HTMLTextAreaElement>('#raw-body').value = JSON.stringify({ ...values, ...guard, sf_PageUrl: window.location.href }, null, 2);
     $<HTMLInputElement>('#raw-path').value = `entries/${definition.id}`;
 }
 

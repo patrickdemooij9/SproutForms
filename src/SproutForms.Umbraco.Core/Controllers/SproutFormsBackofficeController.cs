@@ -2,6 +2,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Text.Json;
+using SproutForms.Core;
+using SproutForms.Core.Fields.Configs;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Files;
@@ -207,14 +209,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                     NextLabel = p.NextLabel,
                     PreviousLabel = p.PreviousLabel,
                     Visibility = p.Visibility,
-                    Rows = p.Rows.Select(r => new FormRow
-                    {
-                        Columns = r.Columns.Select(c => new FormColumn
-                        {
-                            FieldAlias = c.FieldAlias,
-                            Width = c.Width
-                        }).ToList()
-                    }).ToList()
+                    Rows = Map(p.Rows)
                 }).ToList(),
                 SubmitLabel = model.Definition.SubmitLabel,
                 ShowProgress = model.Definition.ShowProgress,
@@ -358,7 +353,8 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Alias = formFieldType.Alias,
                     DisplayName = descriptor.DisplayName,
                     Icon = descriptor.Icon,
-                    Properties = descriptor.FromConfig(formFieldType.DefaultConfiguration)
+                    Properties = descriptor.FromConfig(formFieldType.DefaultConfiguration),
+                    IsFieldGroup = formFieldType.DefaultConfiguration is IFormFieldGroupConfiguration
                 });
             }
             return Ok(formFieldTypes);
@@ -592,17 +588,7 @@ namespace SproutForms.Umbraco.Core.Controllers
             {
                 Id = submission.Id,
                 PageUrl = submission.PageUrl,
-                Values = submission.Values.Select(it =>
-                {
-                    var field = formVersion.Definition.Fields.FirstOrDefault(f => f.Alias == it.Key);
-                    if (field is null) return null; //TODO: Fallback in place!!
-                    return new FormSubmissionValueBackofficeModel
-                    {
-                        FieldTypeAlias = field.FieldTypeAlias,
-                        Name = field.Label,
-                        Value = it.Value.ToString()
-                    };
-                }).WhereNotNull().ToArray(),
+                Values = MapValues(submission.Values, formVersion.Definition.Fields),
                 WorkflowStages = workflowStages
             });
         }
@@ -684,13 +670,19 @@ namespace SproutForms.Umbraco.Core.Controllers
         {
             var duplicateAliasses = new List<string>();
             var aliasses = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var field in model.Definition.Fields)
+            // A field group's fields are in the same form, so their aliases can't repeat any other
+            void Check(IEnumerable<FormFieldBackofficeModel> fields)
             {
-                if (!aliasses.Add(field.Alias))
+                foreach (var field in fields)
                 {
-                    duplicateAliasses.Add(field.Alias);
+                    if (!aliasses.Add(field.Alias))
+                    {
+                        duplicateAliasses.Add(field.Alias);
+                    }
+                    Check(field.Fields ?? []);
                 }
             }
+            Check(model.Definition.Fields);
             return duplicateAliasses;
         }
 
@@ -727,6 +719,11 @@ namespace SproutForms.Umbraco.Core.Controllers
             var descriptor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == field.FieldTypeAlias, "field type", field.FieldTypeAlias);
             result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
             result.Conditions = field.Conditions;
+            if (field.Configuration is IFormFieldGroupConfiguration group)
+            {
+                result.Fields = [.. group.Fields.Select(child => Map(child, formTypeDescriptor))];
+                result.Rows = [.. group.Rows.Select(row => new FormRowBackofficeModel(row))];
+            }
 
             // Settings the form type no longer describes stay as raw JSON, and are left out
             var extensionDescriptor = formTypeDescriptor?.FieldExtensions.FirstOrDefault(it => it.FieldTypeAlias == field.FieldTypeAlias);
@@ -752,6 +749,12 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Conditions = model.Conditions
             };
 
+            if (configuration is IFormFieldGroupConfiguration group)
+            {
+                group.Fields.AddRange((model.Fields ?? []).Select(child => Map(child, formType, formTypeDescriptor)));
+                group.Rows.AddRange(Map(model.Rows ?? []));
+            }
+
             // Every field of an extended field type gets the extension, with default settings when none were sent
             if (formType.FieldExtensions.Any(it => it.FieldTypeAlias == model.FieldTypeAlias))
             {
@@ -764,5 +767,37 @@ namespace SproutForms.Umbraco.Core.Controllers
             }
             return result;
         }
+
+        private static List<FormRow> Map(IEnumerable<FormRowBackofficeModel> rows)
+            => rows.Select(r => new FormRow
+            {
+                Columns = r.Columns.Select(c => new FormColumn
+                {
+                    FieldAlias = c.FieldAlias,
+                    Width = c.Width
+                }).ToList()
+            }).ToList();
+
+        // A submission is stored with the values its own version's fields took, so a field group's value is always its entries
+        private static FormSubmissionValueBackofficeModel[] MapValues(IReadOnlyDictionary<string, JsonElement> values, IReadOnlyList<FormField> fields)
+            => values.Select(it =>
+            {
+                var field = fields.FirstOrDefault(f => f.Alias == it.Key);
+                if (field is null) return null;
+                return new FormSubmissionValueBackofficeModel
+                {
+                    FieldTypeAlias = field.FieldTypeAlias,
+                    Name = field.Label,
+                    Value = it.Value.ToString(),
+                    Entries = field.Configuration is IFormFieldGroupConfiguration group
+                        ? [.. it.Value.EnumerateArray()
+                            .Select((entry, index) => new FormSubmissionEntryBackofficeModel
+                            {
+                                Title = (group as RepeaterFieldConfig)?.GetItemTitle(index) ?? FormTexts.ItemTitle.Replace("{n}", (index + 1).ToString()),
+                                Values = MapValues(entry.EnumerateObject().ToDictionary(property => property.Name, property => property.Value), group.Fields)
+                            })]
+                        : null
+                };
+            }).WhereNotNull().ToArray();
     }
 }
