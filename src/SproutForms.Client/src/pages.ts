@@ -1,4 +1,5 @@
 import type { FormClientField, FormClientModel, FormClientPage, FormClientRow } from './api/types.gen';
+import { calculateVariables } from './calculations';
 import { isPageVisible } from './conditions';
 import type { FormValues } from './types';
 
@@ -81,12 +82,13 @@ export function getFieldByPath(definition: FormClientModel, path: string): FormC
 }
 
 /**
- * The pages the visitor goes through with the values entered so far. The current page always counts: its conditions only
- * depend on earlier pages.
+ * The pages the visitor goes through with the values entered so far, and the variables worked out from them. The current page
+ * always counts: its conditions only depend on earlier pages.
  */
 export function getVisiblePageIndexes(definition: FormClientModel, values: FormValues, currentIndex?: number): number[] {
+    const variables = calculateVariables(definition, values);
     return definition.pages
-        .filter(page => page.index === currentIndex || isPageVisible(page, values))
+        .filter(page => page.index === currentIndex || isPageVisible(page, values, variables))
         .map(page => page.index);
 }
 

@@ -21,6 +21,8 @@ import SproutFormsWorkspaceContext, {
   SF_FORM_DETAIL_TOKEN_CONTEXT,
 } from "./sproutFormsWorkspaceContext";
 
+import "./formTypeSettings.element";
+
 const PAGE_SIZE = 10;
 
 const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
@@ -109,6 +111,7 @@ export class FormInfoElement extends UmbElementMixin(LitElement) {
   }
 
   #renderHistory() {
+    if (!this._form?.id) return html`<p>The history starts once the form is saved.</p>`;
     if (!this._items) return html`<div id="loader"><uui-loader></uui-loader></div>`;
     if (this._items.length === 0) {
       return html`<p>No history yet. Changes made from now on are shown here.</p>`;
@@ -167,7 +170,7 @@ export class FormInfoElement extends UmbElementMixin(LitElement) {
   override render() {
     if (!this._form) return nothing;
 
-    const canRollback = this._form.source !== SOURCE_CODE;
+    const canRollback = !!this._form.id && this._form.source !== SOURCE_CODE;
     return html`
       <div id="container">
         <umb-workspace-info-app-layout headline="History">
@@ -187,24 +190,32 @@ export class FormInfoElement extends UmbElementMixin(LitElement) {
           <div id="content">${this.#renderHistory()}</div>
         </umb-workspace-info-app-layout>
 
-        <uui-box headline="General">
-          <div class="general-item">
-            <strong>Version</strong>
-            <span>${this._form.version}</span>
-          </div>
-          <div class="general-item">
-            <strong>Alias</strong>
-            <span>${this._form.alias}</span>
-          </div>
-          <div class="general-item">
-            <strong>Source</strong>
-            <span>${this._form.source === SOURCE_CODE ? "Code" : "Backoffice"}</span>
-          </div>
-          <div class="general-item">
-            <strong>Id</strong>
-            <span>${this._form.id}</span>
-          </div>
-        </uui-box>
+        <div id="side">
+          <sf-form-type-settings></sf-form-type-settings>
+          <uui-box headline="General">
+            <div class="general-item">
+              <strong>Version</strong>
+              <span>${this._form.version}</span>
+            </div>
+            <div class="general-item">
+              <strong>Alias</strong>
+              <span>${this._form.alias}</span>
+            </div>
+            <div class="general-item">
+              <strong>Source</strong>
+              <span>${this._form.source === SOURCE_CODE ? "Code" : "Backoffice"}</span>
+            </div>
+            ${when(
+              this._form.id,
+              () => html`
+                <div class="general-item">
+                  <strong>Id</strong>
+                  <span>${this._form!.id}</span>
+                </div>
+              `,
+            )}
+          </uui-box>
+        </div>
       </div>
     `;
   }
@@ -223,6 +234,12 @@ export class FormInfoElement extends UmbElementMixin(LitElement) {
         gap: var(--uui-size-layout-1);
         align-items: start;
         padding: var(--uui-size-layout-1);
+      }
+
+      #side {
+        display: flex;
+        flex-direction: column;
+        gap: var(--uui-size-layout-1);
       }
 
       #content {

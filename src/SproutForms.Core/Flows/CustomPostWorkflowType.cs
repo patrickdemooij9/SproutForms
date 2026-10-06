@@ -63,7 +63,8 @@ namespace SproutForms.Core.Flows
                 ["submittedAt"] = submission.SubmittedAt,
                 ["ipAddress"] = submission.IpAddress ?? string.Empty,
                 ["pageUrl"] = submission.PageUrl ?? string.Empty,
-                ["values"] = submission.Values
+                ["values"] = submission.Values,
+                ["variables"] = submission.Variables
             };
 
             return JsonSerializer.Serialize(dict);

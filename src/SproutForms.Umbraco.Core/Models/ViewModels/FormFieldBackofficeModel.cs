@@ -14,7 +14,7 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public bool Required { get; set; }
 
         public Dictionary<string, object?> Configuration { get; set; }
-        public FieldConditions? Conditions { get; set; }
+        public List<FieldRule> Rules { get; set; } = [];
 
         // The settings the form's type adds to this field's type, when it extends it
         public Dictionary<string, object?>? Extension { get; set; }
@@ -29,7 +29,7 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
             Label = field.Label;
             FieldTypeAlias = field.FieldTypeAlias;
             Required = field.Required;
-            Conditions = field.Conditions;
+            Rules = field.Rules;
 
             Configuration = [];
         }

@@ -20,6 +20,7 @@ namespace SproutForms.Umbraco.Core.Startup.Migrations
             To<AddFormAuditMigration>("v8");
             To<AddFormRecycleBinMigration>("v9");
             To<AddSubmissionRecycleBinMigration>("v10");
+            To<AddSubmissionVariablesMigration>("v11");
         }
     }
 }

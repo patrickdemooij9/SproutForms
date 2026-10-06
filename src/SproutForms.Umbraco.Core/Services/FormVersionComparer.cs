@@ -1,4 +1,5 @@
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Descriptors.Fields;
@@ -72,6 +73,28 @@ namespace SproutForms.Umbraco.Core.Services
             }
 
             AddChange(changes, FormChangeSection.Outcome, "After submitting", DescribeOutcome(current.SubmitOutcome), DescribeOutcome(version.SubmitOutcome));
+
+            var outcomeCount = Math.Max(current.ConditionalOutcomes.Count, version.ConditionalOutcomes.Count);
+            for (var i = 0; i < outcomeCount; i++)
+            {
+                AddChange(changes, FormChangeSection.Outcome, $"Conditional outcome {i + 1}",
+                    i < current.ConditionalOutcomes.Count ? DescribeConditionalOutcome(current.ConditionalOutcomes[i]) : null,
+                    i < version.ConditionalOutcomes.Count ? DescribeConditionalOutcome(version.ConditionalOutcomes[i]) : null);
+            }
+
+            foreach (var alias in MatchByAlias(current.Variables.Select(it => it.Alias), version.Variables.Select(it => it.Alias)))
+            {
+                var currentVariable = current.Variables.FirstOrDefault(it => it.Alias == alias);
+                var versionVariable = version.Variables.FirstOrDefault(it => it.Alias == alias);
+                AddChange(changes, FormChangeSection.Calculation, $"Variable {alias}",
+                    currentVariable is null ? null : DescribeVariable(currentVariable),
+                    versionVariable is null ? null : DescribeVariable(versionVariable));
+            }
+
+            // The rules run in order, so they're compared as one list
+            AddChange(changes, FormChangeSection.Calculation, "Calculations",
+                current.Calculations.Count == 0 ? null : DescribeCalculations(current),
+                version.Calculations.Count == 0 ? null : DescribeCalculations(version));
 
             return changes;
         }
@@ -171,7 +194,7 @@ namespace SproutForms.Umbraco.Core.Services
                 description["Fields"] = DescribeLayout(group, group.Fields);
             }
 
-            description["Conditions"] = field.Conditions is null ? null : JsonSerializer.Serialize(field.Conditions);
+            description["Rules"] = field.Rules.Count == 0 ? null : JsonSerializer.Serialize(field.Rules);
 
             if (field.Extension != null)
             {
@@ -205,6 +228,28 @@ namespace SproutForms.Umbraco.Core.Services
             AddProperties(description, descriptor is null ? null : descriptor.FromConfig, outcome.Configuration, "Configuration");
             return description;
         }
+
+        private Dictionary<string, string?> DescribeConditionalOutcome(ConditionalOutcome outcome)
+        {
+            var description = DescribeOutcome(outcome.Outcome);
+            description["Condition"] = JsonSerializer.Serialize(outcome.Condition);
+            return description;
+        }
+
+        private static Dictionary<string, string?> DescribeVariable(FormVariable variable)
+            => new()
+            {
+                ["Label"] = variable.Label,
+                ["Type"] = variable.Type.ToString(),
+                ["Initial value"] = variable.InitialValue is null ? null : JsonSerializer.Serialize(variable.InitialValue),
+                ["Decimals"] = variable.Type == FormVariableType.Number ? variable.Decimals.ToString() : null
+            };
+
+        private static Dictionary<string, string?> DescribeCalculations(FormDefinition definition)
+            => new()
+            {
+                ["Rules"] = JsonSerializer.Serialize(definition.Calculations)
+            };
 
         // A type that's no longer registered left its configuration as raw JSON, which its descriptor can't read
         private static void AddProperties(Dictionary<string, string?> description, Func<object, FormPropertyBackofficeModel[]>? fromConfig, object? configuration, string rawName)

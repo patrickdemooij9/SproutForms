@@ -11,7 +11,8 @@ namespace SproutForms.Core.Models
         public required string FieldTypeAlias { get; set; }
         public bool Required { get; set; }
         public required object Configuration { get; set; }
-        public FieldConditions? Conditions { get; set; }
+        // When the field shows, hides or is required; a rule that changes a variable is a CalculationRule listed on the field
+        public List<FieldRule> Rules { get; set; } = [];
         public FormFieldExtensionValue? Extension { get; set; }
     }
 }

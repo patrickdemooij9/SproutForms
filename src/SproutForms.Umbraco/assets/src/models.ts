@@ -1,4 +1,4 @@
-import { ConditionDefinition, FieldConditions } from "./api";
+import { CalculationRule, ConditionDefinition, FieldRule, FormVariable } from "./api";
 
 export interface FormDto {
   id?: string | null;
@@ -15,6 +15,11 @@ export interface FormDefinitionDto {
   pages: Array<FormPageDto>;
   fields: Array<FormFieldDto>;
   outcome: FormOutcomeDto;
+  // Checked top to bottom after submitting; the first whose condition holds replaces the outcome
+  conditionalOutcomes: Array<FormConditionalOutcomeDto>;
+  variables: Array<FormVariableDto>;
+  // Run top to bottom, so their order matters
+  calculations: Array<CalculationRuleDto>;
   workflows: Array<FormWorkflowDto>;
   submitLabel?: string | null;
   showProgress: boolean;
@@ -49,7 +54,8 @@ export interface FormFieldDto {
   configuration: {
     [key: string]: unknown;
   };
-  conditions?: FieldConditions | null;
+  // When the field shows, hides or is required. Its rules that change a variable are calculations it owns
+  rules: Array<FieldRule>;
   extension?: {
     [key: string]: unknown;
   } | null;
@@ -82,6 +88,17 @@ export type FormOutcomeDto = {
     [key: string]: unknown;
   };
 };
+
+// The ids only exist in the editor, so the lists can be reordered and variables renamed while editing
+export type FormConditionalOutcomeDto = {
+  id: string;
+  condition: ConditionDefinition;
+  outcome: FormOutcomeDto;
+};
+
+export type FormVariableDto = FormVariable & { id: string };
+
+export type CalculationRuleDto = CalculationRule & { id: string };
 
 export type FormTypeSelectionDto = {
   typeAlias: string;
@@ -193,6 +210,12 @@ export type FormSubmissionOverviewItem = {
   // Set for a submission in the recycle bin
   trashedAt?: string | null;
   trashedByName?: string | null;
+  // The form's variables as calculated for the submission, with their values formatted
+  variables?: Array<{
+    alias: string;
+    name: string;
+    value: string;
+  }>;
   workflowStages?: Array<{
     workflowAlias: string;
     displayName: string;

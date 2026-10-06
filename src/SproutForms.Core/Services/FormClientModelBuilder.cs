@@ -1,4 +1,5 @@
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.SubmissionGuard;
@@ -29,6 +30,9 @@ namespace SproutForms.Core.Services
             var definition = version.Definition;
             var formType = _formTypes.FirstOrDefault(it => it.Alias == definition.Type.TypeAlias);
 
+            // A variable that isn't exposed or needed by a condition stays on the server, with its rules, so they can't give away answers
+            var clientVariables = new CalculationDependencies(definition).GetClientVariables();
+
             return new FormClientModel
             {
                 Id = form.Id,
@@ -39,6 +43,16 @@ namespace SproutForms.Core.Services
                 SubmitLabel = string.IsNullOrWhiteSpace(definition.SubmitLabel) ? FormTexts.Submit : definition.SubmitLabel,
                 ShowProgress = definition.ShowProgress,
                 Pages = definition.Pages.Select((page, index) => BuildPage(version, page, index, formType)).ToList(),
+                Variables = definition.Variables
+                    .Where(variable => clientVariables.Contains(variable.Alias))
+                    .Select(variable => new FormClientVariable
+                    {
+                        Alias = variable.Alias,
+                        Type = variable.Type,
+                        InitialValue = variable.InitialValue,
+                        Decimals = variable.Decimals
+                    }).ToList(),
+                Calculations = definition.Calculations.Where(rule => clientVariables.Contains(rule.VariableAlias)).ToList(),
                 SubmissionGuard = _submissionGuard is null ? null : new FormClientSubmissionGuard
                 {
                     Alias = _submissionGuard.Alias,
@@ -84,7 +98,7 @@ namespace SproutForms.Core.Services
                 Required = field.Required,
                 RendersOwnLabel = fieldType.RendersOwnLabel,
                 Configuration = fieldType.GetClientConfiguration(field.Configuration),
-                Conditions = field.Conditions,
+                Rules = field.Rules,
                 ValidationRules = GetValidationRules(field, fieldType),
                 Extension = field.Extension is null ? null : formType?.GetClientFieldExtension(field),
                 Rows = field.Configuration is IFormFieldGroupConfiguration group ? BuildRows(version, group, group.Fields, formType) : null

@@ -1,6 +1,7 @@
-import { evaluateCondition } from "../../../SproutForms.Client/src/conditions";
+import { computeVariables, usesVariables } from "../../../SproutForms.Client/src/calculations";
+import { evaluateCondition, isRequiredByRules, isShownByRules } from "../../../SproutForms.Client/src/conditions";
 import { builtInValidators } from "../../../SproutForms.Client/src/validation";
-import type { ConditionDefinition } from "../../../SproutForms.Client/src/types";
+import type { CalculationRule, ConditionDefinition, FieldRule, FormClientVariable, FormVariables } from "../../../SproutForms.Client/src/types";
 
 interface SubmissionGuard {
     load?: (form: HTMLFormElement, settings: Record<string, unknown>) => Promise<void>;
@@ -14,16 +15,23 @@ interface SubmissionGuardRegistry {
 interface FieldCondition {
     rules: Array<{
         fieldAlias: string;
+        variableAlias?: string | null;
         comparison: string;
         value: unknown;
+        valueSource?: string;
     }>;
     operator?: "All" | "Any";
 }
 
-interface FieldConditions {
-    visibility?: FieldCondition;
-    required?: FieldCondition;
+// The variables the conditions of a form use, and the calculations that work them out, from data-sf-calculations
+interface CalculationState {
+    variables: FormClientVariable[];
+    calculations: CalculationRule[];
+    dependsOnVisibility: boolean;
 }
+
+// A field's rules from data-field-rules, kept on its wrapper
+type FieldRulesElement = HTMLElement & { rules?: FieldRule[] };
 
 interface Validator {
     (value: string | undefined, options: Record<string, string | undefined>, context?: Element): Promise<boolean>;
@@ -85,7 +93,7 @@ declare global {
             conditions: {
                 registry: FieldCondition[] | null;
                 init(form: Element): void;
-                evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>): boolean;
+                evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>, variables?: FormVariables): boolean;
             };
             validation: {
                 registry: ValidatorRegistry;
@@ -125,8 +133,8 @@ window.SproutForms = {
             }
         },
         // Shared with @sproutforms/client, so Razor and headless forms decide the same way as the server
-        evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>): boolean {
-            return evaluateCondition(fieldConditions as ConditionDefinition | undefined, formValues);
+        evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>, variables?: FormVariables): boolean {
+            return evaluateCondition(fieldConditions as ConditionDefinition | undefined, formValues, variables);
         }
     },
     validation: {
@@ -461,8 +469,9 @@ function updatePageVisibility(form: HTMLFormElement) {
     if (!state) return;
 
     const formValues = getFormValues(form);
+    const variables = getFormVariables(form, formValues);
     state.pages.forEach((page, index) => {
-        const isVisible = window.SproutForms.conditions.evaluate(state.conditions[index], formValues);
+        const isVisible = window.SproutForms.conditions.evaluate(state.conditions[index], formValues, variables);
         page.toggleAttribute("data-sf-skipped", !isVisible);
     });
 
@@ -720,6 +729,7 @@ async function validateAllFields(root: ParentNode): Promise<boolean> {
 // Listens on the form, so the fields of a repeater entry added later are evaluated too
 function initConditionalFields(form: HTMLFormElement) {
     initFieldConditions(form);
+    initCalculations(form);
 
     form.addEventListener("input", () => evaluateAllConditions(form));
     form.addEventListener("change", () => evaluateAllConditions(form));
@@ -728,20 +738,19 @@ function initConditionalFields(form: HTMLFormElement) {
 }
 
 function initFieldConditions(root: ParentNode) {
-    const formFields = root.querySelectorAll("[data-field-conditions]");
+    const formFields = root.querySelectorAll("[data-field-rules]");
 
     formFields.forEach(wrapper => {
         const fieldAlias = wrapper.getAttribute("data-sf-field-id");
-        const conditionsRaw = wrapper.getAttribute("data-field-conditions");
+        const rulesRaw = wrapper.getAttribute("data-field-rules");
 
-        if (!conditionsRaw || !fieldAlias) return;
+        if (!rulesRaw || !fieldAlias) return;
 
         try {
-            const conditions: FieldConditions = JSON.parse(conditionsRaw);
             wrapper.setAttribute("data-condition-field", fieldAlias);
-            (wrapper as HTMLElement & { conditions: FieldConditions }).conditions = conditions;
+            (wrapper as FieldRulesElement).rules = JSON.parse(rulesRaw);
         } catch (e) {
-            console.error("Failed to parse field conditions:", e);
+            console.error("Failed to parse field rules:", e);
         }
     });
 }
@@ -780,21 +789,73 @@ function getScopedValues(element: Element, formValues: Record<string, unknown>):
     return values;
 }
 
+const calculationStates = new WeakMap<HTMLFormElement, CalculationState>();
+
+function initCalculations(form: HTMLFormElement) {
+    const raw = form.getAttribute("data-sf-calculations");
+    if (!raw) return;
+
+    try {
+        const { variables, calculations } = JSON.parse(raw) as { variables: FormClientVariable[]; calculations: CalculationRule[] };
+        const conditions = [
+            ...Array.from(form.querySelectorAll("[data-sf-page]")).map(page => parsePageConditions(page as HTMLElement)),
+            ...Array.from(form.querySelectorAll<FieldRulesElement>("[data-condition-field]"))
+                .flatMap(wrapper => (wrapper.rules ?? []).map(rule => rule.condition))
+        ];
+        calculationStates.set(form, {
+            variables,
+            calculations,
+            dependsOnVisibility: conditions.some(condition => usesVariables(condition as ConditionDefinition | undefined))
+        });
+    } catch (e) {
+        console.error("Failed to parse calculations:", e);
+    }
+}
+
+// The fields of the form itself, not those in a repeater's entries: calculations only use those
+function isTopLevelField(element: Element): boolean {
+    return !element.closest("[data-sf-repeater-entry]");
+}
+
+// A field the visitor doesn't see, because of its own conditions or a skipped page, counts as empty in the calculations
+function getHiddenFieldAliases(form: HTMLFormElement, formValues: Record<string, unknown>, variables: FormVariables): string[] {
+    const hidden: string[] = [];
+    form.querySelectorAll<HTMLElement>("[data-sf-page]").forEach(page => {
+        if (window.SproutForms.conditions.evaluate(parsePageConditions(page), formValues, variables)) return;
+        page.querySelectorAll("[data-sf-field-id]").forEach(field => {
+            if (isTopLevelField(field)) hidden.push(field.getAttribute("data-sf-field-id")!);
+        });
+    });
+    form.querySelectorAll<FieldRulesElement>("[data-condition-field]").forEach(wrapper => {
+        if (isTopLevelField(wrapper) && !isShownByRules(wrapper.rules, formValues, variables)) {
+            hidden.push(wrapper.getAttribute("data-condition-field")!);
+        }
+    });
+    return hidden;
+}
+
+// The variables the form's conditions use, worked out the same way as on the server, which works them out again on submit
+function getFormVariables(form: HTMLFormElement, formValues: Record<string, unknown>): FormVariables {
+    const state = calculationStates.get(form);
+    if (!state) return {};
+
+    return computeVariables(state.variables, state.calculations, formValues,
+        variables => getHiddenFieldAliases(form, formValues, variables), state.dependsOnVisibility);
+}
+
 function evaluateAllConditions(form: HTMLFormElement) {
     const formValues = getFormValues(form);
+    const variables = getFormVariables(form, formValues);
     const fields = form.querySelectorAll("[data-condition-field]");
 
     fields.forEach(wrapper => {
-        const wrapperEl = wrapper as HTMLElement & { conditions?: FieldConditions };
-        const conditions = wrapperEl.conditions;
-        if (!conditions) return;
-
-        const visibilityCondition = conditions.visibility;
-        const requiredCondition = conditions.required;
+        const wrapperEl = wrapper as FieldRulesElement;
+        const rules = wrapperEl.rules;
+        if (!rules) return;
 
         // Inside a repeater entry, a condition sees the entry's own fields by their alias, over the form's
         const values = getScopedValues(wrapperEl, formValues);
-        const isVisible = window.SproutForms.conditions.evaluate(visibilityCondition, values);
+        const isVisible = isShownByRules(rules, values, variables);
 
         setHidden(wrapperEl, !isVisible);
         const parentCol = wrapper.closest<HTMLElement>("[data-sf-col]");
@@ -807,7 +868,7 @@ function evaluateAllConditions(form: HTMLFormElement) {
             existingRequired.removeAttribute("required");
         });
 
-        if (isVisible && requiredCondition && window.SproutForms.conditions.evaluate(requiredCondition, values)) {
+        if (isVisible && isRequiredByRules(rules, values, variables)) {
             // A repeater marks itself, since its inputs belong to its entries' fields
             const input = getOwnElements(wrapper, "input, select, textarea, [data-sf-repeater]")[0];
             if (input) {

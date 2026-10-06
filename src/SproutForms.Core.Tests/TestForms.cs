@@ -48,11 +48,11 @@ namespace SproutForms.Core.Tests
                 .Build();
 
             // Only asked for when this entry says it has allergies
-            definition.FindField("allergies")!.Conditions = new FieldConditions
-            {
-                Visibility = When("hasAllergies", "true"),
-                Required = When("hasAllergies", "true")
-            };
+            definition.FindField("allergies")!.Rules =
+            [
+                new FieldRule { Condition = When("hasAllergies", "true"), Action = FieldRuleAction.Show },
+                new FieldRule { Condition = When("hasAllergies", "true"), Action = FieldRuleAction.Require }
+            ];
 
             return new FormVersion
             {
@@ -79,6 +79,7 @@ namespace SproutForms.Core.Tests
                 FieldTypes,
                 [new StandardFormDefinitionType()],
                 new ConditionEvaluator(),
+                new FormCalculator(new ConditionEvaluator()),
                 Substitute.For<IWorkflowExecutionRepository>(),
                 storageProviders,
                 Substitute.For<IUnitOfWorkProvider>(),

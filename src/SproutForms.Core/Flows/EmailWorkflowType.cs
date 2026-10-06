@@ -35,7 +35,7 @@ namespace SproutForms.Core.Flows
                 await _emailSender.SendAsync(
                 config.From,
                 config.To,
-                config.Subject,
+                VariableTokens.Resolve(config.Subject, context.Submission, context.Version.Definition),
                 body,
                 ct);
             }
@@ -59,6 +59,13 @@ namespace SproutForms.Core.Flows
             {
                 var html = WebUtility.HtmlEncode(value).Replace("\n", "<br/>");
                 sb.AppendLine($"{WebUtility.HtmlEncode(label)}: {html}");
+                sb.AppendLine("<br/>");
+            }
+
+            foreach (var variable in version.Definition.Variables.Where(it => submission.Variables.ContainsKey(it.Alias)))
+            {
+                var value = VariableTokens.Format(variable.Alias, submission, version.Definition);
+                sb.AppendLine($"{WebUtility.HtmlEncode(string.IsNullOrWhiteSpace(variable.Label) ? variable.Alias : variable.Label)}: {WebUtility.HtmlEncode(value)}");
                 sb.AppendLine("<br/>");
             }
 

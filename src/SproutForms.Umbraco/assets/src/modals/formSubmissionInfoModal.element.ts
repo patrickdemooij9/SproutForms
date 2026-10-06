@@ -179,6 +179,20 @@ export default class FormSubmissionInfoModalElement extends UmbModalBaseElement<
           )}
         </uui-box>
 
+        ${when(
+          this.submission?.variables?.length,
+          () => html`
+            <uui-box>
+              <h2>Variables</h2>
+              ${repeat(
+                this.submission!.variables,
+                (item) => item.alias,
+                (item) => html`<p><strong>${item.name}:</strong> ${item.value}</p>`,
+              )}
+            </uui-box>
+          `,
+        )}
+
         <uui-box>
           ${when(
             this.submission?.workflowStages?.length,

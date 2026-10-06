@@ -1,3 +1,4 @@
+using SproutForms.Core.Services;
 
 namespace SproutForms.Core.Models.Outcomes
 {
@@ -22,7 +23,7 @@ namespace SproutForms.Core.Models.Outcomes
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
-                    ["url"] = config.RedirectUrl
+                    ["url"] = VariableTokens.Resolve(config.RedirectUrl, context.Submission, context.Version.Definition, Uri.EscapeDataString)
                 }
             });
         }

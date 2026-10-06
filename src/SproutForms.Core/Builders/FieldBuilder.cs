@@ -1,4 +1,5 @@
 ﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models.Conditions;
 using SproutForms.Core.Models.FormTypes;
 using System.Text.Json;
 
@@ -23,6 +24,35 @@ namespace SproutForms.Core.Builders
         public FieldBuilder<TConfig, TValue> Required()
         {
             _field.Required = true;
+            return this;
+        }
+
+        /// <summary>
+        /// Shows the field only when the condition holds, or that of another VisibleWhen. A hidden field isn't validated, and counts
+        /// as empty in calculations.
+        /// </summary>
+        public FieldBuilder<TConfig, TValue> VisibleWhen(Action<ConditionBuilder> condition)
+            => AddRule(FieldRuleAction.Show, condition);
+
+        /// <summary>
+        /// Hides the field when the condition holds, whatever its VisibleWhen rules say.
+        /// </summary>
+        public FieldBuilder<TConfig, TValue> HiddenWhen(Action<ConditionBuilder> condition)
+            => AddRule(FieldRuleAction.Hide, condition);
+
+        /// <summary>
+        /// Makes the field required when the condition holds.
+        /// </summary>
+        public FieldBuilder<TConfig, TValue> RequiredWhen(Action<ConditionBuilder> condition)
+            => AddRule(FieldRuleAction.Require, condition);
+
+        private FieldBuilder<TConfig, TValue> AddRule(FieldRuleAction action, Action<ConditionBuilder> condition)
+        {
+            _field.Rules.Add(new FieldRule
+            {
+                Condition = ConditionBuilder.Build(condition),
+                Action = action
+            });
             return this;
         }
 

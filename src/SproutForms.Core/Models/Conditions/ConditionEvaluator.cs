@@ -1,4 +1,4 @@
-﻿using System.Globalization;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -11,48 +11,58 @@ namespace SproutForms.Core.Models.Conditions
     {
         private static readonly TimeSpan RegexMatchTimeout = TimeSpan.FromMilliseconds(500);
 
-        // The number at the start of a value, as JavaScript's parseFloat reads it
-        private static readonly Regex LeadingNumber = new(@"^\s*[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?", RegexOptions.Compiled);
+        private static readonly IReadOnlyDictionary<string, JsonElement> NoVariables = new Dictionary<string, JsonElement>();
 
-        public bool IsVisible(FormField field, Dictionary<string, JsonElement> values)
-            => field.Conditions?.Visibility is null
-                || Evaluate(field.Conditions.Visibility, values);
-
-        public bool IsVisible(FormPage page, Dictionary<string, JsonElement> values)
-            => page.Visibility is null
-                || Evaluate(page.Visibility, values);
-
-        public bool IsRequired(FormField field, Dictionary<string, JsonElement> values)
-            => field.Conditions?.Required is not null
-                && Evaluate(field.Conditions.Required, values);
-
-        private static bool Evaluate(
-            ConditionDefinition condition,
-            Dictionary<string, JsonElement> values)
+        public bool IsVisible(FormField field, IReadOnlyDictionary<string, JsonElement> values, IReadOnlyDictionary<string, JsonElement>? variables = null)
         {
-            if (condition.Rules.Count == 0)
+            if (field.Rules.Any(rule => rule.Action == FieldRuleAction.Hide && Evaluate(rule.Condition, values, variables)))
+                return false;
+
+            var showRules = field.Rules.Where(rule => rule.Action == FieldRuleAction.Show).ToList();
+            return showRules.Count == 0 || showRules.Any(rule => Evaluate(rule.Condition, values, variables));
+        }
+
+        public bool IsVisible(FormPage page, IReadOnlyDictionary<string, JsonElement> values, IReadOnlyDictionary<string, JsonElement>? variables = null)
+            => page.Visibility is null
+                || Evaluate(page.Visibility, values, variables);
+
+        public bool IsRequired(FormField field, IReadOnlyDictionary<string, JsonElement> values, IReadOnlyDictionary<string, JsonElement>? variables = null)
+            => field.Rules.Any(rule => rule.Action == FieldRuleAction.Require && Evaluate(rule.Condition, values, variables));
+
+        public bool Evaluate(ConditionDefinition? condition, IReadOnlyDictionary<string, JsonElement> values, IReadOnlyDictionary<string, JsonElement>? variables = null)
+        {
+            if (condition is null || condition.Rules.Count == 0)
                 return true;
 
+            variables ??= NoVariables;
             return condition.Operator == "All"
-                ? condition.Rules.All(r => EvaluateRule(r, values))
-                : condition.Rules.Any(r => EvaluateRule(r, values));
+                ? condition.Rules.All(r => EvaluateRule(r, values, variables))
+                : condition.Rules.Any(r => EvaluateRule(r, values, variables));
         }
 
         private static bool EvaluateRule(
             ConditionRule rule,
-            Dictionary<string, JsonElement> values)
+            IReadOnlyDictionary<string, JsonElement> values,
+            IReadOnlyDictionary<string, JsonElement> variables)
         {
-            // A field that wasn't posted counts as empty
-            var value = values.TryGetValue(rule.FieldAlias, out var element) ? AsString(element) : "";
-            var target = rule.Value is JsonElement targetElement ? AsString(targetElement) : rule.Value?.ToString() ?? "";
+            // A field that wasn't posted, or a variable the form doesn't have, counts as empty
+            var value = rule.VariableAlias is { Length: > 0 } variableAlias
+                ? Read(variables, variableAlias)
+                : Read(values, rule.FieldAlias);
+            var target = rule.ValueSource switch
+            {
+                ConditionValueSource.Field => Read(values, AsString(rule.Value)),
+                ConditionValueSource.Variable => Read(variables, AsString(rule.Value)),
+                _ => AsString(rule.Value)
+            };
 
             return rule.Comparison switch
             {
                 ConditionComparison.Equals => string.Equals(value, target, StringComparison.OrdinalIgnoreCase),
                 ConditionComparison.NotEquals => !string.Equals(value, target, StringComparison.OrdinalIgnoreCase),
                 ConditionComparison.Contains => value.Contains(target, StringComparison.OrdinalIgnoreCase),
-                ConditionComparison.GreaterThan => ParseNumber(value) is { } greater && ParseNumber(target) is { } than && greater > than,
-                ConditionComparison.LessThan => ParseNumber(value) is { } less && ParseNumber(target) is { } lessThan && less < lessThan,
+                ConditionComparison.GreaterThan => ConditionValues.ParseNumber(value) is { } greater && ConditionValues.ParseNumber(target) is { } than && greater > than,
+                ConditionComparison.LessThan => ConditionValues.ParseNumber(value) is { } less && ConditionValues.ParseNumber(target) is { } lessThan && less < lessThan,
                 ConditionComparison.IsEmpty => string.IsNullOrWhiteSpace(value),
                 ConditionComparison.IsNotEmpty => !string.IsNullOrWhiteSpace(value),
                 ConditionComparison.MatchesRegex => MatchesRegex(value, target) == true,
@@ -61,23 +71,11 @@ namespace SproutForms.Core.Models.Conditions
             };
         }
 
-        private static string AsString(JsonElement element)
-            => element.ValueKind switch
-            {
-                JsonValueKind.String => element.GetString() ?? "",
-                JsonValueKind.Null or JsonValueKind.Undefined => "",
-                JsonValueKind.True => "true",
-                JsonValueKind.False => "false",
-                _ => element.GetRawText()
-            };
+        private static string Read(IReadOnlyDictionary<string, JsonElement> values, string alias)
+            => values.TryGetValue(alias, out var element) ? ConditionValues.AsString(element) : "";
 
-        private static double? ParseNumber(string value)
-        {
-            var match = LeadingNumber.Match(value);
-            return match.Success && double.TryParse(match.Value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number)
-                ? number
-                : null;
-        }
+        private static string AsString(object? value)
+            => value is JsonElement element ? ConditionValues.AsString(element) : Convert.ToString(value, CultureInfo.InvariantCulture) ?? "";
 
         // Null when the pattern is invalid or too slow, which fails both regex comparisons, as in the browser
         private static bool? MatchesRegex(string value, string pattern)

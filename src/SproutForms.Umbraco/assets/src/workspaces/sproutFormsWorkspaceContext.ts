@@ -19,18 +19,21 @@ import {
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import {
+  CalculationRuleDto,
   FieldContainer,
   FormColumnDto,
+  FormConditionalOutcomeDto,
   FormDefinitionDto,
   FormDefinitionTypeDto,
   FormDto,
   FormFieldDto,
   FormPageDto,
   FormRowDto,
+  FormVariableDto,
   SOURCE_UI,
 } from "../models";
 import { mapToDto, mapToPost } from "../mappings";
-import { FormBackofficeModel } from "../api";
+import { ConditionDefinition, ConditionValueSource, FormBackofficeModel } from "../api";
 
 export default class SproutFormsWorkspaceContext
   extends UmbContextBase
@@ -65,9 +68,13 @@ export default class SproutFormsWorkspaceContext
           message: "Thank you for submitting",
         },
       },
+      conditionalOutcomes: [],
+      variables: [],
+      calculations: [],
     },
   });
   public readonly form = this.#form.asObservable();
+  public readonly variables = this.#form.asObservablePart((form) => form.definition.variables);
   public readonly formId = this.#form.value.id;
 
   // The page the Build tab shows and edits
@@ -188,18 +195,46 @@ export default class SproutFormsWorkspaceContext
     return findField(this.#form.value.definition.fields, fieldId);
   }
 
+  // The calculations the field owns follow it when its alias changes, and so do its own rules' conditions on its
+  // answer, since a new rule starts from one. Other fields' conditions keep the old alias
   updateField(updatedField: Partial<FormFieldDto>) {
     const clonedFields = structuredClone(this.#form.value.definition.fields);
     const field = findField(clonedFields, updatedField.id!);
-    if (field) {
-      Object.assign(field, updatedField);
-      this.#form.update({
-        definition: {
-          ...this.#form.value.definition,
-          fields: [...clonedFields],
-        },
-      });
+    if (!field) return;
+
+    const oldAlias = field.alias;
+    Object.assign(field, updatedField);
+    let calculations = this.#form.value.definition.calculations;
+    if (oldAlias !== field.alias) {
+      field.rules = field.rules.map((rule) => ({ ...rule, condition: renameField(rule.condition, oldAlias, field.alias) }));
+      calculations = calculations.map((rule) =>
+        rule.ownerFieldAlias === oldAlias
+          ? { ...rule, ownerFieldAlias: field.alias, condition: rule.condition && renameField(rule.condition, oldAlias, field.alias) }
+          : rule,
+      );
     }
+    this.#updateDefinition({ fields: [...clonedFields], calculations });
+  }
+
+  #updateDefinition(changes: Partial<FormDefinitionDto>) {
+    this.#form.update({
+      definition: {
+        ...this.#form.value.definition,
+        ...changes,
+      },
+    });
+  }
+
+  updateVariables(variables: FormVariableDto[]) {
+    this.#updateDefinition({ variables });
+  }
+
+  updateCalculations(calculations: CalculationRuleDto[]) {
+    this.#updateDefinition({ calculations });
+  }
+
+  updateConditionalOutcomes(conditionalOutcomes: FormConditionalOutcomeDto[]) {
+    this.#updateDefinition({ conditionalOutcomes });
   }
 
   getCurrentPageIndex(): number {
@@ -212,12 +247,7 @@ export default class SproutFormsWorkspaceContext
   }
 
   #setPages(pages: FormPageDto[]) {
-    this.#form.update({
-      definition: {
-        ...this.#form.value.definition,
-        pages,
-      },
-    });
+    this.#updateDefinition({ pages });
   }
 
   // Adds an empty page at the end and shows it
@@ -450,12 +480,17 @@ export default class SproutFormsWorkspaceContext
     this.#form.update({ definition });
   }
 
-  // Removing a field group removes the fields inside it too
+  // Removing a field group removes the fields inside it too, and removing a field the calculations it owns
   removeField(fieldId: string) {
     const container = this.getFieldContainer(fieldId);
     if (!container) return;
 
     const definition = structuredClone(this.#form.value.definition);
+    const removed = findField(definition.fields, fieldId)!;
+    const removedAliases = [removed.alias, ...(removed.fields ?? []).map((child) => child.alias)];
+    definition.calculations = definition.calculations.filter(
+      (rule) => !rule.ownerFieldAlias || !removedAliases.includes(rule.ownerFieldAlias),
+    );
     const withoutField = (rows: FormRowDto[]) => rows
       .map(row => ({ ...row, columns: row.columns.filter(col => col.fieldId !== fieldId) }))
       .filter(row => row.columns.length > 0);
@@ -541,6 +576,17 @@ export function isSameFieldContainer(a: FieldContainer | undefined, b: FieldCont
   return a.kind === "page"
     ? b.kind === "page" && a.pageIndex === b.pageIndex
     : b.kind === "group" && a.groupId === b.groupId;
+}
+
+function renameField(condition: ConditionDefinition, oldAlias: string, newAlias: string): ConditionDefinition {
+  return {
+    ...condition,
+    rules: condition.rules.map((rule) => ({
+      ...rule,
+      fieldAlias: !rule.variableAlias && rule.fieldAlias === oldAlias ? newAlias : rule.fieldAlias,
+      value: rule.valueSource === ConditionValueSource.FIELD && rule.value === oldAlias ? newAlias : rule.value,
+    })),
+  };
 }
 
 // Groups only go one level deep, so a field is either top-level or inside a top-level group

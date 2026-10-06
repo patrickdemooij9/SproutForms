@@ -141,7 +141,7 @@ export class FormPageSettingsElement extends UmbElementMixin(LitElement) {
                 @condition-change=${(e: ConditionChangeEvent) => this.#update({ visibility: e.condition })}
               ></sf-condition-editor>
               <p class="description">
-                A page that isn't shown is skipped, and its fields aren't validated. Its conditions can use the fields on earlier pages.
+                A page that isn't shown is skipped, and its fields aren't validated. Its conditions can use the fields on earlier pages and the form's variables.
               </p>
             `}
 

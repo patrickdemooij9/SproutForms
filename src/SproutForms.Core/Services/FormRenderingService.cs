@@ -71,6 +71,8 @@ namespace SproutForms.Umbraco.Core.Services
                 SubmitLabel = clientModel.SubmitLabel,
                 ShowProgress = clientModel.ShowProgress,
                 SubmissionGuards = submissionGuards,
+                Variables = clientModel.Variables,
+                Calculations = clientModel.Calculations,
                 HasErrors = _errors.Count > 0
             };
         }
@@ -119,7 +121,7 @@ namespace SproutForms.Umbraco.Core.Services
                 Required = clientField.Required,
                 RendersOwnLabel = clientField.RendersOwnLabel,
                 Configuration = field.Configuration,
-                Conditions = clientField.Conditions,
+                Rules = clientField.Rules,
                 ValidationRules = clientField.ValidationRules,
                 Entries = field.Configuration is RepeaterFieldConfig repeater && clientField.Rows is { } rows
                     ? [.. Enumerable.Range(0, repeater.GetInitialItemCount()).Select(index => BuildEntry(repeater, rows, FieldPath.ForEntry(path, index), repeater.GetItemTitle(index)))]

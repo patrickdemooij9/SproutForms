@@ -35,7 +35,8 @@ namespace SproutForms.Umbraco.Core.Repositories
                 SubmittedAt = submission.SubmittedAt,
                 ValuesJson = JsonSerializer.Serialize(submission.Values),
                 PageUrl = submission.PageUrl,
-                ResultsJson = submission.Results.Count == 0 ? null : JsonSerializer.Serialize(submission.Results)
+                ResultsJson = submission.Results.Count == 0 ? null : JsonSerializer.Serialize(submission.Results),
+                VariablesJson = submission.Variables.Count == 0 ? null : JsonSerializer.Serialize(submission.Variables)
             });
         }
 
@@ -177,12 +178,13 @@ namespace SproutForms.Umbraco.Core.Repositories
             SubmittedAt = entity.SubmittedAt,
             PageUrl = entity.PageUrl,
             Results = DeserializeResults(entity.ResultsJson),
+            Variables = DeserializeResults(entity.VariablesJson),
             // The database gives the value back without its kind
             TrashedAt = entity.TrashedAt is { } trashedAt ? DateTime.SpecifyKind(trashedAt, DateTimeKind.Utc) : null,
             TrashedBy = entity.TrashedBy
         };
 
-        // Submissions saved before form types, or whose type computed nothing, have no results
+        // Submissions saved before form types or calculations, or with nothing computed, have none
         private static IReadOnlyDictionary<string, JsonElement> DeserializeResults(string? resultsJson)
         {
             return resultsJson is null

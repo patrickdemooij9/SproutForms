@@ -18,6 +18,7 @@ namespace SproutForms.Core.Services
         private readonly IFormFieldType[] _fieldTypes;
         private readonly IFormDefinitionType[] _formTypes;
         private readonly IConditionEvaluator _conditionEvaluator;
+        private readonly FormCalculator _calculator;
         private readonly IWorkflowExecutionRepository _workflowExecutionRepository;
         private readonly IFormFileStorageProvider[] _formFileStorageProviders;
         private readonly IUnitOfWorkProvider _unitOfWorkProvider;
@@ -30,6 +31,7 @@ namespace SproutForms.Core.Services
             IEnumerable<IFormFieldType> fieldTypes,
             IEnumerable<IFormDefinitionType> formTypes,
             IConditionEvaluator conditionEvaluator,
+            FormCalculator calculator,
             IWorkflowExecutionRepository workflowExecutionRepository,
             IEnumerable<IFormFileStorageProvider> formFileStorageProviders,
             IUnitOfWorkProvider unitOfWorkProvider,
@@ -41,6 +43,7 @@ namespace SproutForms.Core.Services
             _fieldTypes = fieldTypes.ToArray();
             _formTypes = formTypes.ToArray();
             _conditionEvaluator = conditionEvaluator;
+            _calculator = calculator;
             _workflowExecutionRepository = workflowExecutionRepository;
             _formFileStorageProviders = [..formFileStorageProviders];
             _unitOfWorkProvider = unitOfWorkProvider;
@@ -61,7 +64,10 @@ namespace SproutForms.Core.Services
             try
             {
                 await StoreFilesAsync(formVersion, files, values, storedFiles, errors);
-                ValidateFields(formVersion, formVersion.Definition.Fields, values, errors);
+
+                // Worked out on the server whatever the browser showed, and before validating, because conditions can use them
+                var variables = _calculator.Calculate(formVersion.Definition, values.ToDictionary());
+                ValidateFields(formVersion, formVersion.Definition.Fields, values, variables, errors);
 
                 // What is stored, and what the form's type, workflows and outcome see
                 var storedValues = values.ToDictionary();
@@ -75,7 +81,7 @@ namespace SproutForms.Core.Services
                     };
                 }
 
-                var typeResult = await ProcessWithFormTypeAsync(formVersion, storedValues);
+                var typeResult = await ProcessWithFormTypeAsync(formVersion, storedValues, variables);
                 if (typeResult.Errors.Count != 0)
                 {
                     await DeleteStoredFilesAsync(storedFiles);
@@ -94,6 +100,7 @@ namespace SproutForms.Core.Services
                     SubmittedAt = DateTime.UtcNow,
                     Values = storedValues,
                     Results = typeResult.Results.ToDictionary(it => it.Key, it => JsonSerializer.SerializeToElement(it.Value)),
+                    Variables = variables,
                     PageUrl = GetPageUrl(request.PageUrl, httpContext),
                     IpAddress = _options.CurrentValue.StoreIpAddress ? httpContext?.Connection.RemoteIpAddress?.ToString() : null
                 };
@@ -131,7 +138,7 @@ namespace SproutForms.Core.Services
         }
 
         // A form whose type is no longer registered is still accepted, without the type's processing
-        private async Task<FormTypeSubmissionResult> ProcessWithFormTypeAsync(FormVersion formVersion, Dictionary<string, JsonElement> values)
+        private async Task<FormTypeSubmissionResult> ProcessWithFormTypeAsync(FormVersion formVersion, Dictionary<string, JsonElement> values, IReadOnlyDictionary<string, JsonElement> variables)
         {
             var typeAlias = formVersion.Definition.Type.TypeAlias;
             var formType = _formTypes.FirstOrDefault(it => it.Alias == typeAlias);
@@ -144,7 +151,8 @@ namespace SproutForms.Core.Services
             return await formType.ProcessSubmissionAsync(new FormTypeSubmissionContext
             {
                 Version = formVersion,
-                Values = values
+                Values = values,
+                Variables = variables
             }, CancellationToken.None);
         }
 
@@ -155,23 +163,25 @@ namespace SproutForms.Core.Services
             var fields = formVersion.Definition.Fields.Where(field => aliases.Contains(field.Alias));
 
             var errors = new Dictionary<string, List<string>>();
-            ValidateFields(formVersion, fields, SubmittedValues.Parse(formVersion.Definition.Fields, values), errors, includeFiles: false);
+            var submittedValues = SubmittedValues.Parse(formVersion.Definition.Fields, values);
+            var variables = _calculator.Calculate(formVersion.Definition, submittedValues.ToDictionary());
+            ValidateFields(formVersion, fields, submittedValues, variables, errors, includeFiles: false);
             return errors;
         }
 
-        private void ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, SubmittedValues values, Dictionary<string, List<string>> errors, bool includeFiles = true)
+        private void ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, SubmittedValues values, IReadOnlyDictionary<string, JsonElement> variables, Dictionary<string, List<string>> errors, bool includeFiles = true)
         {
             var conditionValues = values.ToDictionary();
 
             // The visitor skipped these pages, so their fields aren't validated, like a hidden field
             var skippedFieldAliases = formVersion.Definition.Pages
-                .Where(page => !_conditionEvaluator.IsVisible(page, conditionValues))
+                .Where(page => !_conditionEvaluator.IsVisible(page, conditionValues, variables))
                 .SelectMany(page => page.Rows)
                 .SelectMany(row => row.Columns)
                 .Select(column => column.FieldAlias)
                 .ToHashSet();
 
-            var scope = new ValidationScope(formVersion, errors, includeFiles);
+            var scope = new ValidationScope(formVersion, variables, errors, includeFiles);
             ValidateScope(scope, fields.Where(field => !skippedFieldAliases.Contains(field.Alias)), values, conditionValues, string.Empty);
         }
 
@@ -193,11 +203,11 @@ namespace SproutForms.Core.Services
                 if (!scope.IncludeFiles && field.Configuration is FileFieldConfig)
                     continue;
 
-                if (!_conditionEvaluator.IsVisible(field, conditionValues))
+                if (!_conditionEvaluator.IsVisible(field, conditionValues, scope.Variables))
                     continue;
 
                 var isRequired = field.Required ||
-                    _conditionEvaluator.IsRequired(field, conditionValues);
+                    _conditionEvaluator.IsRequired(field, conditionValues, scope.Variables);
 
                 // Fail closed: a field whose type is no longer registered can't be validated
                 var fieldType = GetFieldType(scope.FormVersion, field);
@@ -375,7 +385,7 @@ namespace SproutForms.Core.Services
             return fields.FirstOrDefault(it => it.Alias == path.FieldAlias);
         }
 
-        private sealed record ValidationScope(FormVersion FormVersion, Dictionary<string, List<string>> Errors, bool IncludeFiles);
+        private sealed record ValidationScope(FormVersion FormVersion, IReadOnlyDictionary<string, JsonElement> Variables, Dictionary<string, List<string>> Errors, bool IncludeFiles);
 
         private async Task DeleteStoredFilesAsync(List<StoredFileReference> storedFiles)
         {

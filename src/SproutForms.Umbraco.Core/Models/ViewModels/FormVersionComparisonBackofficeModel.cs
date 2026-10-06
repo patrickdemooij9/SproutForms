@@ -40,7 +40,8 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         Page,
         Field,
         Workflow,
-        Outcome
+        Outcome,
+        Calculation
     }
 
     // Seen from the current version: Added means the rollback brings the item back

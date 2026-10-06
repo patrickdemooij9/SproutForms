@@ -1,7 +1,8 @@
 import type { FormClientField, FormClientModel, FormClientTexts, ValidationRule } from './api/types.gen';
+import { calculateVariables } from './calculations';
 import { getEntryScope, isFieldRequired, isFieldVisible, isPageVisible, toConditionText } from './conditions';
 import { getEntries, getEntryPrefix, getGroupFields, getPageFields, isFieldGroup } from './pages';
-import type { FormErrors, FormValues } from './types';
+import type { FormErrors, FormValues, FormVariables } from './types';
 
 export interface ValidatorContext {
     field: FormClientField;
@@ -90,14 +91,15 @@ export function countFilledEntries(field: FormClientField, value: unknown): numb
 /**
  * The first error of a field, or undefined when it is valid. Rule types without a registered validator are skipped: the server
  * checks every rule again. For a field in a field group's entry, pass the entry's scope (see getEntryScope) as values. A field
- * group's own rules are checked, not its entries: validateForm does those.
+ * group's own rules are checked, not its entries: validateForm does those. Pass the form's variables (see calculateVariables)
+ * when its conditions use them.
  */
-export async function validateField(field: FormClientField, values: FormValues, texts: FormClientTexts): Promise<string | undefined> {
+export async function validateField(field: FormClientField, values: FormValues, texts: FormClientTexts, variables?: FormVariables): Promise<string | undefined> {
     const value = toFieldText(field, values[field.alias]);
     const requiredRule = field.validationRules.find(rule => rule.type === 'required');
 
     if (value.trim() === '') {
-        if (isFieldRequired(field, values)) return requiredRule?.message ?? texts.required;
+        if (isFieldRequired(field, values, variables)) return requiredRule?.message ?? texts.required;
         // A field group without entries still has too few of them, as on the server
         if (!isFieldGroup(field)) return undefined;
     }
@@ -127,10 +129,11 @@ export interface ValidateFormOptions {
  */
 export async function validateForm(definition: FormClientModel, values: FormValues, options: ValidateFormOptions = {}): Promise<FormErrors> {
     const errors: FormErrors = {};
-    const pages = definition.pages.filter(page => options.pageIndex === undefined ? isPageVisible(page, values) : page.index === options.pageIndex);
+    const variables = calculateVariables(definition, values);
+    const pages = definition.pages.filter(page => options.pageIndex === undefined ? isPageVisible(page, values, variables) : page.index === options.pageIndex);
 
     for (const page of pages) {
-        await validateFields(getPageFields(page), values, values, '', definition.texts, errors);
+        await validateFields(getPageFields(page), values, values, variables, '', definition.texts, errors);
     }
     return errors;
 }
@@ -138,9 +141,9 @@ export async function validateForm(definition: FormClientModel, values: FormValu
 /**
  * Validates the fields of the form, or of one entry of a field group: its own values, and the scope its conditions see.
  */
-async function validateFields(fields: FormClientField[], values: FormValues, scope: FormValues, pathPrefix: string, texts: FormClientTexts, errors: FormErrors): Promise<void> {
+async function validateFields(fields: FormClientField[], values: FormValues, scope: FormValues, variables: FormVariables, pathPrefix: string, texts: FormClientTexts, errors: FormErrors): Promise<void> {
     for (const field of fields) {
-        if (!isFieldVisible(field, scope)) continue;
+        if (!isFieldVisible(field, scope, variables)) continue;
 
         const path = pathPrefix + field.alias;
         if (isFieldGroup(field)) {
@@ -148,11 +151,11 @@ async function validateFields(fields: FormClientField[], values: FormValues, sco
             for (let index = 0; index < entries.length; index++) {
                 const entry = entries[index];
                 if (isBlankEntry(field, entry)) continue;
-                await validateFields(getGroupFields(field), entry, getEntryScope(entry, scope), getEntryPrefix(path, index), texts, errors);
+                await validateFields(getGroupFields(field), entry, getEntryScope(entry, scope), variables, getEntryPrefix(path, index), texts, errors);
             }
         }
 
-        const error = await validateField(field, scope, texts);
+        const error = await validateField(field, scope, texts, variables);
         if (error) errors[path] = [error];
     }
 }

@@ -29,10 +29,10 @@ namespace SproutForms.Core.JsonConverters
             var fieldTypeAlias = root.GetProperty("FieldTypeAlias").GetString()!;
             var required = root.TryGetProperty("Required", out var req) && req.GetBoolean();
 
-            FieldConditions? conditions = null;
-            if (root.TryGetProperty("Conditions", out var cond) && cond.ValueKind != JsonValueKind.Null)
+            var rules = new List<FieldRule>();
+            if (root.TryGetProperty("Rules", out var rulesElement) && rulesElement.ValueKind == JsonValueKind.Array)
             {
-                conditions = JsonSerializer.Deserialize<FieldConditions>(cond.GetRawText(), options);
+                rules = JsonSerializer.Deserialize<List<FieldRule>>(rulesElement.GetRawText(), options) ?? [];
             }
 
             object configuration = null!;
@@ -70,7 +70,7 @@ namespace SproutForms.Core.JsonConverters
                 FieldTypeAlias = fieldTypeAlias,
                 Required = required,
                 Configuration = configuration,
-                Conditions = conditions,
+                Rules = rules,
                 Extension = extension
             };
         }
@@ -94,11 +94,8 @@ namespace SproutForms.Core.JsonConverters
                 JsonSerializer.Serialize(writer, value.Configuration, value.Configuration.GetType(), options);
             }
 
-            writer.WritePropertyName("Conditions");
-            if (value.Conditions is null)
-                writer.WriteNullValue();
-            else
-                JsonSerializer.Serialize(writer, value.Conditions, options);
+            writer.WritePropertyName("Rules");
+            JsonSerializer.Serialize(writer, value.Rules, options);
 
             writer.WritePropertyName("Extension");
             if (value.Extension is null)

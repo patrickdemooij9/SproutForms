@@ -284,9 +284,9 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
           <span class="field-type">${fieldType?.displayName ?? field.fieldTypeAlias}</span>
         </span>
         ${when(
-          // A condition whose rules were all removed is still stored, so look for rules
-          (field.conditions?.visibility?.rules?.length ?? 0) + (field.conditions?.required?.rules?.length ?? 0) > 0,
-          () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has conditions"></uui-icon>`,
+          // Its rules that change a variable are stored with the form's calculations
+          (field.rules?.length ?? 0) > 0 || this.definition.calculations.some((rule) => rule.ownerFieldAlias === field.alias),
+          () => html`<uui-icon class="badge-icon" name="icon-directions" title="Has rules"></uui-icon>`,
         )}
         ${when(
           isResizingThis,

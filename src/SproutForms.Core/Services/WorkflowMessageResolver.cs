@@ -4,7 +4,7 @@ using SproutForms.Core.Models;
 namespace SproutForms.Core.Services
 {
     /// <summary>
-    /// Fills in the tokens of a workflow's message: {alias} for a field's value and {AllValues} for all of them.
+    /// Fills in the tokens of a workflow's message: {alias} for a field's value, {AllValues} for all of them, and {var:alias} for a variable's value.
     /// A field group such as a repeater has one token for all its entries; the fields inside it have none.
     /// </summary>
     public class WorkflowMessageResolver
@@ -26,6 +26,8 @@ namespace SproutForms.Core.Services
             return TokenPattern.Replace(template, match =>
             {
                 var fieldAlias = match.Groups[1].Value;
+                if (fieldAlias.StartsWith(VariableTokens.Prefix, StringComparison.Ordinal))
+                    return VariableTokens.Format(fieldAlias[VariableTokens.Prefix.Length..].Trim(), submission, formVersion.Definition);
                 return GetFieldValue(fieldAlias, submission, formVersion);
             });
         }

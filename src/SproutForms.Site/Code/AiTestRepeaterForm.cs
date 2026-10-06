@@ -57,7 +57,11 @@ namespace SproutForms.Site.Code
             {
                 Rules = [new ConditionRule { FieldAlias = "hasAllergies", Comparison = ConditionComparison.Equals, Value = "true" }]
             };
-            definition.FindField("allergies")!.Conditions = new FieldConditions { Visibility = hasAllergies, Required = hasAllergies };
+            definition.FindField("allergies")!.Rules =
+            [
+                new FieldRule { Condition = hasAllergies, Action = FieldRuleAction.Show },
+                new FieldRule { Condition = hasAllergies, Action = FieldRuleAction.Require }
+            ];
 
             return definition;
         }

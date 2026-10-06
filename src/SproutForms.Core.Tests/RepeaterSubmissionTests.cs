@@ -64,7 +64,7 @@ namespace SproutForms.Core.Tests
         public async Task A_condition_in_an_entry_can_use_a_field_of_the_form()
         {
             var version = TestForms.People();
-            version.Definition.FindField("allergies")!.Conditions!.Required!.Rules[0] = new Models.Conditions.ConditionRule
+            version.Definition.FindField("allergies")!.Rules.Single(rule => rule.Action == Models.Conditions.FieldRuleAction.Require).Condition.Rules[0] = new Models.Conditions.ConditionRule
             {
                 FieldAlias = "name",
                 Comparison = Models.Conditions.ConditionComparison.Equals,

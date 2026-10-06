@@ -1,4 +1,5 @@
 ﻿using SproutForms.Core.Models;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.Outcomes;
@@ -15,6 +16,9 @@ namespace SproutForms.Core.Builders
         private readonly List<FormWorkflow> _workflows = [];
         private FormSubmitOutcome? _outcome;
         private FormDefinitionTypeReference? _type;
+        private readonly List<FormVariable> _variables = [];
+        private readonly List<CalculationRule> _calculations = [];
+        private readonly List<ConditionalOutcome> _conditionalOutcomes = [];
 
         public string Alias { get; }
         public string Name { get; }
@@ -88,6 +92,51 @@ namespace SproutForms.Core.Builders
             return this;
         }
 
+        /// <summary>
+        /// Uses another outcome instead of the one from <see cref="SetOutcome(string, object)"/> when the condition holds, such as a
+        /// result page per score. Conditional outcomes are checked in the order they're added; the first that holds is used.
+        /// </summary>
+        public FormBuilder SetOutcomeWhen(Action<ConditionBuilder> condition, string outcomeTypeAlias, object configuration)
+        {
+            _conditionalOutcomes.Add(new ConditionalOutcome
+            {
+                Condition = ConditionBuilder.Build(condition),
+                Outcome = new FormSubmitOutcome
+                {
+                    OutcomeTypeAlias = outcomeTypeAlias,
+                    Configuration = configuration
+                }
+            });
+            return this;
+        }
+
+        public FormBuilder SetOutcomeWhen(Action<ConditionBuilder> condition, IFormSubmitOutcomeType outcome, object configuration)
+            => SetOutcomeWhen(condition, outcome.Alias, configuration);
+
+        /// <summary>
+        /// Adds a variable for the calculations to work out, a number that starts at 0 unless configured otherwise.
+        /// </summary>
+        public FormBuilder Variable(string alias, Action<VariableBuilder>? configure = null)
+        {
+            if (_variables.Any(it => it.Alias == alias))
+                throw new InvalidOperationException($"Duplicate variable alias '{alias}'.");
+
+            var variable = new FormVariable { Alias = alias };
+            configure?.Invoke(new VariableBuilder(variable));
+            _variables.Add(variable);
+            return this;
+        }
+
+        /// <summary>
+        /// Adds calculation rules that change a variable. All rules run in the order they're added, across variables, so a rule sees
+        /// what the rules before it did.
+        /// </summary>
+        public FormBuilder Calculate(string variableAlias, Action<CalculationBuilder> configure)
+        {
+            configure(new CalculationBuilder(variableAlias, _calculations));
+            return this;
+        }
+
         public FormBuilder OfType(string typeAlias, object settings)
         {
             _type = new FormDefinitionTypeReference
@@ -113,7 +162,10 @@ namespace SproutForms.Core.Builders
                 Fields = _fields,
                 Pages = _pages,
                 Workflows = _workflows,
-                SubmitLabel = _submitLabel
+                SubmitLabel = _submitLabel,
+                Variables = _variables,
+                Calculations = _calculations,
+                ConditionalOutcomes = _conditionalOutcomes
             };
             if (_type != null)
             {

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.SubmissionGuard;
 using SproutForms.Core.Repositories;
@@ -121,13 +122,19 @@ namespace SproutForms.Umbraco.Core.Controllers
                 return Invalid(result.Errors);
 
             var outcome = await _outcomeRunner.RunAsync(formVersion, result.Submission!, HttpContext.RequestAborted);
+
+            // Only what the browser could work out itself; the other variables stay on the server
+            var clientVariables = new CalculationDependencies(formVersion.Definition).GetClientVariables();
             return Ok(new HeadlessSubmitResponse
             {
                 Outcome = outcome is null ? null : new HeadlessOutcome
                 {
                     Type = outcome.OutcomeTypeAlias,
                     Data = outcome.Data
-                }
+                },
+                Variables = result.Submission!.Variables
+                    .Where(variable => clientVariables.Contains(variable.Key))
+                    .ToDictionary(variable => variable.Key, variable => variable.Value)
             });
         }
 

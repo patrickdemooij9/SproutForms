@@ -1,3 +1,5 @@
+using SproutForms.Core.Models.Calculations;
+
 namespace SproutForms.Core.Models.ClientModels
 {
     /// <summary>
@@ -20,6 +22,10 @@ namespace SproutForms.Core.Models.ClientModels
 
         // Every field is in exactly one column of one page, the same shape as the Razor view model
         public IReadOnlyList<FormClientPage> Pages { get; init; } = [];
+
+        // Only the variables the browser needs, and the calculations that change them, in the order they run
+        public IReadOnlyList<FormClientVariable> Variables { get; init; } = [];
+        public IReadOnlyList<CalculationRule> Calculations { get; init; } = [];
 
         public FormClientSubmissionGuard? SubmissionGuard { get; init; }
 
