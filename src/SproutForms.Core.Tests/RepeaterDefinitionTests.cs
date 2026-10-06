@@ -27,7 +27,7 @@ namespace SproutForms.Core.Tests
         public void A_field_outside_the_repeater_cant_use_a_field_inside_it()
         {
             var definition = TestForms.People().Definition;
-            definition.FindField("name")!.Conditions = new() { Visibility = TestForms.When("firstName", "Ann") };
+            definition.FindField("name")!.Rules = [new() { Condition = TestForms.When("firstName", "Ann") }];
 
             Assert.That(FormDefinitionStructureValidator.Validate(definition), Has.Some.Contains("which is inside 'People'"));
         }
@@ -63,7 +63,7 @@ namespace SproutForms.Core.Tests
             var group = Group(stored);
             Assert.That(group.Fields.Select(it => it.Alias), Is.EqualTo(new[] { "firstName", "hasAllergies", "allergies", "cv" }));
             Assert.That(group.Rows.SelectMany(row => row.Columns).Select(column => column.FieldAlias), Is.EqualTo(new[] { "firstName", "hasAllergies", "allergies", "cv" }));
-            Assert.That(stored.FindField("allergies")!.Conditions!.Visibility!.Rules[0].FieldAlias, Is.EqualTo("hasAllergies"));
+            Assert.That(stored.FindField("allergies")!.Rules[0].Condition.Rules[0].FieldAlias, Is.EqualTo("hasAllergies"));
         }
 
         [Test]

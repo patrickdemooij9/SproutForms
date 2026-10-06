@@ -1,5 +1,5 @@
-import type { ConditionDefinition, FormClientField, FormClientPage } from './api/types.gen';
-import type { FormValues } from './types';
+import type { ConditionDefinition, ConditionRule, FieldRule, FormClientField, FormClientPage } from './api/types.gen';
+import type { FormValues, FormVariables } from './types';
 
 /**
  * A value as the server compares it: text, with booleans as "true"/"false" and a missing value as empty.
@@ -13,7 +13,7 @@ export function toConditionText(value: unknown): string {
 }
 
 // The number at the start of a value, as parseFloat reads it; the server reads it the same way
-function parseNumber(value: string): number | undefined {
+export function parseNumber(value: string): number | undefined {
     const number = parseFloat(value);
     return isNaN(number) ? undefined : number;
 }
@@ -27,15 +27,28 @@ function matchesRegex(value: string, pattern: string): boolean | undefined {
     }
 }
 
+// What a rule compares with: its value, or the value of the field or variable it names
+function getTarget(rule: ConditionRule, values: FormValues, variables: FormVariables): unknown {
+    switch (rule.valueSource) {
+        case 'Field':
+            return values[toConditionText(rule.value)];
+        case 'Variable':
+            return variables[toConditionText(rule.value)];
+        default:
+            return rule.value;
+    }
+}
+
 /**
- * Evaluates a condition against the values entered so far, the same way the server does. No condition, or one without rules, holds.
+ * Evaluates a condition against the values entered so far and the form's variables (see calculateVariables), the same way the
+ * server does. No condition, or one without rules, holds.
  */
-export function evaluateCondition(condition: ConditionDefinition | null | undefined, values: FormValues): boolean {
+export function evaluateCondition(condition: ConditionDefinition | null | undefined, values: FormValues, variables: FormVariables = {}): boolean {
     if (!condition || !condition.rules || condition.rules.length === 0) return true;
 
     const results = condition.rules.map(rule => {
-        const value = toConditionText(values[rule.fieldAlias]);
-        const target = toConditionText(rule.value);
+        const value = toConditionText(rule.variableAlias ? variables[rule.variableAlias] : values[rule.fieldAlias]);
+        const target = toConditionText(getTarget(rule, values, variables));
 
         switch (rule.comparison) {
             case 'Equals':
@@ -78,17 +91,33 @@ export function getEntryScope(entry: FormValues, values: FormValues): FormValues
     return { ...values, ...entry };
 }
 
-export function isFieldVisible(field: FormClientField, values: FormValues): boolean {
-    return evaluateCondition(field.conditions?.visibility, values);
+/**
+ * Whether a field's rules show it: hidden while any Hide rule holds and, when it has Show rules, only shown while one of them holds.
+ */
+export function isShownByRules(rules: FieldRule[] | null | undefined, values: FormValues, variables?: FormVariables): boolean {
+    if (rules?.some(rule => rule.action === 'Hide' && evaluateCondition(rule.condition, values, variables))) return false;
+    const showRules = rules?.filter(rule => rule.action === 'Show') ?? [];
+    return showRules.length === 0 || showRules.some(rule => evaluateCondition(rule.condition, values, variables));
 }
 
 /**
- * Required on its own, or because its required condition holds.
+ * Whether one of a field's Require rules holds.
  */
-export function isFieldRequired(field: FormClientField, values: FormValues): boolean {
-    return field.required || (!!field.conditions?.required && evaluateCondition(field.conditions.required, values));
+export function isRequiredByRules(rules: FieldRule[] | null | undefined, values: FormValues, variables?: FormVariables): boolean {
+    return !!rules?.some(rule => rule.action === 'Require' && evaluateCondition(rule.condition, values, variables));
 }
 
-export function isPageVisible(page: FormClientPage, values: FormValues): boolean {
-    return evaluateCondition(page.visibility, values);
+export function isFieldVisible(field: FormClientField, values: FormValues, variables?: FormVariables): boolean {
+    return isShownByRules(field.rules, values, variables);
+}
+
+/**
+ * Required on its own, or because one of its Require rules holds.
+ */
+export function isFieldRequired(field: FormClientField, values: FormValues, variables?: FormVariables): boolean {
+    return field.required || isRequiredByRules(field.rules, values, variables);
+}
+
+export function isPageVisible(page: FormClientPage, values: FormValues, variables?: FormVariables): boolean {
+    return evaluateCondition(page.visibility, values, variables);
 }

@@ -1,4 +1,5 @@
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Conditions;
 
 namespace SproutForms.Umbraco.Core.Models.ViewModels
 {
@@ -13,7 +14,7 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
 
         public object Configuration { get; init; } = default!;
 
-        public object? Conditions { get; init; }
+        public IReadOnlyList<FieldRule> Rules { get; init; } = [];
 
         public string[] Errors { get; set; } = [];
         public string? Value { get; set; }

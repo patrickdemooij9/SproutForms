@@ -68,6 +68,19 @@ export function mapToDto(model: FormBackofficeModel): FormDto {
       outcome: {
         ...model.definition.outcome,
       },
+      conditionalOutcomes: model.definition.conditionalOutcomes.map((conditional) => ({
+        id: crypto.randomUUID(),
+        condition: conditional.condition,
+        outcome: { ...conditional.outcome },
+      })),
+      variables: model.definition.variables.map((variable) => ({
+        id: crypto.randomUUID(),
+        ...variable,
+      })),
+      calculations: model.definition.calculations.map((calculation) => ({
+        id: crypto.randomUUID(),
+        ...calculation,
+      })),
       workflows: model.definition.workflows.map((workflow) => ({
         id: crypto.randomUUID(),
         ...workflow
@@ -101,6 +114,9 @@ export function mapToPost(model: FormDto): FormBackofficeModel {
       outcome: {
         ...model.definition.outcome,
       },
+      conditionalOutcomes: model.definition.conditionalOutcomes.map(({ id, ...conditional }) => conditional),
+      variables: model.definition.variables.map(({ id, ...variable }) => variable),
+      calculations: model.definition.calculations.map(({ id, ...calculation }) => calculation),
       workflows: [...model.definition.workflows],
     },
   };

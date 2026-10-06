@@ -23,6 +23,10 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
     - `exampleQuiz`: a quiz with a pass mark of 3. `strongest` = `espresso` (2 points) and `origin` = `yemen` (1 point) score 3 of 3 and pass; the stored results are `{"score":3,"maxScore":3,"passed":true}`. The page shows the score and the pass or fail message.
     - `examplePoll`: one radio question. The result shows the vote percentages of all submissions, with the visitor's own vote marked.
     - `exampleProductFinder`: `cups` and `taste` answers point to products. `few` + `strong` recommend the espresso machine, `many` + `mild` the filter machine, and a tie goes to the product listed first. A submit redirects to the product's URL, which doesn't exist in the demo site, with or without JavaScript.
+    - Calculations (`Examples/Calculations/`, standard forms without a form type):
+      - `exampleCalculatorQuiz`: `strongest` = `espresso` adds 2 and `origin` = `yemen` adds 1 to `score`. 3 shows "A perfect 3 of 3. You know your coffee!", anything else "You scored {n} of 3…". Its page has no `data-sf-calculations`, since no condition uses `score`.
+      - `examplePersonalityTest`: `morning` (`quick`/`slow`) and `taste` (`bold`/`smooth`) add to `espresso` and `latte`. The "Tie-breaker" page with a required `tieBreaker` only shows when they're level; `seattle` there makes the text variable `coffee` "Latte". Only `espresso` and `latte` go to the browser and come back from a headless submit. The outcome reads "You're a Latte…" or "You're an Espresso…".
+      - `exampleQuote`: `size` (`250` = 7.50, `1000` = 24.95), plus 0.50 when `ground` is ticked, times `quantity`, into `total` (2 decimals), shown in the message. No condition uses them, so neither goes to the browser and a headless submit returns `{"variables":{}}`.
     - Adding a field type a type doesn't allow, or an extension on a field type it doesn't extend, makes startup fail with the validator's message.
 - **Email:** goes to the pickup folder `src/SproutForms.Site/umbraco/Data/AiTest/Mail/*.eml`. Nothing is ever delivered, whatever address a form's workflow names.
 - **Uploads:** stored in `src/SproutForms.Site/umbraco/Data/AiTest/Uploads/`, set by `SproutForms:LocalDiskFileStorage:RootPath` in `appsettings.AiTest.json`.
@@ -30,7 +34,7 @@ The `AiTest` environment of `src/SproutForms.Site` is a disposable test rig:
 - **Test endpoints** (`src/SproutForms.Site/Controllers/AiTestController.cs`), which return 404 outside `AiTest`:
   - `GET /ai-test/forms` lists the forms, with alias and source.
   - `GET /ai-test/forms/{alias}` renders one form on a bare page, with the real `forms.js` and CSS. Add `?theme=Example` to render it with the example theme in `Views/Forms/Themes/Example` (it replaces `Field` and `Fields/text`, the rest falls back).
-  - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values, the IP address and every workflow execution (status, attempts, last error).
+  - `GET /ai-test/forms/{alias}/submissions?take=10` returns the newest submissions, their stored values, results and variables, the IP address and every workflow execution (status, attempts, last error).
   - `POST /ai-test/submissions/{submissionId}/workflows/{workflowAlias}/retry` and `DELETE /ai-test/forms/{alias}` call the same services as the backoffice's retry and permanent delete (the backoffice first moves a form to the recycle bin; this skips the bin), which need a signed-in user. Deleting a code-first form only lasts until the next start, when it is registered again.
 
 ## The loop

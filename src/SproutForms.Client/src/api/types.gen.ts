@@ -4,6 +4,30 @@ export type ClientOptions = {
     baseUrl: 'http://localhost:5970' | (string & {});
 };
 
+export type CalculationOperand = {
+    source: ConditionValueSource;
+    value?: unknown;
+};
+
+export const CalculationOperation = {
+    SET: 'Set',
+    ADD: 'Add',
+    SUBTRACT: 'Subtract',
+    MULTIPLY: 'Multiply',
+    DIVIDE: 'Divide',
+    APPEND: 'Append'
+} as const;
+
+export type CalculationOperation = typeof CalculationOperation[keyof typeof CalculationOperation];
+
+export type CalculationRule = {
+    condition?: ConditionDefinition | null;
+    variableAlias: string;
+    operation: CalculationOperation;
+    operand: CalculationOperand;
+    ownerFieldAlias?: string | null;
+};
+
 export const ConditionComparison = {
     EQUALS: 'Equals',
     NOT_EQUALS: 'NotEquals',
@@ -25,9 +49,19 @@ export type ConditionDefinition = {
 
 export type ConditionRule = {
     fieldAlias: string;
+    variableAlias?: string | null;
     comparison: ConditionComparison;
     value?: unknown;
+    valueSource: ConditionValueSource;
 };
+
+export const ConditionValueSource = {
+    VALUE: 'Value',
+    FIELD: 'Field',
+    VARIABLE: 'Variable'
+} as const;
+
+export type ConditionValueSource = typeof ConditionValueSource[keyof typeof ConditionValueSource];
 
 export const EventMessageTypeModel = {
     DEFAULT: 'Default',
@@ -39,10 +73,18 @@ export const EventMessageTypeModel = {
 
 export type EventMessageTypeModel = typeof EventMessageTypeModel[keyof typeof EventMessageTypeModel];
 
-export type FieldConditions = {
-    visibility?: ConditionDefinition | null;
-    required?: ConditionDefinition | null;
+export type FieldRule = {
+    condition: ConditionDefinition;
+    action: FieldRuleAction;
 };
+
+export const FieldRuleAction = {
+    SHOW: 'Show',
+    HIDE: 'Hide',
+    REQUIRE: 'Require'
+} as const;
+
+export type FieldRuleAction = typeof FieldRuleAction[keyof typeof FieldRuleAction];
 
 export type FormClientColumn = {
     width: number;
@@ -56,7 +98,7 @@ export type FormClientField = {
     required: boolean;
     rendersOwnLabel: boolean;
     configuration?: unknown;
-    conditions?: FieldConditions | null;
+    rules: Array<FieldRule>;
     validationRules: Array<ValidationRule>;
     extension?: unknown;
     rows?: Array<FormClientRow> | null;
@@ -71,6 +113,8 @@ export type FormClientModel = {
     submitLabel: string;
     showProgress: boolean;
     pages: Array<FormClientPage>;
+    variables: Array<FormClientVariable>;
+    calculations: Array<CalculationRule>;
     submissionGuard?: FormClientSubmissionGuard | null;
     texts: FormClientTexts;
 };
@@ -101,6 +145,20 @@ export type FormClientTexts = {
     submitSucceeded: string;
 };
 
+export type FormClientVariable = {
+    alias: string;
+    type: FormVariableType;
+    initialValue?: unknown;
+    decimals: number;
+};
+
+export const FormVariableType = {
+    NUMBER: 'Number',
+    TEXT: 'Text'
+} as const;
+
+export type FormVariableType = typeof FormVariableType[keyof typeof FormVariableType];
+
 export type HeadlessOutcome = {
     type: string;
     data: {
@@ -110,6 +168,9 @@ export type HeadlessOutcome = {
 
 export type HeadlessSubmitResponse = {
     outcome?: HeadlessOutcome | null;
+    variables: {
+        [key: string]: unknown;
+    };
 };
 
 export type NotificationHeaderModel = {
@@ -164,6 +225,9 @@ export type GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses = 
 export type GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponse = GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses[keyof GetUmbracoSproutformsDeliveryApiV1DefinitionsByIdOrAliasResponses];
 
 export type PostUmbracoSproutformsDeliveryApiV1EntriesByIdData = {
+    /**
+     * The values keyed by field alias, a repeater's as a list of entry objects. Texts, numbers and booleans are all taken as text. "sf_PageUrl" holds the page the form was on, and the submission guard's values sit next to the fields, such as "g-recaptcha-response" or the honeypot's field.
+     */
     body: {
         [key: string]: unknown;
     };

@@ -1,3 +1,5 @@
+using SproutForms.Core.Services;
+using System.Net;
 
 namespace SproutForms.Core.Models.Outcomes
 {
@@ -25,7 +27,8 @@ namespace SproutForms.Core.Models.Outcomes
                 OutcomeTypeAlias = Alias,
                 Data = new Dictionary<string, object?>
                 {
-                    ["message"] = config.Message
+                    // forms.js shows the message as HTML, so a variable's text is encoded
+                    ["message"] = VariableTokens.Resolve(config.Message, context.Submission, context.Version.Definition, WebUtility.HtmlEncode)
                 }
             });
         }

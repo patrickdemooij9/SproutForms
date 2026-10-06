@@ -111,9 +111,6 @@ namespace SproutForms.Umbraco.Core.Controllers
             if (latestVersion is null) return NotFound();
 
             var formTypeDescriptor = GetViewableDescriptor(latestVersion.Definition.Type.TypeAlias);
-            var outcomeAlias = latestVersion.Definition.SubmitOutcome.OutcomeTypeAlias;
-            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == outcomeAlias, "submit outcome", outcomeAlias);
-            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == outcomeAlias, "submit outcome", outcomeAlias);
             return Ok(new FormBackofficeModel
             {
                 Id = id,
@@ -125,12 +122,14 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Definition = new FormDefinitionBackofficeModel
                 {
                     Type = Map(latestVersion.Definition.Type),
-                    Outcome = new FormOutcomeBackofficeModel
+                    Outcome = Map(latestVersion.Definition.SubmitOutcome),
+                    ConditionalOutcomes = [.. latestVersion.Definition.ConditionalOutcomes.Select(it => new FormConditionalOutcomeBackofficeModel
                     {
-                        TypeAlias = outcomeType.Alias,
-                        DisplayName = outcomeDescriptor.DisplayName,
-                        Configuration = outcomeDescriptor.FromConfig(latestVersion.Definition.SubmitOutcome.Configuration).ToDictionary(it => it.Alias, it => it.Value)
-                    },
+                        Condition = it.Condition,
+                        Outcome = Map(it.Outcome)
+                    })],
+                    Variables = latestVersion.Definition.Variables,
+                    Calculations = latestVersion.Definition.Calculations,
                     Pages = [.. latestVersion.Definition.Pages.Select(page => new FormPageBackofficeModel(page))],
                     SubmitLabel = latestVersion.Definition.SubmitLabel,
                     ShowProgress = latestVersion.Definition.ShowProgress,
@@ -194,8 +193,6 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Title = "The type of an existing form can't be changed."
                 });
             }
-            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
-            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == model.Definition.Outcome.TypeAlias, "submit outcome", model.Definition.Outcome.TypeAlias);
             var newDefinition = new FormDefinition
             {
                 Type = new FormDefinitionTypeReference
@@ -227,11 +224,14 @@ namespace SproutForms.Umbraco.Core.Controllers
                         TemplateId = it.TemplateId
                     };
                 }).ToList(),
-                SubmitOutcome = new FormSubmitOutcome
+                SubmitOutcome = Map(model.Definition.Outcome),
+                ConditionalOutcomes = [.. model.Definition.ConditionalOutcomes.Select(it => new ConditionalOutcome
                 {
-                    OutcomeTypeAlias = outcomeType.Alias,
-                    Configuration = outcomeDescriptor.ToConfig(model.Definition.Outcome.Configuration)
-                }
+                    Condition = it.Condition,
+                    Outcome = Map(it.Outcome)
+                })],
+                Variables = model.Definition.Variables,
+                Calculations = model.Definition.Calculations
             };
             var structureErrors = FormDefinitionStructureValidator.Validate(newDefinition);
             if (structureErrors.Count > 0)
@@ -242,7 +242,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 })
                 {
                     Type = "Error",
-                    Title = "The form's pages aren't valid."
+                    Title = "The form isn't valid."
                 });
             }
 
@@ -293,6 +293,29 @@ namespace SproutForms.Umbraco.Core.Controllers
             _formHistoryService.RecordSave(existingForm, form, newVersion, userKey);
 
             return GetForm(form.Id); //TODO: Probably just map everything back
+        }
+
+        private FormOutcomeBackofficeModel Map(FormSubmitOutcome outcome)
+        {
+            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == outcome.OutcomeTypeAlias, "submit outcome", outcome.OutcomeTypeAlias);
+            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == outcome.OutcomeTypeAlias, "submit outcome", outcome.OutcomeTypeAlias);
+            return new FormOutcomeBackofficeModel
+            {
+                TypeAlias = outcomeType.Alias,
+                DisplayName = outcomeDescriptor.DisplayName,
+                Configuration = outcomeDescriptor.FromConfig(outcome.Configuration).ToDictionary(it => it.Alias, it => it.Value)
+            };
+        }
+
+        private FormSubmitOutcome Map(FormOutcomeBackofficeModel outcome)
+        {
+            var outcomeType = GetRegistered(_outcomeTypes, it => it.Alias == outcome.TypeAlias, "submit outcome", outcome.TypeAlias);
+            var outcomeDescriptor = GetRegistered(_outcomeDescriptors, it => it.OutcomeTypeAlias == outcome.TypeAlias, "submit outcome", outcome.TypeAlias);
+            return new FormSubmitOutcome
+            {
+                OutcomeTypeAlias = outcomeType.Alias,
+                Configuration = outcomeDescriptor.ToConfig(outcome.Configuration)
+            };
         }
 
         [HttpGet("form/history")]
@@ -547,6 +570,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                     Name = "Submission at " + it.SubmittedAt.ToString("G"),
                     PageUrl = it.PageUrl,
                     WorkflowStages = workflowStages,
+                    Variables = formVersion is null ? [] : MapVariables(it, formVersion.Definition),
                     TrashedAt = it.TrashedAt,
                     TrashedByName = it.IsTrashed ? await _userNameResolver.GetNameAsync(it.TrashedBy ?? string.Empty, userNames) : null
                 });
@@ -589,9 +613,20 @@ namespace SproutForms.Umbraco.Core.Controllers
                 Id = submission.Id,
                 PageUrl = submission.PageUrl,
                 Values = MapValues(submission.Values, formVersion.Definition.Fields),
+                Variables = MapVariables(submission, formVersion.Definition),
                 WorkflowStages = workflowStages
             });
         }
+
+        private static FormSubmissionVariableBackofficeModel[] MapVariables(FormSubmission submission, FormDefinition definition)
+            => [.. definition.Variables
+                .Where(variable => submission.Variables.ContainsKey(variable.Alias))
+                .Select(variable => new FormSubmissionVariableBackofficeModel
+                {
+                    Alias = variable.Alias,
+                    Name = string.IsNullOrWhiteSpace(variable.Label) ? variable.Alias : variable.Label,
+                    Value = VariableTokens.Format(variable.Alias, submission, definition)
+                })];
 
         [HttpPost("submission/workflow/retry")]
         [ProducesResponseType(typeof(bool), 200)]
@@ -718,7 +753,6 @@ namespace SproutForms.Umbraco.Core.Controllers
             var result = new FormFieldBackofficeModel(field);
             var descriptor = GetRegistered(_fieldDescriptors, it => it.FieldTypeAlias == field.FieldTypeAlias, "field type", field.FieldTypeAlias);
             result.Configuration = descriptor.FromConfig(field.Configuration).ToDictionary(it => it.Alias, it => it.Value);
-            result.Conditions = field.Conditions;
             if (field.Configuration is IFormFieldGroupConfiguration group)
             {
                 result.Fields = [.. group.Fields.Select(child => Map(child, formTypeDescriptor))];
@@ -746,7 +780,7 @@ namespace SproutForms.Umbraco.Core.Controllers
                 FieldTypeAlias = model.FieldTypeAlias,
                 Required = model.Required,
                 Configuration = configuration,
-                Conditions = model.Conditions
+                Rules = model.Rules ?? []
             };
 
             if (configuration is IFormFieldGroupConfiguration group)

@@ -78,6 +78,7 @@ namespace SproutForms.Site.Controllers
                     submission.IpAddress,
                     submission.Values,
                     submission.Results,
+                    submission.Variables,
                     Workflows = executions.Select(e => new
                     {
                         e.WorkflowAlias,

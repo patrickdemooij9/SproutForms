@@ -1,3 +1,4 @@
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.Outcomes;
@@ -14,6 +15,13 @@ namespace SproutForms.Core.Models
         public List<FormWorkflow> Workflows { get; set; } = [];
 
         public FormSubmitOutcome SubmitOutcome { get; set; } = FormSubmitOutcome.Default();
+
+        // Checked top to bottom after a submit; the first whose condition holds replaces the submit outcome
+        public List<ConditionalOutcome> ConditionalOutcomes { get; set; } = [];
+
+        // The values the calculations work out, and the rules that do, run top to bottom
+        public List<FormVariable> Variables { get; set; } = [];
+        public List<CalculationRule> Calculations { get; set; } = [];
 
         public string? SubmitLabel { get; set; }
         public bool ShowProgress { get; set; } = true;

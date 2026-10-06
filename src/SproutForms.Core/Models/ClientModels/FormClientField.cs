@@ -13,7 +13,7 @@ namespace SproutForms.Core.Models.ClientModels
         // From IFormFieldType.GetClientConfiguration, so without settings only the server needs
         public object? Configuration { get; init; }
 
-        public FieldConditions? Conditions { get; init; }
+        public IReadOnlyList<FieldRule> Rules { get; init; } = [];
         public IReadOnlyList<ValidationRule> ValidationRules { get; init; } = [];
 
         // From IFormDefinitionType.GetClientFieldExtension; nothing unless the form type shares it

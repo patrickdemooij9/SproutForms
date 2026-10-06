@@ -12,7 +12,6 @@ import {
 import "./formEditor.element";
 import "./formSettings.element";
 import "./formIntegrations.element";
-import "./formSubmissions.element";
 import "./formInfo.element";
 import { UUIInputEvent } from "@umbraco-cms/backoffice/external/uui";
 import SproutFormsWorkspaceContext, {
@@ -24,7 +23,6 @@ enum TabState {
   Editor,
   Settings,
   Integrations,
-  Submissions,
   Info,
 }
 
@@ -60,22 +58,18 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     await this.context?.save();
   }
 
-  // Submissions and history only exist once the form has been saved
+  // The submissions have a page of their own, opened from the forms list
   #getTabs(): Array<Tab> {
-    const tabs: Array<Tab> = [
+    return [
       { state: TabState.Editor, label: "Build", icon: "icon-layout" },
       { state: TabState.Settings, label: "Settings", icon: "icon-settings" },
       { state: TabState.Integrations, label: "Integrations", icon: "icon-nodes" },
+      { state: TabState.Info, label: "Info", icon: "icon-info" },
     ];
-    if (this.form.id) {
-      tabs.push({ state: TabState.Submissions, label: "Submissions", icon: "icon-inbox" });
-      tabs.push({ state: TabState.Info, label: "Info", icon: "icon-info" });
-    }
-    return tabs;
   }
 
   get #isReadOnly() {
-    return this.form.source === SOURCE_CODE && this.tabState !== TabState.Submissions && this.tabState !== TabState.Info;
+    return this.form.source === SOURCE_CODE && this.tabState !== TabState.Info;
   }
 
   render() {
@@ -135,10 +129,6 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
             ${when(
               this.tabState == TabState.Integrations,
               () => html`<form-integrations></form-integrations>`,
-            )}
-            ${when(
-              this.tabState == TabState.Submissions,
-              () => html`<form-submissions></form-submissions>`,
             )}
             ${when(
               this.tabState == TabState.Info,
@@ -208,10 +198,15 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     form-editor,
     form-settings,
     form-integrations,
-    form-submissions,
     form-info {
       display: block;
       height: 100%;
+    }
+
+    /* Its sub-tabs stay on top while the selected view scrolls */
+    form-settings {
+      display: flex;
+      flex-direction: column;
     }
 
     .read-only-notice {

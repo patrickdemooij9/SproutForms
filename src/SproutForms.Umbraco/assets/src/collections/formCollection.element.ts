@@ -21,6 +21,7 @@ import SproutFormsListContext, {
 } from "../workspaces/sproutFormsListContext";
 
 import "./formNameLayout.element";
+import "./formSubmissionsLayout.element";
 import { SOURCE_UI } from "../models";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
 import { RECYCLE_BIN_PATH } from "../workspaces/recycleBinWorkspaceContext";
@@ -48,6 +49,7 @@ export default class FormCollectionElement extends UmbLitElement {
     {
       name: "Submissions",
       alias: "submissions",
+      elementName: "sf-form-submissions-column-layout",
     },
     {
       name: "",
@@ -113,7 +115,10 @@ export default class FormCollectionElement extends UmbLitElement {
               },
               {
                 columnAlias: "submissions",
-                value: item.totalSubmissions,
+                value:
+                  item.entityType == "sf-form"
+                    ? { unique: item.unique, total: item.totalSubmissions }
+                    : undefined,
               },
               {
                 columnAlias: "actions",

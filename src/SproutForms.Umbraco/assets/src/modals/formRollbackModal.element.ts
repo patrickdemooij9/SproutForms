@@ -37,6 +37,7 @@ const SECTION_HEADLINES: Record<FormChangeSection, string> = {
   [FormChangeSection.FIELD]: "Fields",
   [FormChangeSection.WORKFLOW]: "Workflows",
   [FormChangeSection.OUTCOME]: "After submitting",
+  [FormChangeSection.CALCULATION]: "Calculations",
 };
 
 const CHANGE_TAGS: Record<FormChangeType, { label: string; color: string }> = {

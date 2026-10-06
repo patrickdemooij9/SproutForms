@@ -13,7 +13,7 @@ import {
 import { FieldConfigPropertyElement } from "./fieldEditors/fieldConfigProperty.element";
 
 import "./fieldEditors/fieldConfigProperty.element";
-import "./fieldEditors/fieldConditionsEditor.element";
+import "./fieldEditors/fieldRulesEditor.element";
 import {
   FormFieldDto,
   FormFieldTypeDto,
@@ -185,18 +185,6 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
     this.dispatchEvent(fieldChangeEvent);
   }
 
-  #onConditionsChange(event: CustomEvent) {
-    const conditions = event.detail;
-    const updatedField: Partial<FormFieldDto> = {
-      id: this.field.id,
-      conditions: conditions,
-    };
-
-    const fieldChangeEvent = new FieldChangeEvent();
-    fieldChangeEvent.field = updatedField;
-    this.dispatchEvent(fieldChangeEvent);
-  }
-
   protected render() {
     return html`
       <umb-property-dataset
@@ -214,8 +202,8 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
             @click=${() => (this._activeTab = "advanced")}
           ></uui-tab>
           <uui-tab
-            label="Conditions"
-            @click=${() => (this._activeTab = "conditions")}
+            label="Rules"
+            @click=${() => (this._activeTab = "rules")}
           ></uui-tab>
           ${when(
             this.#extension,
@@ -307,14 +295,13 @@ export default class FormInspectorFieldTypeElement extends UmbElementMixin(
             `,
           )}
           ${when(
-            this._activeTab == "conditions",
+            this._activeTab == "rules",
             () => html`
-              <sf-field-conditions-editor
+              <sf-field-rules-editor
                 .field=${this.field}
                 .fields=${this.fields}
                 .allowRequired=${!this.fieldType?.isFieldGroup}
-                @conditions-change=${this.#onConditionsChange}
-              ></sf-field-conditions-editor>
+              ></sf-field-rules-editor>
             `,
           )}
         </div>

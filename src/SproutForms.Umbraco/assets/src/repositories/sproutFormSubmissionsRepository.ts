@@ -9,9 +9,9 @@ import {
 } from "@umbraco-cms/backoffice/repository";
 import { SproutFormsSource } from "./sproutFormsSource";
 import { FormSubmissionOverviewItem, SUBMISSION_ENTITY_TYPE, TRASHED_SUBMISSION_ENTITY_TYPE } from "../models";
-import SproutFormsWorkspaceContext, {
-  SF_FORM_DETAIL_TOKEN_CONTEXT,
-} from "../workspaces/sproutFormsWorkspaceContext";
+import FormSubmissionsWorkspaceContext, {
+  SF_FORM_SUBMISSIONS_TOKEN_CONTEXT,
+} from "../workspaces/formSubmissionsWorkspaceContext";
 import { UmbControllerHost } from "@umbraco-cms/backoffice/controller-api";
 
 export default class FormSubmissionsRepository
@@ -19,14 +19,14 @@ export default class FormSubmissionsRepository
   implements UmbCollectionRepository
 {
   #source: SproutFormsSource = new SproutFormsSource(this);
-  #context?: SproutFormsWorkspaceContext;
+  #context?: FormSubmissionsWorkspaceContext;
 
   // The repository of the form's recycle bin lists the trashed submissions instead
   protected trashed = false;
 
   constructor(host: UmbControllerHost) {
     super(host);
-    this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
+    this.consumeContext(SF_FORM_SUBMISSIONS_TOKEN_CONTEXT, (context) => {
       this.#context = context;
     });
   }

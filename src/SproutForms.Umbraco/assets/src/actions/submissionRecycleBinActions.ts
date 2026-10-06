@@ -6,11 +6,11 @@ import { umbConfirmModal } from "@umbraco-cms/backoffice/modal";
 import { UMB_NOTIFICATION_CONTEXT } from "@umbraco-cms/backoffice/notification";
 import { UmbWorkspaceActionBase } from "@umbraco-cms/backoffice/workspace";
 import { SproutFormsSource } from "../repositories/sproutFormsSource";
-import { SF_FORM_DETAIL_TOKEN_CONTEXT } from "../workspaces/sproutFormsWorkspaceContext";
+import { SF_FORM_SUBMISSIONS_TOKEN_CONTEXT } from "../workspaces/formSubmissionsWorkspaceContext";
 
-// Every form has a recycle bin of its own, so each action works on the submissions of the open form
+// Every form has a recycle bin of its own, so each action works on the submissions of the form whose submissions are open
 async function getFormId(host: UmbControllerBase) {
-  const formContext = await host.getContext(SF_FORM_DETAIL_TOKEN_CONTEXT);
+  const formContext = await host.getContext(SF_FORM_SUBMISSIONS_TOKEN_CONTEXT);
   return formContext?.getFormId();
 }
 

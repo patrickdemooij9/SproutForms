@@ -10,6 +10,9 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public string? PageUrl { get; set; }
         public List<WorkflowStageStatusModel> WorkflowStages { get; set; } = [];
 
+        // A column per variable of the submission's form version
+        public FormSubmissionVariableBackofficeModel[] Variables { get; set; } = [];
+
         // Set for a submission in the recycle bin
         public DateTime? TrashedAt { get; set; }
         public string? TrashedByName { get; set; }

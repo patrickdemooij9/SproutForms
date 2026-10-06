@@ -72,10 +72,13 @@ namespace SproutForms.Core.Services
                 }
             }
 
-            var outcomeType = _outcomeTypes.FirstOrDefault(it => it.Alias == definition.SubmitOutcome.OutcomeTypeAlias);
-            if (outcomeType != null && !IsAllowed(formType, outcomeType))
+            foreach (var outcome in definition.ConditionalOutcomes.Select(it => it.Outcome).Prepend(definition.SubmitOutcome))
             {
-                errors.Add($"Submit outcome type '{outcomeType.Alias}' isn't allowed by form type '{typeAlias}'.");
+                var outcomeType = _outcomeTypes.FirstOrDefault(it => it.Alias == outcome.OutcomeTypeAlias);
+                if (outcomeType != null && !IsAllowed(formType, outcomeType))
+                {
+                    errors.Add($"Submit outcome type '{outcomeType.Alias}' isn't allowed by form type '{typeAlias}'.");
+                }
             }
 
             return errors;

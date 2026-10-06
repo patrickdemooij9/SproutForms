@@ -58,6 +58,7 @@ import FormPickerElement from "../propertyEditors/formPickerElement";
 import TokenAutocompleteTextareaElement from "../propertyEditors/tokenAutocompleteTextarea.element";
 import CreateFolderAction from "../actions/CreateFolderAction";
 import FolderWorkspaceContext from "../workspaces/folderWorkspaceContext";
+import FormSubmissionsWorkspaceContext, { FORM_SUBMISSIONS_ENTITY_TYPE } from "../workspaces/formSubmissionsWorkspaceContext";
 import SproutFormsDashboardElement from "../workspaces/sproutFormsDashboard.element";
 
 const SproutFormSection: ManifestSection = {
@@ -127,6 +128,17 @@ const SproutFolderWorkspace: ManifestWorkspace = {
     entityType: "sprout-folder"
   }
 }
+
+const FormSubmissionsWorkspace: ManifestWorkspace = {
+  type: "workspace",
+  kind: "routable",
+  alias: "sproutForms.form.submissions",
+  name: "SproutForms Form Submissions Workspace",
+  api: FormSubmissionsWorkspaceContext,
+  meta: {
+    entityType: FORM_SUBMISSIONS_ENTITY_TYPE,
+  },
+};
 
 const FormsCollection: ManifestCollection = {
   type: "collection",
@@ -634,6 +646,7 @@ export const SproutFormManifests = [
   SproutFormsDashboard,
   SproutFormsWorkspace,
   SproutFolderWorkspace,
+  FormSubmissionsWorkspace,
   FormsCollection,
   FormsCollectionView,
   FormRepository,

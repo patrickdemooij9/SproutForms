@@ -10,6 +10,9 @@ namespace SproutForms.Core.Models.FormTypes
         public required FormVersion Version { get; init; }
         public required IReadOnlyDictionary<string, JsonElement> Values { get; init; }
 
+        // What the form's calculations worked out, by variable alias
+        public IReadOnlyDictionary<string, JsonElement> Variables { get; init; } = new Dictionary<string, JsonElement>();
+
         public FormDefinition Definition => Version.Definition;
     }
 }

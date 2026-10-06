@@ -1,10 +1,15 @@
 import type { FormClientField } from './api/types.gen';
 
 export type {
+    CalculationOperand,
+    CalculationOperation,
+    CalculationRule,
     ConditionComparison,
     ConditionDefinition,
     ConditionRule,
-    FieldConditions,
+    ConditionValueSource,
+    FieldRule,
+    FieldRuleAction,
     FormClientColumn,
     FormClientField,
     FormClientModel,
@@ -12,6 +17,8 @@ export type {
     FormClientRow,
     FormClientSubmissionGuard,
     FormClientTexts,
+    FormClientVariable,
+    FormVariableType,
     HeadlessOutcome,
     HeadlessSubmitResponse,
     ValidationProblemDetails,
@@ -23,6 +30,11 @@ export type {
  * group, such as a repeater, holds a list of entries (see RepeaterValue).
  */
 export type FormValues = Record<string, unknown>;
+
+/**
+ * The form's variables as the browser works them out (see calculateVariables), keyed by variable alias: a number or text.
+ */
+export type FormVariables = Record<string, number | string>;
 
 /**
  * The value of a field group such as a repeater: one object per entry, keyed by the alias of the fields in it, such as

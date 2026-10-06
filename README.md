@@ -109,8 +109,8 @@ To change a view for every form, whatever the theme, put it at the same path as 
 
 forms.js only relies on `data-sf-*` attributes, never on class names, so you can use any classes you like (Bootstrap, Tailwind, ...). Keep these attributes when you replace a view:
 
-- The `<form>`: `data-form-ajax`, `data-submission-guards`, `data-sf-paged`, and the hidden `data-sf-page-url` input.
-- A field's wrapper: the attributes `AttributesHelper.Build` renders (`data-sf-field-id`, `data-sf-validate`, ...) and `data-field-conditions`. Inputs are found by their `name`.
+- The `<form>`: `data-form-ajax`, `data-submission-guards`, `data-sf-paged`, `data-sf-calculations`, and the hidden `data-sf-page-url` input.
+- A field's wrapper: the attributes `AttributesHelper.Build` renders (`data-sf-field-id`, `data-sf-validate`, ...) and `data-field-rules`. Inputs are found by their `name`.
 - A column: `data-sf-col`, so a hidden field hides its column too.
 - Pages: `data-sf-page` and its labels and conditions, `data-sf-previous` and `data-sf-next` on the buttons, `data-sf-progress` on the progress list and `data-sf-progress-step` on its items.
 
@@ -179,6 +179,52 @@ A form built with only `Row` has a single page, and renders without page navigat
 document.addEventListener("sproutforms:pagechange", e => window.scrollTo({ top: e.target.offsetTop }));
 ```
 
+## Field rules
+
+A field's rules say when it shows, hides or is required: each rule has a condition and an action. A field is hidden while any of its Hide rules holds and, when it has Show rules, only shown while one of them holds. It is required while any of its Require rules holds. A hidden field isn't validated, in the browser or on the server. A rule can also change a variable, see [Calculations](#calculations).
+
+In the backoffice, a field's rules are on its Rules tab. In code, `VisibleWhen`, `HiddenWhen` and `RequiredWhen` each add a rule:
+
+```csharp
+.Col(12, col => col.Text("address", "Address")
+    .VisibleWhen(c => c.Field("delivery").Is("home"))
+    .RequiredWhen(c => c.Field("delivery").Is("home"))
+    .Done())
+```
+
+## Calculations
+
+A form can work out values from its answers, such as a quiz score, a personality type or a price, without any code. It has **variables**, each a number or text with a starting value, and **calculation rules** that change them. A rule has an optional condition and an operation: a number can be set, added to, subtracted from, multiplied or divided, and text can be set or appended to. The value a rule works with is a value you type, or the value of a field or another variable. The rules run top to bottom, so a rule sees what the rules above it did.
+
+- A field the visitor doesn't see, because of its rules or a skipped page, counts as empty. A value that isn't a number counts as 0, and dividing by zero leaves a variable as it was.
+- A number is rounded to its variable's decimals once all rules have run.
+- Conditions can compare a field or a variable with a value, another field or another variable. For "the highest counter wins", compare the counters: `When introvert > extrovert, set personality to "Introvert"`.
+- A calculation rule can be listed on a field, among the field's own rules ("when this answer is Paris, add 10 to score"). It still runs in its place in the form's list of rules.
+- Page conditions and field rules can use variables too, to skip a page or show a field based on the answers so far. A variable a condition uses may only depend on earlier pages, and a field's visibility can't depend on the field itself; saving such a form fails with a message that says which variable and field.
+- **Conditional outcomes** replace the form's outcome when their condition holds, such as a different message or result page per score range. They're checked top to bottom, and the first that holds is used; otherwise the form's own outcome is.
+- `{var:alias}` fills in a variable's value in a message outcome (HTML-encoded), a redirect URL (URL-encoded), an email subject, and Slack and Teams messages. A number shows its variable's decimals. Emails list the variables under the answers, and a Custom POST sends them as `variables`.
+- The server always works out the variables again when a form is submitted, whatever the browser sent, and stores them with the submission. The backoffice shows them with each submission, and as a column in the list.
+- A variable stays on the server, with its rules, unless a page condition or field rule uses it. Then the browser gets it, and the rules it needs, to decide what to show. So a quiz score only reaches the browser when a condition uses it. A headless submit returns the values of the variables the browser got in `variables`.
+
+In the backoffice, variables and all calculation rules are under Settings → Calculations, conditional outcomes under Settings → Outcomes, and a field's rules on its Rules tab. In code:
+
+```csharp
+new FormBuilder("quiz", "Coffee quiz")
+    .Row(row => row.Col(12, col => col.Text("capital", "Capital of Italy").Done()))
+    .Row(row => row.Col(12, col => col.Text("beans", "Most grown bean").Done()))
+    .Variable("score", v => v.Label("Score"))
+    .Calculate("score", rules => rules
+        .When(c => c.Field("capital").Is("Rome")).Add(10)
+        .When(c => c.Field("beans").Is("arabica")).Add(5))
+    .SetOutcome(ShowMessageOutcome.Alias, new ShowMessageOutcomeConfig { Message = "You scored {var:score}." })
+    .SetOutcomeWhen(c => c.Variable("score").Is(15), ShowMessageOutcome.Alias, new ShowMessageOutcomeConfig { Message = "Perfect!" })
+    .Build();
+```
+
+`Variable` takes `Number(decimals)`, `Text()` and `StartAt(value)`. A rule's value can be `ValueOf.Field("quantity")` or `ValueOf.Variable("price")`, in conditions too: `c.Variable("latte").GreaterThan(ValueOf.Variable("espresso"))`. The demo site has a calculated quiz, a personality test with a tie-breaker page, and a price quote in [`src/SproutForms.Site/Examples/Calculations`](src/SproutForms.Site/Examples/Calculations).
+
+A form type's `ProcessSubmissionAsync` gets the variables in `context.Variables`, and an outcome finds them in `context.Submission.Variables`.
+
 # Headless
 
 A front-end that isn't rendered by Umbraco, such as a Next.js, Nuxt or mobile app, can use SproutForms through its headless API. The API returns a published form's structure as JSON and accepts submissions. The front-end renders the form itself.
@@ -211,8 +257,8 @@ All routes start with `/umbraco/sproutforms/delivery/api/v1`. The OpenAPI docume
 
 | Endpoint | Does |
 |---|---|
-| `GET definitions/{idOrAlias}` | The published form: its pages, rows and columns, each column holding its field with its configuration, conditions and validation rules (the same shape as the Razor view model), the submission guard's settings and the default texts. The `ETag` is the published version, so a client can revalidate with `If-None-Match` (304). |
-| `POST entries/{id}` | Submits the form. The body is its values as a JSON object, the same values a Razor form posts: `{ "alias": value, "sf_PageUrl": "...", ... }`, with what the submission guard checks next to the fields. A repeater's value is a list of entry objects, `[{ "alias": value }]`. With uploads, send `multipart/form-data` instead: the values as a JSON part named `values`, and each file as a part named by its field's path, such as `cv` or `people[0].cv`. Returns `{ "outcome": { "type", "data" } }`. |
+| `GET definitions/{idOrAlias}` | The published form: its pages, rows and columns, each column holding its field with its configuration, rules and validation rules (the same shape as the Razor view model), the submission guard's settings and the default texts. The `ETag` is the published version, so a client can revalidate with `If-None-Match` (304). |
+| `POST entries/{id}` | Submits the form. The body is its values as a JSON object, the same values a Razor form posts: `{ "alias": value, "sf_PageUrl": "...", ... }`, with what the submission guard checks next to the fields. A repeater's value is a list of entry objects, `[{ "alias": value }]`. With uploads, send `multipart/form-data` instead: the values as a JSON part named `values`, and each file as a part named by its field's path, such as `cv` or `people[0].cv`. Returns `{ "outcome": { "type", "data" }, "variables": { ... } }`, with the values of the variables the definition holds (those its conditions use). |
 | `POST entries/{id}/pages/{index}/validate` | Checks one page of a paged form with the values entered so far, as the same JSON object, without saving anything. Returns 204 when the page is valid. |
 
 A rejected submission or page returns 400 as `application/problem+json`, with the errors keyed by field alias in `errors`. `submissionGuard`, and any other key that isn't a field, is about the whole form.
@@ -226,7 +272,7 @@ The outcome's `data` depends on its type:
 
 When `outcome` is null, the submission was still saved. Show the form's `texts.submitSucceeded`.
 
-The definition never holds what a visitor mustn't see: the storage provider of an upload, workflows, the outcome's settings, or a form type's settings and field extensions (such as a quiz's correct answers). See [Showing settings to a headless front-end](#showing-settings-to-a-headless-front-end).
+The definition never holds what a visitor mustn't see: the storage provider of an upload, workflows, the outcome's settings, the calculations of variables no condition uses, or a form type's settings and field extensions (such as a quiz's correct answers). See [Showing settings to a headless front-end](#showing-settings-to-a-headless-front-end).
 
 ## The JavaScript client
 
@@ -253,6 +299,7 @@ registerOutcomeHandler('redirectUmbracoPage', outcome => router.push(String(outc
 
 It also has:
 - `client.validatePage` for paged forms, and `client.revalidateDefinition` to check whether a copy you cached is out of date.
+- `calculateVariables(form, values)`, which works out the variables the definition holds the way the server does. Pass them to `isFieldVisible` and `isFieldRequired` when a form's conditions use variables; the page functions and `validateForm` work them out themselves.
 - `isFieldOfType(field, 'select')`, which types a built-in field's `configuration`.
 - `registerValidator` for the validation rules of a custom field type. Rules without a validator are only checked by the server.
 - `registerSubmissionGuard` for a custom guard. The honeypot and reCAPTCHA v3 are built in; call `loadSubmissionGuard(form)` when the form shows.
@@ -298,6 +345,8 @@ A **form type** decides what kind of form something is: a standard form, a quiz,
 - add settings to every field of a field type (a quiz question's correct answer and points), shown on a tab of that field named after the form type,
 - process each submission before it is saved, to store results with it (a score) or to reject it,
 - come with outcomes that show those results to the visitor.
+
+For a score, a personality type or a price, [calculations](#calculations) usually do without a form type or any code.
 
 Working examples of a quiz, a poll and a product finder are in [`src/SproutForms.Site/Examples`](src/SproutForms.Site/Examples). Each one is a form type, a backoffice descriptor, an outcome, and a code-first example form; [`form-type-examples.js`](src/SproutForms.Site/wwwroot/examples/form-type-examples.js) holds their front-end handlers. The steps below build the quiz.
 

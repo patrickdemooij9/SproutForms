@@ -34,6 +34,9 @@ const NAME_COLUMN: UmbTableColumn = {
 const STATUS_COLUMN: UmbTableColumn = { name: "Workflow Status", alias: "workflowStatus" };
 const ACTIONS_COLUMN: UmbTableColumn = { name: "", alias: "actions", elementName: "umb-entity-actions-table-column-view" };
 
+// Each variable gets a column of its own, just before the actions
+const VARIABLE_COLUMN_PREFIX = "variable-";
+
 // The recycle bin shows when and by whom a submission was deleted as well
 const COLUMNS = [NAME_COLUMN, STATUS_COLUMN, ACTIONS_COLUMN];
 const TRASHED_COLUMNS = [
@@ -93,11 +96,29 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
             (this._selection = selection.filter((it) => it) as string[])
         );
         this.observe(this.#context.items, (items) => {
-          this._tableColumns = items.some((item) => item.trashedAt) ? TRASHED_COLUMNS : COLUMNS;
+          const columns = items.some((item) => item.trashedAt) ? TRASHED_COLUMNS : COLUMNS;
+          this._tableColumns = [
+            ...columns.slice(0, -1),
+            ...this.#getVariableColumns(items),
+            ACTIONS_COLUMN,
+          ];
           this._tableItems = items.map((item) => this.#toTableItem(item));
         });
       }
     );
+  }
+
+  // One column per variable the loaded submissions have, since older submissions can have other variables
+  #getVariableColumns(items: Array<FormSubmissionOverviewItem>): Array<UmbTableColumn> {
+    const columns = new Map<string, UmbTableColumn>();
+    items.forEach((item) => {
+      item.variables?.forEach((variable) => {
+        if (!columns.has(variable.alias)) {
+          columns.set(variable.alias, { name: variable.name, alias: VARIABLE_COLUMN_PREFIX + variable.alias });
+        }
+      });
+    });
+    return [...columns.values()];
   }
 
   #toTableItem(item: FormSubmissionOverviewItem): UmbTableItem {
@@ -126,6 +147,10 @@ export default class FormSubmissionCollectionElement extends UmbLitElement {
             this.#getStatusDot(stage.status)
           ) ?? [],
         },
+        ...(item.variables ?? []).map((variable) => ({
+          columnAlias: VARIABLE_COLUMN_PREFIX + variable.alias,
+          value: variable.value,
+        })),
         {
           columnAlias: "actions",
           value: { entityType: item.entityType, unique: item.unique, name: item.name },

@@ -1,4 +1,5 @@
 import {
+    calculateVariables,
     getEntries,
     getEntryPrefix,
     getEntryScope,
@@ -146,7 +147,7 @@ export function mountForm(root: HTMLElement, options: FormRendererOptions): void
                 const field = column.field;
                 const col = element('div', { class: 'col', style: `flex: ${column.width}` });
                 col.append(renderField(field, scope));
-                col.hidden = !isFieldVisible(field, scope.conditionValues());
+                col.hidden = !isFieldVisible(field, scope.conditionValues(), calculateVariables(definition, values));
                 conditionalColumns.push({ column: col, field, scope });
                 rowElement.append(col);
             }
@@ -157,7 +158,7 @@ export function mountForm(root: HTMLElement, options: FormRendererOptions): void
     function renderField(field: FormClientField, scope: FieldScope): HTMLElement {
         const path = scope.pathPrefix + field.alias;
         const wrapper = element('div', { class: 'field' });
-        const required = isFieldRequired(field, scope.conditionValues()) ? ' *' : '';
+        const required = isFieldRequired(field, scope.conditionValues(), calculateVariables(definition, values)) ? ' *' : '';
         const onInput = (value: unknown) => {
             scope.values[field.alias] = value;
             delete errors[path];
@@ -284,7 +285,7 @@ export function mountForm(root: HTMLElement, options: FormRendererOptions): void
     // Shows and hides fields as their conditions change, without rendering the inputs again
     function updateConditions() {
         for (const { column, field, scope } of conditionalColumns) {
-            column.hidden = !isFieldVisible(field, scope.conditionValues());
+            column.hidden = !isFieldVisible(field, scope.conditionValues(), calculateVariables(definition, values));
         }
     }
 

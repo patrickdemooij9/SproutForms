@@ -225,6 +225,7 @@ export class FormInspector extends UmbElementMixin(LitElement) {
       alias: crypto.randomUUID(),
       fieldTypeAlias: fieldType.alias,
       required: false,
+      rules: [],
       configuration: configuration,
     };
     if (fieldType.isFieldGroup) {

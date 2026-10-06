@@ -224,9 +224,11 @@ namespace SproutForms.Umbraco.Core.Services
                     errors.Add($"The template of workflow '{workflow.Alias}' has been deleted.");
             }
 
-            var outcomeAlias = definition.SubmitOutcome.OutcomeTypeAlias;
-            if (!_outcomeTypes.Any(it => it.Alias == outcomeAlias) || !_outcomeDescriptors.Any(it => it.OutcomeTypeAlias == outcomeAlias))
-                errors.Add($"The submit outcome '{outcomeAlias}' is no longer registered.");
+            foreach (var outcomeAlias in definition.ConditionalOutcomes.Select(it => it.Outcome.OutcomeTypeAlias).Prepend(definition.SubmitOutcome.OutcomeTypeAlias).Distinct())
+            {
+                if (!_outcomeTypes.Any(it => it.Alias == outcomeAlias) || !_outcomeDescriptors.Any(it => it.OutcomeTypeAlias == outcomeAlias))
+                    errors.Add($"The submit outcome '{outcomeAlias}' is no longer registered.");
+            }
 
             // The validators assume the types they check are registered
             if (errors.Count > 0) return errors;

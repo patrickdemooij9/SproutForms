@@ -72,10 +72,17 @@ export default class TokenAutocompleteTextareaElement
       return;
     }
 
-    this._fieldTokens = form.definition.fields.map(field => ({
-      label: `{${field.label}}`,
-      alias: field.alias
-    }));
+    // A variable's token is {var:alias}
+    this._fieldTokens = [
+      ...form.definition.fields.map(field => ({
+        label: `{${field.label}}`,
+        alias: field.alias
+      })),
+      ...(form.definition.variables ?? []).map(variable => ({
+        label: `{var:${variable.label || variable.alias}}`,
+        alias: `var:${variable.alias}`
+      })),
+    ];
   }
 
   #getAllTokens(): { label: string; alias: string }[] {

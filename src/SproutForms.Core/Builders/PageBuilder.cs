@@ -34,7 +34,7 @@ namespace SproutForms.Core.Builders
         }
 
         /// <summary>
-        /// Shows the page only when all the conditions hold, such as an answer on an earlier page. A hidden page is skipped, and its fields aren't validated.
+        /// Shows the page only when the condition holds, such as an answer on an earlier page or a variable worked out from them. A hidden page is skipped, and its fields aren't validated.
         /// </summary>
         public PageBuilder VisibleWhen(Action<ConditionBuilder> configure)
         {

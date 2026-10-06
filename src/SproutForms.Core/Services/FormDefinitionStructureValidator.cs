@@ -1,5 +1,7 @@
 using SproutForms.Core.Models;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.Conditions;
+using System.Text.RegularExpressions;
 
 namespace SproutForms.Core.Services
 {
@@ -10,6 +12,9 @@ namespace SproutForms.Core.Services
     {
         // How deep field groups may go: a repeater can't hold another repeater yet
         public const int MaxFieldGroupDepth = 1;
+
+        // A variable's alias goes in {var:alias} tokens, so it keeps to letters, digits, underscores and dashes
+        private static readonly Regex VariableAliasPattern = new(@"^[A-Za-z_][A-Za-z0-9_-]*$", RegexOptions.Compiled);
 
         /// <summary>
         /// Returns a message per problem, or none when the layout is valid.
@@ -78,35 +83,148 @@ namespace SproutForms.Core.Services
 
             foreach (var field in allFields.Where(field => availableByAlias.ContainsKey(field.Alias)))
             {
-                foreach (var rule in GetRules(field.Conditions?.Visibility, field.Conditions?.Required))
+                foreach (var alias in field.Rules.SelectMany(rule => CalculationDependencies.FieldsIn(rule.Condition)).Distinct())
                 {
-                    if (availableByAlias[field.Alias].Contains(rule.FieldAlias))
+                    if (availableByAlias[field.Alias].Contains(alias))
                         continue;
 
-                    if (groupByChildAlias.TryGetValue(rule.FieldAlias, out var group))
-                        errors.Add($"A condition of field '{field.Label}' uses field '{Label(rule.FieldAlias)}', which is inside '{group.Label}'; only the fields in the same entry can use it.");
-                    else if (!pageIndexByAlias.ContainsKey(rule.FieldAlias))
-                        errors.Add($"A condition of field '{field.Label}' uses field '{rule.FieldAlias}', which isn't on the form.");
+                    if (groupByChildAlias.TryGetValue(alias, out var group))
+                        errors.Add($"A condition of field '{field.Label}' uses field '{Label(alias)}', which is inside '{group.Label}'; only the fields in the same entry can use it.");
+                    else if (!pageIndexByAlias.ContainsKey(alias))
+                        errors.Add($"A condition of field '{field.Label}' uses field '{alias}', which isn't on the form.");
                     else
-                        errors.Add($"A condition of field '{field.Label}' uses field '{Label(rule.FieldAlias)}', which is on a later page.");
+                        errors.Add($"A condition of field '{field.Label}' uses field '{Label(alias)}', which is on a later page.");
                 }
             }
 
             for (var index = 0; index < definition.Pages.Count; index++)
             {
-                foreach (var rule in definition.Pages[index].Visibility?.Rules ?? [])
+                foreach (var alias in CalculationDependencies.FieldsIn(definition.Pages[index].Visibility))
                 {
-                    if (!pageIndexByAlias.TryGetValue(rule.FieldAlias, out var rulePage))
-                        errors.Add(groupByChildAlias.TryGetValue(rule.FieldAlias, out var group)
-                            ? $"A condition of {PageName(definition, index)} uses field '{Label(rule.FieldAlias)}', which is inside '{group.Label}'."
-                            : $"A condition of {PageName(definition, index)} uses field '{rule.FieldAlias}', which isn't on the form.");
+                    if (!pageIndexByAlias.TryGetValue(alias, out var rulePage))
+                        errors.Add(groupByChildAlias.TryGetValue(alias, out var group)
+                            ? $"A condition of {PageName(definition, index)} uses field '{Label(alias)}', which is inside '{group.Label}'."
+                            : $"A condition of {PageName(definition, index)} uses field '{alias}', which isn't on the form.");
                     else if (rulePage >= index)
-                        errors.Add($"A condition of {PageName(definition, index)} uses field '{Label(rule.FieldAlias)}', which isn't on an earlier page.");
+                        errors.Add($"A condition of {PageName(definition, index)} uses field '{Label(alias)}', which isn't on an earlier page.");
                 }
             }
 
+            ValidateCalculations(definition, allFields, pageIndexByAlias, availableByAlias, groupByChildAlias, Label, errors);
+
             return errors;
         }
+
+        /// <summary>
+        /// Variables have valid, unique aliases, rules and conditions only use fields and variables the form has, and a condition on a
+        /// field or page only uses a variable whose value can't depend on that field itself or on a later page, the same as with fields.
+        /// </summary>
+        private static void ValidateCalculations(
+            FormDefinition definition,
+            List<FormField> allFields,
+            Dictionary<string, int> pageIndexByAlias,
+            Dictionary<string, HashSet<string>> availableByAlias,
+            Dictionary<string, FormField> groupByChildAlias,
+            Func<string, string> label,
+            List<string> errors)
+        {
+            var variables = new Dictionary<string, FormVariable>();
+            foreach (var variable in definition.Variables)
+            {
+                if (!VariableAliasPattern.IsMatch(variable.Alias ?? string.Empty))
+                    errors.Add($"Variable '{variable.Alias}' needs an alias of letters, digits, underscores and dashes that doesn't start with a digit or dash.");
+                else if (!variables.TryAdd(variable.Alias, variable))
+                    errors.Add($"The form has more than one variable with alias '{variable.Alias}'.");
+
+                if (variable.Decimals < 0 || variable.Decimals > VariableValues.MaxDecimals)
+                    errors.Add($"Variable '{variable.Alias}' can keep 0 to {VariableValues.MaxDecimals} decimals.");
+            }
+
+            // Calculations and outcomes read the fields of the form itself; a field group holds a list of entries
+            void CheckField(string alias, string user)
+            {
+                if (groupByChildAlias.TryGetValue(alias, out var group))
+                    errors.Add($"{user} uses field '{label(alias)}', which is inside '{group.Label}'.");
+                else if (!pageIndexByAlias.ContainsKey(alias))
+                    errors.Add($"{user} uses field '{alias}', which isn't on the form.");
+            }
+
+            void CheckVariables(IEnumerable<string> aliases, string user)
+            {
+                foreach (var alias in aliases.Where(alias => !variables.ContainsKey(alias)).Distinct())
+                    errors.Add($"{user} uses variable '{alias}', which the form doesn't have.");
+            }
+
+            for (var index = 0; index < definition.Calculations.Count; index++)
+            {
+                var rule = definition.Calculations[index];
+                var user = $"Calculation {index + 1}";
+                if (!variables.TryGetValue(rule.VariableAlias ?? string.Empty, out var target))
+                    errors.Add($"{user} changes variable '{rule.VariableAlias}', which the form doesn't have.");
+                else if (!FitsType(rule.Operation, target.Type))
+                    errors.Add($"{user} can't {rule.Operation.ToString().ToLowerInvariant()} variable '{target.Alias}', which holds {(target.Type == FormVariableType.Text ? "text" : "a number")}.");
+
+                foreach (var alias in CalculationDependencies.FieldsIn(rule))
+                    CheckField(alias, user);
+                CheckVariables(CalculationDependencies.VariablesIn(rule), user);
+
+                // Only the form's own fields list rules that change a variable
+                if (rule.OwnerFieldAlias is { Length: > 0 } owner && !pageIndexByAlias.ContainsKey(owner))
+                    errors.Add($"{user} is listed on field '{label(owner)}', which isn't one of the form's own fields.");
+            }
+
+            for (var index = 0; index < definition.ConditionalOutcomes.Count; index++)
+            {
+                var outcome = definition.ConditionalOutcomes[index];
+                var user = $"Conditional outcome {index + 1}";
+                if (outcome.Condition.Rules.Count == 0)
+                    errors.Add($"{user} has no condition; make it the outcome after submitting instead.");
+
+                foreach (var alias in CalculationDependencies.FieldsIn(outcome.Condition))
+                    CheckField(alias, user);
+                CheckVariables(CalculationDependencies.VariablesIn(outcome.Condition), user);
+            }
+
+            var dependencies = new CalculationDependencies(definition);
+            foreach (var field in allFields.Where(field => availableByAlias.ContainsKey(field.Alias)))
+            {
+                var user = $"A condition of field '{field.Label}'";
+                var visibilityVariables = CalculationDependencies.VisibilityConditions(field).SelectMany(CalculationDependencies.VariablesIn).ToList();
+                var usedVariables = field.Rules.SelectMany(rule => CalculationDependencies.VariablesIn(rule.Condition)).Distinct().ToList();
+                CheckVariables(usedVariables, user);
+
+                // A hidden field counts as empty, so a field whose visibility depends on its own value would never settle
+                foreach (var alias in visibilityVariables.Where(variables.ContainsKey).Distinct())
+                {
+                    if (dependencies.GetFieldsBehind(alias).Contains(field.Alias))
+                        errors.Add($"{user} uses variable '{alias}', which depends on field '{field.Label}' itself.");
+                }
+
+                foreach (var alias in usedVariables.Where(variables.ContainsKey))
+                {
+                    foreach (var later in dependencies.GetFieldsBehind(alias).Where(it => it != field.Alias && !availableByAlias[field.Alias].Contains(it)))
+                        errors.Add($"{user} uses variable '{alias}', which depends on field '{label(later)}' on a later page.");
+                }
+            }
+
+            for (var index = 0; index < definition.Pages.Count; index++)
+            {
+                var user = $"A condition of {PageName(definition, index)}";
+                var used = CalculationDependencies.VariablesIn(definition.Pages[index].Visibility).Distinct().ToList();
+                CheckVariables(used, user);
+
+                foreach (var alias in used.Where(variables.ContainsKey))
+                {
+                    foreach (var later in dependencies.GetFieldsBehind(alias).Where(it => !pageIndexByAlias.TryGetValue(it, out var page) || page >= index))
+                        errors.Add($"{user} uses variable '{alias}', which depends on field '{label(later)}', which isn't on an earlier page.");
+                }
+            }
+        }
+
+        private static bool FitsType(CalculationOperation operation, FormVariableType type)
+            => type == FormVariableType.Text
+                ? operation is CalculationOperation.Set or CalculationOperation.Append
+                : operation is not CalculationOperation.Append;
 
         // A field group's own layout places each of its fields once, and its fields' conditions may use the fields its own conditions may, and those of the same entry
         private static void ValidateGroup(
@@ -147,9 +265,6 @@ namespace SproutForms.Core.Services
                 ValidateGroup(child, entryAvailable, depth + 1, labels, availableByAlias, errors);
             }
         }
-
-        private static IEnumerable<ConditionRule> GetRules(params ConditionDefinition?[] conditions)
-            => conditions.Where(condition => condition != null).SelectMany(condition => condition!.Rules);
 
         private static string PageName(FormDefinition definition, int index)
             => string.IsNullOrWhiteSpace(definition.Pages[index].Title)

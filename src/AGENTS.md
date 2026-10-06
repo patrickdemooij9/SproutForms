@@ -59,7 +59,7 @@ Located in `SproutForms.Umbraco.Core/Descriptors/`:
 - `FormSubmitOutcomeRunner` - Runs a form's submit outcome for a saved submission, for both submission controllers
 - `FormThemeViewResolver` - Finds the view to render: `~/Views/Forms/Themes/{theme}/{view}.cshtml` when the theme has it, otherwise `~/Views/Forms/{view}.cshtml`. The theme is passed to the partials in `ViewData`, so the package's views render each other with `Html.SproutFormsPartialAsync("Rows", model)`, never with a hard-coded path
 - `FormRecycleBinService` - Deleting a form in the backoffice moves it to the recycle bin (`Form.TrashedAt`). A trashed form is treated as deleted everywhere but the bin: it doesn't render, takes no submissions, and its workflows pause. `FormDeletionService` deletes it for good from the bin, and `RecycleBinCleanupJob` does so after `SproutForms:RecycleBin:RetentionDays` (default 30, 0 keeps it)
-- `FormSubmissionRecycleBinService` - The same for submissions (`FormSubmission.TrashedAt`), with a recycle bin per form in its Submissions tab. `IFormSubmissionRepository.GetByForm` and `Count` leave trashed submissions out, `GetAllByForm` includes them. Each action is one entry in the form's history, however many submissions it covered
+- `FormSubmissionRecycleBinService` - The same for submissions (`FormSubmission.TrashedAt`), with a recycle bin per form on its submissions page, opened from the forms list. `IFormSubmissionRepository.GetByForm` and `Count` leave trashed submissions out, `GetAllByForm` includes them. Each action is one entry in the form's history, however many submissions it covered
 
 ### Database Entities
 Located in `SproutForms.Umbraco.Core/Models/Database/`:
@@ -79,6 +79,7 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `AddFormAuditMigration` - `SproutForms_FormAudit` table for a form's history
 - `AddFormRecycleBinMigration` - `TrashedAt` and `TrashedBy` columns that put a form in the recycle bin
 - `AddSubmissionRecycleBinMigration` - the same columns for submissions
+- `AddSubmissionVariablesMigration` - `VariablesJson` column for the variables a form's calculations work out
 
 ## Headless API
 
@@ -103,6 +104,18 @@ A field type whose configuration implements `IFormFieldGroupConfiguration` holds
 - `FormSubmissionService` validates each entry with its conditions seeing the entry's values over the form's, drops the entries the visitor left empty (a value that fails a required check, like an unticked checkbox, counts as empty), keeps the posted index in error keys, and saves the rest. The group's own type only checks the number of entries, even when there are none.
 - `IFormFieldType.GetDisplayValue` shows a value as text for workflows through `FormValueFormatter`; `WorkflowMessageResolver` and the email workflow use it. A group has one `{alias}` token; its children have none.
 - The client model and the backoffice model carry a group's `rows` (and, in the backoffice, `fields`). The Razor view is `Fields/repeater.cshtml` with `RepeaterEntry.cshtml`; forms.js clones its `<template>` and renumbers the entries.
+
+## Calculations
+
+A definition has `Variables` (`FormVariable`: a number or text with an initial value and decimals), `Calculations` (`CalculationRule`s: an optional condition, a variable, an operation, a `CalculationOperand` that is a value, a field or a variable, and the `OwnerFieldAlias` of the field the backoffice lists it on) and `ConditionalOutcomes`, all in `SproutForms.Core/Models/Calculations/` and `Models/ConditionalOutcome.cs`. The README's "Calculations" section is the user guide.
+
+- A field's `Rules` (`FieldRule`: a condition and Show, Hide or Require) decide whether it's shown and required: hidden while a Hide rule holds, with Show rules only shown while one holds. `ConditionEvaluator.IsVisible`/`IsRequired` and `isShownByRules`/`isRequiredByRules` in `conditions.ts` implement this; Razor renders them as `data-field-rules`. A rule that changes a variable is a `CalculationRule` with `OwnerFieldAlias` set.
+- A `ConditionRule` reads a field (`FieldAlias`) or a variable (`VariableAlias`), and compares it with its `Value` as written or, by `ValueSource`, with the field or variable that `Value` names. `IConditionEvaluator` takes the variables next to the values; every condition anywhere can use them.
+- `FormCalculator` runs the rules top to bottom with hidden fields (their own conditions or a skipped page) left out, and repeats until nothing changes when page or field conditions use variables. `FormSubmissionService` calls it before validating, since conditions can use variables, stores the result in `FormSubmission.Variables`, and passes it to the form type in `FormTypeSubmissionContext.Variables`.
+- `SproutForms.Client/src/calculations.ts` is the same engine for the browser (`calculateVariables` for headless, `computeVariables` for forms.js, which gets the rules from `data-sf-calculations`). Keep it in step with `FormCalculator` and `VariableValues`, as with the conditions.
+- `CalculationDependencies` says which fields and variables conditions and rules read. `FormClientModelBuilder` uses it to send only the variables a page condition or field rule needs, and the variables their rules read, with their rules; the rest never leaves the server. A headless submit returns the same variables. `FormDefinitionStructureValidator` uses it to reject unknown references, rules that don't fit their variable's type, conditions whose variables depend on a later page, and a field whose visibility depends on itself.
+- `FormSubmitOutcomeRunner.GetOutcome` picks the first conditional outcome whose condition holds, else `SubmitOutcome`. `VariableTokens` fills in `{var:alias}` in the message and redirect outcomes (HTML- and URL-encoded), the email subject and `WorkflowMessageResolver`.
+- Code-first: `FormBuilder.Variable`, `Calculate`, `SetOutcomeWhen`, `ValueOf.Field` / `ValueOf.Variable`, and `ConditionBuilder.Field(alias).Is(...)` / `Variable(alias)`.
 
 ## Form Definition Types
 

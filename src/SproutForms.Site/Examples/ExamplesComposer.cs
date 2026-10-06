@@ -1,6 +1,7 @@
 using SproutForms.Core.Models.FormTypes;
 using SproutForms.Core.Models.Outcomes;
 using SproutForms.Core.Registry;
+using SproutForms.Site.Examples.Calculations;
 using SproutForms.Site.Examples.Poll;
 using SproutForms.Site.Examples.ProductFinder;
 using SproutForms.Site.Examples.Quiz;
@@ -39,6 +40,11 @@ namespace SproutForms.Site.Examples
                 forms.Add<ExampleQuizForm>();
                 forms.Add<ExamplePollForm>();
                 forms.Add<ExampleProductFinderForm>();
+
+                // Standard forms that use calculations instead of a form type
+                forms.Add<ExampleCalculatorQuizForm>();
+                forms.Add<ExamplePersonalityTestForm>();
+                forms.Add<ExampleQuoteForm>();
             });
         }
     }
