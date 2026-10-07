@@ -59,7 +59,8 @@ export default class TokenAutocompleteTextareaElement
 
   async #initContext() {
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
-      context?.form.subscribe((form: FormDto) => {
+      this.observe(context?.form, (form) => {
+        if (!form) return;
         this.#updateFieldTokens(form);
         this._displayValue = this.#resolveDisplayValue(this._value);
       });

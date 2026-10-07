@@ -1,6 +1,7 @@
 using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Caching;
+using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Umbraco.Core.Models.Database;
 using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Infrastructure.Scoping;
@@ -12,16 +13,19 @@ namespace SproutForms.Umbraco.Core.Repositories
     {
         private readonly IScopeProvider _scopeProvider;
         private readonly Caching.IRepositoryCachePolicy<Form, Guid> _cachePolicy;
+        private readonly DistributedCache _distributedCache;
 
-        public FormRepository(IScopeProvider scopeProvider, IAppPolicyCache cache)
+        public FormRepository(IScopeProvider scopeProvider, IAppPolicyCache cache, DistributedCache distributedCache)
         {
             _scopeProvider = scopeProvider;
+            _distributedCache = distributedCache;
             _cachePolicy = new Caching.DefaultRepositoryCachePolicy<Form, Guid>(cache, new RepositoryPolicyOptions<Form, Guid>(PerformCount, it => it.Id));
         }
 
         public void Delete(Guid formId)
         {
             _cachePolicy.Delete(formId, DoDelete);
+            _distributedCache.RefreshSproutForms();
         }
 
         private void DoDelete(Guid formId)
@@ -63,6 +67,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             trashed.TrashedAt = trashedAt;
             trashed.TrashedBy = trashedBy;
             _cachePolicy.Update(trashed, DoSave);
+            _distributedCache.RefreshSproutForms();
         }
 
         public void RestoreFromRecycleBin(Guid formId, Guid? folderId)
@@ -73,6 +78,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             restored.TrashedAt = null;
             restored.TrashedBy = null;
             _cachePolicy.Update(restored, DoSave);
+            _distributedCache.RefreshSproutForms();
         }
 
         // The cache hands out its own instances, so changes are made to a copy
@@ -94,8 +100,6 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         private Form? DoGetById(Guid id)
         {
-            Console.WriteLine("Cache fail!");
-
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             var entity = scope.Database.FirstOrDefault<FormEntity>(scope.SqlContext.Sql()
                 .SelectAll()
@@ -107,7 +111,6 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         private Form[] DoGetAll(Guid[]? ids)
         {
-            Console.WriteLine("Cache fail!");
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
 
             var sql = scope.SqlContext.Sql()
@@ -142,6 +145,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             }
 
             _cachePolicy.Create(form, DoSave);
+            _distributedCache.RefreshSproutForms();
             return form.Id;
         }
 

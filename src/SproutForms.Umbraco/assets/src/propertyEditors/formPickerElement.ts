@@ -78,8 +78,8 @@ export default class FormPickerElement
       return;
     }
 
-    this.#source.getForm(this.value).then((resp) => {
-      this.formName = resp.data.name;
+    this.#source.getFormItem(this.value).then((resp) => {
+      this.formName = resp.data?.name ?? "";
     });
   }
 

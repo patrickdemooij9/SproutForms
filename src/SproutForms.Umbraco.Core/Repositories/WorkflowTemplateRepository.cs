@@ -2,7 +2,9 @@ using System.Text.Json;
 using SproutForms.Core.Models;
 using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Repositories;
+using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Umbraco.Core.Models.Database;
+using Umbraco.Cms.Core.Cache;
 using Umbraco.Cms.Infrastructure.Scoping;
 using Umbraco.Extensions;
 
@@ -12,10 +14,12 @@ namespace SproutForms.Umbraco.Core.Repositories
     {
         private readonly IScopeProvider _scopeProvider;
         private readonly IFormWorkflowType[] _formWorkflowTypes;
+        private readonly DistributedCache _distributedCache;
 
-        public WorkflowTemplateRepository(IScopeProvider scopeProvider, IEnumerable<IFormWorkflowType> formWorkflowTypes)
+        public WorkflowTemplateRepository(IScopeProvider scopeProvider, IEnumerable<IFormWorkflowType> formWorkflowTypes, DistributedCache distributedCache)
         {
             _scopeProvider = scopeProvider;
+            _distributedCache = distributedCache;
             _formWorkflowTypes = formWorkflowTypes.ToArray();
         }
 
@@ -58,6 +62,15 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         public Guid Save(WorkflowTemplate template)
         {
+            var id = DoSave(template);
+
+            // Cached form versions hold the values of the templates their workflows use
+            _distributedCache.RefreshSproutForms();
+            return id;
+        }
+
+        private Guid DoSave(WorkflowTemplate template)
+        {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
 
             WorkflowTemplateEntity entity;
@@ -90,8 +103,11 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         public void Delete(Guid id)
         {
-            using var scope = _scopeProvider.CreateScope(autoComplete: true);
-            scope.Database.Delete<WorkflowTemplateEntity>(id);
+            using (var scope = _scopeProvider.CreateScope(autoComplete: true))
+            {
+                scope.Database.Delete<WorkflowTemplateEntity>(id);
+            }
+            _distributedCache.RefreshSproutForms();
         }
 
         private WorkflowTemplate MapToModel(WorkflowTemplateEntity entity)

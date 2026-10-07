@@ -1,3 +1,4 @@
+using SproutForms.Umbraco.Core.Security;
 using Umbraco.Cms.Core.Models.Membership;
 using Umbraco.Cms.Core.Services;
 using Umbraco.Cms.Core.Strings;
@@ -25,9 +26,9 @@ public class FormsUserGroupMigration : AsyncMigrationBase
     {
         var userGroup = (await _userGroupService.GetAllAsync(0, int.MaxValue)).Items.FirstOrDefault(it => it.Alias == UmbConstants.Security.AdminGroupAlias);
 
-        if (userGroup != null && !userGroup.AllowedSections.Contains("sproutForms"))
+        if (userGroup != null && !userGroup.AllowedSections.Contains(SproutFormsAuthorization.SectionAlias))
         {
-            userGroup.AddAllowedSection("sproutForms");
+            userGroup.AddAllowedSection(SproutFormsAuthorization.SectionAlias);
 
             await _userGroupService.UpdateAsync(userGroup, UmbConstants.Security.SuperUserKey);
         }

@@ -24,13 +24,16 @@ namespace SproutForms.Core.Flows
             _formSubmissionRepository = formSubmissionRepository;
         }
 
-        public async Task ExecuteWorkflowAsync(WorkflowExecution execution, CancellationToken ct)
+        public async Task<bool> ExecuteWorkflowAsync(WorkflowExecution execution, CancellationToken ct)
         {
+            var (fetchedStatus, fetchedAttemptCount) = (execution.Status, execution.AttemptCount);
             execution.Status = WorkflowExecutionStatus.Running;
             execution.StartedUtc = DateTime.UtcNow;
             execution.AttemptCount++;
 
-            await _workflowExecutionRepository.SaveExecution(execution);
+            // Claimed only while nothing changed it since it was fetched; otherwise another server, or a manual retry, has it
+            if (!await _workflowExecutionRepository.TrySaveExecution(execution, fetchedStatus, fetchedAttemptCount))
+                return false;
 
             try
             {
@@ -77,6 +80,7 @@ namespace SproutForms.Core.Flows
             }
 
             await _workflowExecutionRepository.SaveExecution(execution);
+            return true;
         }
 
         public async Task<WorkflowRetryResult> RetryAsync(Guid submissionId, string workflowAlias)
@@ -90,12 +94,15 @@ namespace SproutForms.Core.Flows
             if (execution.Status is not (WorkflowExecutionStatus.Failed or WorkflowExecutionStatus.Retrying))
                 return WorkflowRetryResult.NotRetryable;
 
-            // A manual retry starts a fresh series of attempts; LastError stays until the next run replaces it
+            // A manual retry starts a fresh series of attempts; LastError stays until the next run replaces it. When the worker started a
+            // scheduled retry in the meantime, it is already running
+            var (fetchedStatus, fetchedAttemptCount) = (execution.Status, execution.AttemptCount);
             execution.Status = WorkflowExecutionStatus.Pending;
             execution.AttemptCount = 0;
             execution.NextAttemptUtc = null;
             execution.CompletedUtc = null;
-            await _workflowExecutionRepository.SaveExecution(execution);
+            if (!await _workflowExecutionRepository.TrySaveExecution(execution, fetchedStatus, fetchedAttemptCount))
+                return WorkflowRetryResult.NotRetryable;
 
             return WorkflowRetryResult.Queued;
         }

@@ -54,7 +54,8 @@ export class FormCanvas extends UmbElementMixin(LitElement) {
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
       this.context = context;
 
-      context?.form.subscribe((form) => {
+      this.observe(context?.form, (form) => {
+        if (!form) return;
         this.definition = form.definition;
       });
       this.observe(context?.currentPage, (page) => {

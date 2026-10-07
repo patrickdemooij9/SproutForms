@@ -70,7 +70,8 @@ export class FormSettingsElement extends UmbElementMixin(LitElement) {
         this.formType = formType;
       });
 
-      context?.form.subscribe((form) => {
+      this.observe(context?.form, (form) => {
+        if (!form) return;
         this.form = form;
 
         this._values = [

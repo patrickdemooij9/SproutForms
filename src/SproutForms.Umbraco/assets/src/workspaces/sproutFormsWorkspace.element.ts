@@ -44,7 +44,8 @@ export class SproutFormsWorkspaceElement extends UmbWorkspaceElement {
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
       this.context = context;
 
-      context?.form.subscribe((form) => {
+      this.observe(context?.form, (form) => {
+        if (!form) return;
         this.form = form;
       });
     });

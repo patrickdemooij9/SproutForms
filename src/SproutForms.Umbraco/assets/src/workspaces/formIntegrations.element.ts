@@ -55,7 +55,8 @@ export class FormIntegrationsElement extends UmbElementMixin(LitElement) {
     this.consumeContext(SF_FORM_DETAIL_TOKEN_CONTEXT, (context) => {
       this.context = context;
 
-      context?.form.subscribe((form) => {
+      this.observe(context?.form, (form) => {
+        if (!form) return;
         this.form = form;
         this.selectedFlow = this.selectedFlowId ? this.form.definition.workflows.find((item) => item.id === this.selectedFlowId) : undefined;
       });

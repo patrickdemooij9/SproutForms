@@ -98,6 +98,28 @@ namespace SproutForms.Core.Tests
         }
 
         [Test]
+        public async Task Far_too_many_entries_are_still_rejected_for_the_maximum()
+        {
+            var version = TestForms.People(config => config.MaxItems = 2);
+            var people = Enumerable.Range(0, 50_000).Select(index => new { firstName = $"Person {index}", hasAllergies = "false" });
+
+            var result = await Submit(TestForms.SubmissionService(), version, new { people });
+
+            Assert.That(result.Errors["people"], Is.EqualTo(new[] { FormTexts.MaxItems(2) }));
+        }
+
+        [Test]
+        public async Task Only_the_entries_up_to_the_maximum_are_validated()
+        {
+            var people = Enumerable.Range(0, 50_000).Select(_ => new { firstName = "", hasAllergies = "true" });
+
+            var result = await Submit(TestForms.SubmissionService(), TestForms.People(), new { people });
+
+            // Each entry misses its first name and its allergies
+            Assert.That(result.Errors, Has.Count.EqualTo(2 * Helpers.SubmittedValues.MaxEntries));
+        }
+
+        [Test]
         public async Task A_required_repeater_needs_a_filled_in_entry()
         {
             var version = TestForms.People();
