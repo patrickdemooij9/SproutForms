@@ -5,3 +5,4 @@ export * from './context';
 export * from './fieldProps';
 export * from './plugin';
 export * from './themes';
+export * from './useField';

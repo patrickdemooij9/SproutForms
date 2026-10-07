@@ -18,7 +18,7 @@ export default defineNuxtConfig({
 <SproutForm alias="contact" />
 ```
 
-`<SproutForm>`, `useSproutFormContext`, `useSproutFormsPlugin`, `defineTheme` and `fieldControlProps` are auto-imported. See the [`@sproutforms/vue` README](../SproutForms.Vue/README.md) for the component and for replacing parts of the form.
+`<SproutForm>`, `useField`, `useSproutFormContext`, `useSproutFormsPlugin`, `defineTheme` and `fieldControlProps` are auto-imported. See the [`@sproutforms/vue` README](../SproutForms.Vue/README.md) for the component and for replacing parts of the form.
 
 ## Options
 

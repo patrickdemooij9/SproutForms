@@ -55,6 +55,7 @@ export default defineNuxtModule<ModuleOptions>({
         addImports([
             { name: 'useSproutFormContext', from: '@sproutforms/vue' },
             { name: 'useSproutFormsPlugin', from: '@sproutforms/vue' },
+            { name: 'useField', from: '@sproutforms/vue' },
             { name: 'defineTheme', from: '@sproutforms/vue' },
             { name: 'fieldControlProps', from: '@sproutforms/vue' }
         ]);

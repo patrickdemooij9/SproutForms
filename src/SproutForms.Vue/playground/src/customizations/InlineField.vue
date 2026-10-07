@@ -1,41 +1,24 @@
 <script setup lang="ts">
-import { isFieldRequired, isFieldVisible, type FormClientField } from '@sproutforms/client';
-import { useSproutFormContext } from '@sproutforms/vue';
-import { computed } from 'vue';
+import type { FormClientField } from '@sproutforms/client';
+import { useField } from '@sproutforms/vue';
 
 // A field wrapper with the label next to the control and the error under it, as a theme can replace any part of the form
 const props = defineProps<{ field: FormClientField }>();
 
-const form = useSproutFormContext();
-const control = form.resolveField(props.field);
-const id = form.getFieldId(props.field.alias);
-
-const visible = computed(() => isFieldVisible(props.field, form.state.value.values, form.state.value.variables));
-const required = computed(() => isFieldRequired(props.field, form.state.value.values, form.state.value.variables));
-const errors = computed(() => form.state.value.errors[props.field.alias] ?? []);
+const { id, errorId, visible, required, errors, invalid, control, controlProps } = useField(() => props.field);
 </script>
 
 <template>
     <div
         class="inline-field"
-        :class="{ 'has-error': errors.length > 0, 'inline-field-own-label': field.rendersOwnLabel }"
+        :class="{ 'has-error': invalid, 'inline-field-own-label': field.rendersOwnLabel }"
         :data-sf-field-id="field.alias"
         :data-sf-field-type="field.type"
         :hidden="!visible || undefined"
     >
         <label v-if="!field.rendersOwnLabel && field.type !== 'hidden'" :for="id">{{ field.label }}{{ required ? ' *' : '' }}</label>
-        <component
-            :is="control"
-            :id="id"
-            :field="field"
-            :model-value="form.state.value.values[field.alias]"
-            :path="field.alias"
-            :required="required"
-            :invalid="errors.length > 0"
-            :errors="errors"
-            @update:model-value="form.engine.setValue(field.alias, $event)"
-        />
-        <small v-if="errors.length > 0" class="inline-field-error">{{ errors[0] }}</small>
+        <component :is="control" v-bind="controlProps" />
+        <small v-if="invalid" :id="errorId" class="inline-field-error">{{ errors[0] }}</small>
     </div>
 </template>
 

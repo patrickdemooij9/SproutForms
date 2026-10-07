@@ -114,7 +114,33 @@ createSproutForms({
 | `Errors` | Errors that aren't about one field, such as a failed submit | |
 | `Success` | What shows instead of the form after a `message` outcome | `message` (HTML from the CMS) or `text` |
 
-Inside one, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, status), `getFieldId`, `resolveField`, `resolveComponent` and `submit`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
+#### Your own field wrapper
+
+`useField(() => props.field)` gives a `Field` component everything about its field, so yours only does the layout:
+
+```vue
+<script setup lang="ts">
+import type { FormClientField } from '@sproutforms/client';
+import { useField } from '@sproutforms/vue';
+
+const props = defineProps<{ field: FormClientField }>();
+const { id, errorId, visible, required, errors, invalid, control, controlProps } = useField(() => props.field);
+</script>
+
+<template>
+    <div class="my-field" :hidden="!visible || undefined">
+        <label v-if="!field.rendersOwnLabel" :for="id">{{ field.label }}{{ required ? ' *' : '' }}</label>
+        <component :is="control" v-bind="controlProps" />
+        <small v-if="invalid" :id="errorId">{{ errors[0] }}</small>
+    </div>
+</template>
+```
+
+`control` is the field's control as this form resolves it: its alias override, or its type's control in the theme. `controlProps` holds `fieldControlProps` and the update handler. `useField` also returns `path`, `value`, `setValue` and `disabled`. Keep `data-sf-field-type` on the wrapper when you use `layout.css`: it hides a hidden field's column.
+
+#### The rest of the form
+
+Inside any theme component, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, status), `getFieldId`, `resolveField`, `resolveComponent` and `submit`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
 
 ## Validators, guards and outcomes
 
