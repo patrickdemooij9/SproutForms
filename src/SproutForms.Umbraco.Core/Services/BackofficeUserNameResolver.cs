@@ -7,7 +7,7 @@ namespace SproutForms.Umbraco.Core.Services
     /// </summary>
     public class BackofficeUserNameResolver
     {
-        public const string SystemUserKey = "System";
+        public const string SystemUserKey = SproutForms.Core.SystemUser.Key;
 
         private readonly IUserService _userService;
 

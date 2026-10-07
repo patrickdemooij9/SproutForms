@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -11,6 +11,9 @@
     <Description>Core binaries for the SproutForms package which allows you to easily create forms in code</Description>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Version>1.0.0-beta002</Version>
+
+    <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
+    <StaticWebAssetBasePath>forms</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,10 +23,6 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SproutForms.Core.Tests" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Storage\" />
   </ItemGroup>
 
 </Project>

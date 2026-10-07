@@ -1,0 +1,37 @@
+@using SproutForms.Core
+@using SproutForms.Core.Fields.Configs
+@using SproutForms.Core.Rendering
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@{
+    var config = (RepeaterFieldConfig)Model.Configuration;
+    var addLabel = string.IsNullOrWhiteSpace(config.AddLabel) ? FormTexts.AddItem : config.AddLabel;
+}
+
+@* forms.js adds and removes entries; each entry's inputs are named after its index, such as people[0].firstName *@
+<fieldset class="form-repeater"
+          data-sf-repeater="@Model.Alias"
+          data-sf-repeater-min="@config.MinItems"
+          data-sf-repeater-max="@config.MaxItems"
+          data-sf-item-title="@config.GetItemTitleTemplate()">
+    <legend class="form-repeater-title">
+        @Model.Label
+        @if (Model.Required)
+        {
+            <span class="required">*</span>
+        }
+    </legend>
+    <div class="form-repeater-entries" data-sf-repeater-entries>
+        @foreach (var entry in Model.Entries)
+        {
+            @await Html.SproutFormsPartialAsync("RepeaterEntry", entry)
+        }
+    </div>
+    @if (Model.EntryTemplate != null)
+    {
+        <template data-sf-repeater-template>
+            @await Html.SproutFormsPartialAsync("RepeaterEntry", Model.EntryTemplate)
+        </template>
+    }
+    <button type="button" class="form-repeater-add" data-sf-repeater-add hidden>@addLabel</button>
+</fieldset>

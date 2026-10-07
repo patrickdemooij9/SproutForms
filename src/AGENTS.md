@@ -8,10 +8,11 @@ SproutForms is an Umbraco CMS plugin that enables creating and managing forms in
 
 | Project | Description | Dependencies |
 |---------|-------------|--------------|
-| `SproutForms.Core` | Core library for creating forms in code | Microsoft.AspNetCore.Mvc |
+| `SproutForms.Core` | Razor class library with everything that doesn't need Umbraco: forms in code, rendering (views, `forms.js`, CSS), submissions, workflows, in-memory storage | Microsoft.AspNetCore.App |
 | `SproutForms.Umbraco.Core` | Umbraco plugin core with backoffice, repositories, descriptors | Umbraco.Cms.Web.Website, Umbraco.Cms.Api.Management |
 | `SproutForms.Umbraco` | Umbraco plugin package | SproutForms.Umbraco.Core |
 | `SproutForms.Site` | Demo/test site | - |
+| `SproutForms.Standalone.Site` | ASP.NET Core MVC site without Umbraco, using `SproutForms.Core` alone | SproutForms.Core |
 | `SproutForms.Client` | `@sproutforms/client`, the npm package for the headless API, with an example app in `example/` | - |
 
 ### Target Framework
@@ -87,6 +88,15 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 - `AddSubmissionRecycleBinMigration` - the same columns for submissions
 - `AddSubmissionVariablesMigration` - `VariablesJson` column for the variables a form's calculations work out
 
+## Hosts: Umbraco and standalone
+
+`SproutForms.Core` must not reference Umbraco. `AddSproutForms(configuration)` registers what every host shares: services, the built-in field, outcome and workflow types, rendering and the honeypot guard. A host adds storage (the `SproutForms.Core.Repositories` interfaces), an `IEmailSender`, and runs `CodeFormRegistrar.RegisterAll`, `PendingWorkflowProcessor` and `RecycleBinCleanupService`:
+
+- **Umbraco:** `SproutFormComposer` calls `AddSproutForms`, then registers the NPoco repositories, `UmbracoEmailSender`, the backoffice pieces, `CodeFormUmbracoRegistar` (an Umbraco component, once the database is migrated) and the recurring background jobs.
+- **Standalone:** `AddSproutFormsStandalone` adds `SmtpEmailSender` (`SproutForms:Smtp`) and the hosted services in `SproutForms.Core/Hosting/`; `AddSproutFormsInMemoryStorage` the repositories in `Storage/InMemory/`. Run `SproutForms.Standalone.Site` (launch config `sproutforms-standalone`, port 5180) to check a change there; its emails go to `App_Data/Emails`.
+
+Put a new piece in Core unless it needs Umbraco, and register it in `AddSproutForms` so both hosts get it. Something Umbraco provides implicitly (`IHttpContextAccessor`, `IHttpClientFactory`) must be registered there too, or the standalone site fails to start.
+
 ## Headless API
 
 `SproutFormsDeliveryController` (`/umbraco/sproutforms/delivery/api/v1`, OpenAPI document `sproutforms-delivery`) serves `FormClientModel`s and takes submissions as JSON or multipart, without antiforgery. A submission's body is one values object, the same values a Razor form posts: the fields, `sf_PageUrl` (`FormSubmissionRequest.PageUrlKey`) and the guard's own keys; each consumer takes the values it reads, and the submission service keeps only the form's fields. It is off unless `SproutForms:Headless:Enabled`; `HeadlessApiAccessAttribute` answers 404 then, and checks `SproutForms:Headless:ApiKey`. `AddSproutFormsHeadless` (`Headless/`) registers its CORS policy (`SproutForms:Headless:AllowedOrigins`), the CORS middleware and the OpenAPI document, only when enabled at startup. The Razor `FormSubmissionController` (`/api/forms`) stays as it is; both call `IFormSubmissionService` and `FormSubmitOutcomeRunner`.
@@ -97,9 +107,9 @@ Located in `SproutForms.Umbraco.Core/Startup/Migrations/`:
 
 1. Create descriptor in `SproutForms.Umbraco.Core/Descriptors/Fields/`
 2. Create config model in `SproutForms.Core/Flows/Configs/`
-3. Create view in `SproutForms.Umbraco.Core/Views/Forms/Fields/`
+3. Create view in `SproutForms.Core/Views/Forms/Fields/`
 4. Override `GetClientConfiguration` when the config holds settings the browser mustn't see, and add its config to `BuiltInFieldConfigurations` in `src/SproutForms.Client/src/types.ts`
-5. Register in `SproutFormComposer.cs`
+5. Register the field type in `AddSproutForms` (`SproutForms.Core/SproutFormsServiceCollectionExtensions.cs`) and the descriptor in `SproutFormComposer.cs`
 
 ## Field Groups (repeaters)
 

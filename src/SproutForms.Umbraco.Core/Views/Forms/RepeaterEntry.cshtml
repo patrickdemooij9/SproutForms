@@ -1,9 +1,0 @@
-@using SproutForms.Umbraco.Core.Helpers
-@using SproutForms.Umbraco.Core.Models.ViewModels
-@model FormFieldGroupEntryViewModel
-
-<fieldset class="form-repeater-entry" data-sf-repeater-entry data-sf-entry-prefix="@Model.Prefix">
-    <legend class="form-repeater-entry-title" data-sf-entry-title>@Model.Title</legend>
-    @await Html.SproutFormsPartialAsync("Rows", Model.Rows)
-    <button type="button" class="form-repeater-remove" data-sf-repeater-remove hidden>@Model.RemoveLabel</button>
-</fieldset>

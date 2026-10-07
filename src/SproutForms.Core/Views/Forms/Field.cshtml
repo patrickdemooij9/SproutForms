@@ -1,0 +1,40 @@
+@using SproutForms.Core.Rendering
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model FormFieldViewModel
+@using System.Text.Json
+
+@{
+    var hasError = Model.Errors.Any();
+    var describedBy = hasError
+        ? $"{Model.Alias}-error"
+        : null;
+    var rulesJson = Model.Rules.Count > 0 ? Json.Serialize(Model.Rules) : null;
+}
+
+<div class="form-group @(hasError ? "has-error" : "")" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model)) @if (rulesJson != null) { <text> data-field-rules='@rulesJson'</text> }>
+    @if (!Model.RendersOwnLabel)
+    {
+        <label for="@Model.Alias">
+            @Model.Label
+            @if (Model.Required)
+            {
+                <span class="required">*</span>
+            }
+            </label>
+    }
+
+    @await Html.SproutFormsPartialAsync($"Fields/{Model.Type}", Model)
+
+    @if (hasError)
+    {
+        <div id="@($"{Model.Alias}-error")"
+             class="form-error"
+             data-sf-error
+             role="alert">
+            @foreach (var error in Model.Errors)
+            {
+                <div>@error</div>
+            }
+        </div>
+    }
+</div>

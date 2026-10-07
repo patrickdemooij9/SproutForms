@@ -15,6 +15,12 @@
       "url": "https://localhost:44370"
     },
     {
+      "name": "sproutforms-standalone",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "src/SproutForms.Standalone.Site", "--launch-profile", "SproutForms.Standalone.Site"],
+      "port": 5180
+    },
+    {
       "name": "sproutforms-headless-example",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "src/SproutForms.Client/example", "run", "dev"],

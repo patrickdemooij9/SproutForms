@@ -8,8 +8,8 @@ import cssnano from 'cssnano';
 import postcss from 'postcss';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const srcDir = path.join(__dirname, '../src/SproutForms.Umbraco.Core/wwwroot/forms-src');
-const outDir = path.join(__dirname, '../src/SproutForms.Umbraco.Core/wwwroot');
+const srcDir = path.join(__dirname, '../src/SproutForms.Core/wwwroot/forms-src');
+const outDir = path.join(__dirname, '../src/SproutForms.Core/wwwroot');
 
 const filesConfig = [
     { src: 'forms.js', type: 'js' },

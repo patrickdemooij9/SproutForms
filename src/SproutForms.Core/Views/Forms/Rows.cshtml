@@ -1,0 +1,15 @@
+@using SproutForms.Core.Rendering
+@using SproutForms.Umbraco.Core.Models.ViewModels
+@model IReadOnlyList<FormRowViewModel>
+
+@foreach (var row in Model)
+{
+    <div class="form-row">
+        @foreach (var col in row.Columns)
+        {
+            <div class="form-col col-@col.Width" data-sf-col>
+                @await Html.SproutFormsPartialAsync("Field", col.Field)
+            </div>
+        }
+    </div>
+}
