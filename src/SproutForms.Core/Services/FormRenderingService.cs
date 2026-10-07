@@ -12,7 +12,7 @@ using SproutForms.Core.Services;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using System.Text.Json;
 
-namespace SproutForms.Umbraco.Core.Services
+namespace SproutForms.Core.Services
 {
     /// <summary>
     /// Builds the Razor view model of a form from its <see cref="FormClientModel"/>, nested for the views, with the values and errors

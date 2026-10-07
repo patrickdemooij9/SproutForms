@@ -22,8 +22,47 @@ Installation is simple with just a few steps being required.
 <link rel="stylesheet" href="/forms/forms-default-theme.css" />
 <script src="/forms/forms.js"></script>
 ```
-4) Add the following to your "_ViewImports.cshtml": `@addTagHelper *, SproutForms.Umbraco.Core`
+4) Add the following to your "_ViewImports.cshtml": `@addTagHelper *, SproutForms.Core`
 5) You can now render your forms by using `<vc:render-form form-alias="testFileForm"></vc:render-form>` or `<vc:render-form form-id="[guid]"></vc:render-form>`
+
+## Without Umbraco
+
+`SproutForms.Core` works on any ASP.NET Core MVC site: code-first forms, rendering, validation, conditions, calculations, outcomes and workflows. There's no backoffice, so forms are defined in code.
+
+1) Download the NuGet package `Install-Package SproutForms.Core`
+2) Register it in `Program.cs`:
+```csharp
+builder.Services.AddControllersWithViews();
+builder.Services
+    .AddSproutFormsStandalone(builder.Configuration)
+    .AddSproutFormsInMemoryStorage()
+    .AddCodeFirstForms(forms => forms.Add<ContactForm>());
+
+// ...
+app.MapStaticAssets();
+app.MapDefaultControllerRoute();
+```
+3) Add `@addTagHelper *, SproutForms.Core` to your "_ViewImports.cshtml", and render forms as in steps 3 and 5 above.
+
+`AddSproutFormsStandalone` registers the code-first forms at startup, runs the workflows and empties the recycle bin in the background, and sends emails with SMTP:
+
+```json
+"SproutForms": {
+  "Smtp": {
+    "Host": "smtp.example.com",
+    "Port": 587,
+    "EnableSsl": true,
+    "UserName": "...",
+    "Password": "..."
+  }
+}
+```
+
+Set `PickupDirectory` instead of `Host` to write each email to a folder, such as while developing.
+
+`AddSproutFormsInMemoryStorage` keeps everything in memory: submissions are gone when the site restarts, and every server of a load balanced site has its own. That's fine when the workflows are what you need from a submission (an email, a webhook), and for trying SproutForms out. To keep submissions, register your own implementations of the interfaces in `SproutForms.Core.Repositories` instead.
+
+`src/SproutForms.Standalone.Site` is a working example.
 
 ## Configuration
 
@@ -103,7 +142,7 @@ Choose the theme where you render the form, or set a default for the whole site:
 }
 ```
 
-The views you can put in a theme are `Form`, `Rows`, `Field` and `Fields/{field type alias}`; copy the one you want to change from [`src/SproutForms.Umbraco.Core/Views/Forms`](src/SproutForms.Umbraco.Core/Views/Forms). Render other SproutForms views with `Html.SproutFormsPartialAsync("Field", model)` (from `SproutForms.Umbraco.Core.Helpers`) rather than `Html.PartialAsync`, so they fall back as well. The form root gets `data-sf-theme` with the theme's name, for CSS that belongs to one theme. A theme name can only hold letters, digits, `-` and `_`. The demo site has an example in `src/SproutForms.Site/Views/Forms/Themes/Example`.
+The views you can put in a theme are `Form`, `Rows`, `Field` and `Fields/{field type alias}`; copy the one you want to change from [`src/SproutForms.Core/Views/Forms`](src/SproutForms.Core/Views/Forms). Render other SproutForms views with `Html.SproutFormsPartialAsync("Field", model)` (from `SproutForms.Core.Rendering`) rather than `Html.PartialAsync`, so they fall back as well. The form root gets `data-sf-theme` with the theme's name, for CSS that belongs to one theme. A theme name can only hold letters, digits, `-` and `_`. The demo site has an example in `src/SproutForms.Site/Views/Forms/Themes/Example`.
 
 To change a view for every form, whatever the theme, put it at the same path as in the package instead, such as `Views/Forms/Fields/text.cshtml`.
 

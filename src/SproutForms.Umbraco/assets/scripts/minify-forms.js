@@ -9,8 +9,8 @@ import postcss from 'postcss';
 import { build } from 'vite';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const srcDir = path.join(__dirname, '../../../SproutForms.Umbraco.Core/wwwroot/forms-src');
-const outDir = path.join(__dirname, '../../../SproutForms.Umbraco.Core/wwwroot');
+const srcDir = path.join(__dirname, '../../../SproutForms.Core/wwwroot/forms-src');
+const outDir = path.join(__dirname, '../../../SproutForms.Core/wwwroot');
 
 const filesConfig = [
     { src: 'forms.ts', out: 'forms.js', type: 'ts' },

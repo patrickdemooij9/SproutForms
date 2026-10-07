@@ -1,4 +1,4 @@
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.DependencyInjection;
 using SproutForms.Core;
 using SproutForms.Core.Fields;
 using SproutForms.Core.Flows;
@@ -35,8 +35,8 @@ namespace SproutForms.Umbraco.Core.Startup
     {
         public void Compose(IUmbracoBuilder builder)
         {
-            builder.Services.Configure<SproutFormsOptions>(builder.Config.GetSection("SproutForms"));
-            builder.Services.Configure<LocalDiskFileStorageOptions>(builder.Config.GetSection("SproutForms:LocalDiskFileStorage"));
+            builder.Services.AddSproutForms(builder.Config);
+
             builder.Services.Configure<SwaggerGenOptions>(options =>
             {
                 options.SwaggerDoc("sproutForms", new Microsoft.OpenApi.OpenApiInfo
@@ -46,44 +46,21 @@ namespace SproutForms.Umbraco.Core.Startup
                 });
             });
 
-            builder.Services.AddSingleton<FormClientModelBuilder>();
-            builder.Services.AddSingleton<FormSubmitOutcomeRunner>();
-            builder.Services.AddSingleton<FormCalculator>();
-            builder.Services.AddTransient<FormRenderingService>();
-            builder.Services.AddSingleton<FormThemeViewResolver>();
             builder.Services.AddSingleton<IFormSubmissionRepository, FormSubmissionRepository>();
             builder.Services.AddSingleton<IFormVersionRepository, FormVersionRepository>();
             builder.Services.AddSingleton<IFormRepository, FormRepository>();
             builder.Services.AddSingleton<IFolderRepository, FolderRepository>();
             builder.Services.AddSingleton<IFormAuditRepository, FormAuditRepository>();
             builder.Services.AddSingleton<IWorkflowExecutionRepository, WorkflowExecutionRepository>();
+            builder.Services.AddSingleton<IWorkflowTemplateRepository, WorkflowTemplateRepository>();
             builder.Services.AddSingleton<IUnitOfWorkProvider, ScopeUnitOfWorkProvider>();
-            builder.Services.AddSingleton<IFormSubmissionService, FormSubmissionService>();
-            builder.Services.AddSingleton<FormDeletionService>();
-            builder.Services.AddSingleton<FormRecycleBinService>();
-            builder.Services.AddSingleton<FormSubmissionRecycleBinService>();
+
             builder.Services.AddSingleton<ISproutFormsDashboardService, SproutFormsDashboardService>();
             builder.Services.AddSingleton<FormVersionComparer>();
             builder.Services.AddSingleton<FormHistoryService>();
             builder.Services.AddSingleton<BackofficeUserNameResolver>();
-            builder.Services.AddSingleton<IConditionEvaluator, ConditionEvaluator>();
 
-            builder.Services.AddSingleton<IFormDefinitionType, StandardFormDefinitionType>();
             builder.Services.AddSingleton<IFormDefinitionTypeDescriptor, StandardFormDefinitionTypeDescriptor>();
-            builder.Services.AddSingleton<FormDefinitionTypeValidator>();
-
-            builder.Services.AddSingleton<IFormFieldType, TextFieldFormFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, EmailFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, TextAreaFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, CheckboxFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, SelectFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, HiddenFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, RadioFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, DateFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, FileFieldType>();
-            builder.Services.AddSingleton<IFormFieldType, RepeaterFieldType>();
-            builder.Services.AddSingleton<FormValueFormatter>();
-            builder.Services.AddSingleton<WorkflowMessageResolver>();
 
             builder.Services.AddSingleton<IFieldDescriptor, TextFieldDescriptor>();
             builder.Services.AddSingleton<IFieldDescriptor, TextAreaFieldDescriptor>();
@@ -104,29 +81,13 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFlowDescriptor, TeamsWorkflowDescriptor>();
             builder.Services.AddSingleton<IFlowDescriptor, CustomPostWorkflowDescriptor>();
 
-            builder.Services.AddSingleton<IFormFileStorageProvider, LocalDiskFileStorageProvider>();
-
-            builder.Services.AddSingleton<IFormSubmitOutcomeType, ShowMessageOutcome>();
-            builder.Services.AddSingleton<IFormSubmitOutcomeType, RedirectUrlOutcomeType>();
             builder.Services.AddSingleton<IFormSubmitOutcomeType, RedirectUmbracoPageOutcomeType>();
-
-            builder.Services.AddSingleton<IFormWorkflowType, EmailWorkflowType>();
-            builder.Services.AddSingleton<IFormWorkflowType, SlackWorkflowType>();
-            builder.Services.AddSingleton<IFormWorkflowType, TeamsWorkflowType>();
-            builder.Services.AddSingleton<IFormWorkflowType, CustomPostWorkflowType>();
-            builder.Services.AddSingleton<IWorkflowRunner, WorkflowRunner>();
             builder.Services.AddSingleton<IEmailSender, UmbracoEmailSender>();
-
-            builder.Services.AddSingleton<IWorkflowTemplateRepository, WorkflowTemplateRepository>();
-            builder.Services.AddSingleton<WorkflowTemplateService>();
 
             builder.Components().Append<CodeFormUmbracoRegistar>();
             builder.Services.AddRecurringBackgroundJob<Implementations.WorkflowExecutionWorker>();
             builder.Services.AddRecurringBackgroundJob<Implementations.RecycleBinCleanupJob>();
 
-            builder.Services.AddSingleton<IFormSubmissionGuard, HoneypotSubmissionGuard>();
-
-            builder.Services.AddCodeFirstForms((it) => { });
             builder.AddSproutFormsAuthorization();
             builder.AddSproutFormsHeadless();
 

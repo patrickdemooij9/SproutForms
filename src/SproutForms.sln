@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SproutForms.Umbraco", "Spro
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SproutForms.Core.Tests", "SproutForms.Core.Tests\SproutForms.Core.Tests.csproj", "{82953798-97C7-4AF0-A4F6-BFF98B0E64EC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SproutForms.Standalone.Site", "SproutForms.Standalone.Site\SproutForms.Standalone.Site.csproj", "{0AA803A1-F072-4AF2-B107-8A1B6256486D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -83,6 +85,18 @@ Global
 		{82953798-97C7-4AF0-A4F6-BFF98B0E64EC}.Release|x64.Build.0 = Release|Any CPU
 		{82953798-97C7-4AF0-A4F6-BFF98B0E64EC}.Release|x86.ActiveCfg = Release|Any CPU
 		{82953798-97C7-4AF0-A4F6-BFF98B0E64EC}.Release|x86.Build.0 = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|x64.Build.0 = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Debug|x86.Build.0 = Debug|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|x64.ActiveCfg = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|x64.Build.0 = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|x86.ActiveCfg = Release|Any CPU
+		{0AA803A1-F072-4AF2-B107-8A1B6256486D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

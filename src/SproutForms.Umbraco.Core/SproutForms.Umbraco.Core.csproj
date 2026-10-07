@@ -16,7 +16,6 @@
     <RazorCompileOnBuild>true</RazorCompileOnBuild>
     <EmbedRazorGenerateSources>true</EmbedRazorGenerateSources>
     <AddRazorSupportForMvc>true</AddRazorSupportForMvc>
-    <StaticWebAssetBasePath>forms</StaticWebAssetBasePath>
   </PropertyGroup>
 
   <ItemGroup>

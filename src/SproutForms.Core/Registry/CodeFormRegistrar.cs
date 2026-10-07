@@ -1,50 +1,53 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using SproutForms.Core.Helpers;
 using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
-using System;
-using System.Collections.Generic;
-using System.Text;
+using SproutForms.Core.Services;
 
 namespace SproutForms.Core.Registry
 {
-    //TODO: Find a way to correctly do this in regards to migrations
-    /*public class CodeFormRegistrar : IHostedService
+    /// <summary>
+    /// Stores the code-first forms of the <see cref="CodeFormRegistry"/>: a new form, or a new published version when its definition changed.
+    /// The host runs it once at startup, when its repositories are ready.
+    /// </summary>
+    public class CodeFormRegistrar
     {
         private readonly IServiceProvider _services;
         private readonly CodeFormRegistry _registry;
 
-        public CodeFormRegistrar(
-            IServiceProvider services,
-            CodeFormRegistry registry)
+        public CodeFormRegistrar(IServiceProvider services, CodeFormRegistry registry)
         {
             _services = services;
             _registry = registry;
         }
 
-        public async Task StartAsync(CancellationToken cancellationToken)
+        public void RegisterAll()
         {
             using var scope = _services.CreateScope();
             var formsRepo = scope.ServiceProvider.GetRequiredService<IFormRepository>();
             var versionsRepo = scope.ServiceProvider.GetRequiredService<IFormVersionRepository>();
+            var typeValidator = scope.ServiceProvider.GetRequiredService<FormDefinitionTypeValidator>();
+            var auditRepo = scope.ServiceProvider.GetRequiredService<IFormAuditRepository>();
 
             foreach (var factory in _registry.Factories)
             {
                 var form = factory(scope.ServiceProvider);
-                await RegisterAsync(form, formsRepo, versionsRepo);
+                Register(form, formsRepo, versionsRepo, auditRepo, typeValidator);
             }
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-            => Task.CompletedTask;
-
-        private async Task RegisterAsync(
+        private static void Register(
             ICodeFirstForm codeForm,
             IFormRepository formsRepo,
-            IFormVersionRepository versionsRepo)
+            IFormVersionRepository versionsRepo,
+            IFormAuditRepository auditRepo,
+            FormDefinitionTypeValidator typeValidator)
         {
             var definition = codeForm.Build();
+            var errors = FormDefinitionStructureValidator.Validate(definition).Concat(typeValidator.Validate(definition)).ToList();
+            if (errors.Count > 0)
+                throw new InvalidOperationException($"Code-first form '{codeForm.Alias}' is invalid: {string.Join(" ", errors)}");
+
             var hash = FormDefinitionHasher.Hash(definition);
 
             var form = formsRepo.GetByAlias(codeForm.Alias);
@@ -69,10 +72,11 @@ namespace SproutForms.Core.Registry
                     Definition = definition,
                     DefinitionHash = hash,
                     CreatedAt = DateTime.UtcNow,
-                    CreatedBy = "System"
+                    CreatedBy = SystemUser.Key
                 };
 
                 versionsRepo.Add(version);
+                auditRepo.Add(CreateAuditEntry(form.Id, FormAuditAction.Created, version));
 
                 return;
             }
@@ -81,11 +85,32 @@ namespace SproutForms.Core.Registry
             if (latest!.DefinitionHash == hash)
                 return;
 
-            latest.Id = Guid.NewGuid();
-            latest.Version++;
-            latest.Definition = definition;
-            latest.DefinitionHash = hash;
-            versionsRepo.Add(latest);
+            // A new instance, because the latest version may be the repository's cached one
+            var newVersion = new FormVersion
+            {
+                Id = Guid.NewGuid(),
+                FormId = form.Id,
+                Version = latest.Version + 1,
+                Status = FormStatus.Published,
+                Definition = definition,
+                DefinitionHash = hash,
+                CreatedAt = DateTime.UtcNow,
+                CreatedBy = SystemUser.Key
+            };
+            versionsRepo.Add(newVersion);
+            auditRepo.Add(CreateAuditEntry(form.Id, FormAuditAction.Saved, newVersion));
         }
-    }*/
+
+        private static FormAuditEntry CreateAuditEntry(Guid formId, FormAuditAction action, FormVersion version)
+        {
+            return new FormAuditEntry
+            {
+                FormId = formId,
+                Action = action,
+                UserKey = version.CreatedBy,
+                CreatedAt = version.CreatedAt,
+                VersionId = version.Id
+            };
+        }
+    }
 }
