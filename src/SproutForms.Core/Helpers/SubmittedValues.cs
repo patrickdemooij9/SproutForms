@@ -10,6 +10,13 @@ namespace SproutForms.Core.Helpers
     /// </summary>
     internal sealed class SubmittedValues
     {
+        /// <summary>
+        /// The most entries a submission can hold, across all its field groups, nested ones included. It is as many as posted HTML names can
+        /// reach (<see cref="FieldPath.MaxEntryIndex"/>), and keeps a JSON submission from making the server parse and validate a huge list.
+        /// Entries past it are ignored, as a posted name past the maximum index is.
+        /// </summary>
+        public const int MaxEntries = FieldPath.MaxEntryIndex + 1;
+
         // A field's value, or a field group's entries, in the order they were submitted
         private readonly Dictionary<string, (JsonElement Value, List<SubmittedValues>? Entries)> _values = [];
 
@@ -18,6 +25,12 @@ namespace SproutForms.Core.Helpers
         /// of submitted JSON; everything after it can rely on a field group's value being its entries.
         /// </summary>
         public static SubmittedValues Parse(IReadOnlyList<FormField> fields, IEnumerable<KeyValuePair<string, JsonElement>> values)
+        {
+            var remainingEntries = MaxEntries;
+            return Parse(fields, values, ref remainingEntries);
+        }
+
+        private static SubmittedValues Parse(IReadOnlyList<FormField> fields, IEnumerable<KeyValuePair<string, JsonElement>> values, ref int remainingEntries)
         {
             var result = new SubmittedValues();
             foreach (var (alias, value) in values)
@@ -28,11 +41,22 @@ namespace SproutForms.Core.Helpers
 
                 if (field.Configuration is IFormFieldGroupConfiguration group)
                 {
-                    // An entry that isn't an object is kept as an empty one, so the entries after it keep their index for their errors
-                    if (value.ValueKind == JsonValueKind.Array)
-                        result.SetEntries(alias, [.. value.EnumerateArray().Select(entry => entry.ValueKind == JsonValueKind.Object
-                            ? Parse(group.Fields, entry.EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value)))
-                            : new SubmittedValues())]);
+                    if (value.ValueKind != JsonValueKind.Array)
+                        continue;
+
+                    var entries = new List<SubmittedValues>();
+                    foreach (var entry in value.EnumerateArray())
+                    {
+                        if (remainingEntries == 0)
+                            break;
+                        remainingEntries--;
+
+                        // An entry that isn't an object is kept as an empty one, so the entries after it keep their index for their errors
+                        entries.Add(entry.ValueKind == JsonValueKind.Object
+                            ? Parse(group.Fields, entry.EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value)), ref remainingEntries)
+                            : new SubmittedValues());
+                    }
+                    result.SetEntries(alias, entries);
                 }
                 else if (AsText(value) is { } text)
                 {
@@ -55,6 +79,14 @@ namespace SproutForms.Core.Helpers
             => _values.TryGetValue(alias, out var item) && item.Entries is { } entries ? entries : [];
 
         public void SetEntries(string alias, List<SubmittedValues> entries) => _values[alias] = (default, entries);
+
+        public void Remove(string alias) => _values.Remove(alias);
+
+        // Every value, including those in the entries of field groups
+        public IEnumerable<JsonElement> AllValues()
+            => _values.Values.SelectMany(item => item.Entries is { } entries
+                ? entries.SelectMany(entry => entry.AllValues())
+                : [item.Value]);
 
         // The entry at the index, with the entries before it added when they weren't submitted
         public SubmittedValues GetOrAddEntry(string alias, int index)

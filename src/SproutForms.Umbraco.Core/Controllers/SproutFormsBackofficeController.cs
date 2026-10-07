@@ -17,11 +17,11 @@ using SproutForms.Umbraco.Core.Descriptors.Flows;
 using SproutForms.Umbraco.Core.Descriptors.FormTypes;
 using SproutForms.Umbraco.Core.Descriptors.Outcomes;
 using SproutForms.Umbraco.Core.Models.ViewModels;
+using SproutForms.Umbraco.Core.Security;
 using SproutForms.Umbraco.Core.Services;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
 using Umbraco.Cms.Core.Security;
-using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Cms.Web.Common.Routing;
 using Umbraco.Extensions;
 using WorkflowTemplate = SproutForms.Core.Models.WorkflowTemplate;
@@ -31,7 +31,7 @@ namespace SproutForms.Umbraco.Core.Controllers
     [ApiExplorerSettings(GroupName = "Backoffice SproutForms")]
     [ApiController]
     [BackOfficeRoute("sproutForms")]
-    [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
+    [Authorize(Policy = SproutFormsAuthorization.SectionAccessPolicy)]
     [MapToApi("sproutForms")]
     public class SproutFormsBackofficeController : Controller
     {

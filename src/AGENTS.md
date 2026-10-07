@@ -46,6 +46,12 @@ npm run build
 - `IWorkflowExecutionRepository` / `WorkflowExecutionRepository`
 - `IFormAuditRepository` / `FormAuditRepository` - a form's history (created, saved, renamed, rolled back)
 
+### Caching
+`FormRepository` and `FormVersionRepository` cache in Umbraco's runtime cache, under keys starting with `sproutForms_` (`Caching/DefaultRepositoryCachePolicy`). Every write to them, or to `WorkflowTemplateRepository` (form versions hold their templates' values), calls `DistributedCache.RefreshSproutForms()`, which runs `SproutFormsCacheRefresher` on every server, so a load balanced site doesn't serve an old form from its other servers. A new repository that caches, or whose changes show in cached forms, does the same.
+
+### Backoffice authorization
+Located in `SproutForms.Umbraco.Core/Security/`. A backoffice login alone isn't enough: the backoffice and recycle bin controllers require `SproutFormsAuthorization.SectionAccessPolicy`, the `sproutForms` section. The tree controller requires `TreeAccessPolicy` (the SproutForms, Content, Media or Members section), because the form picker browses it outside the SproutForms section; its `item` endpoint gives the picker a form's name. Anything in the tree controller that changes data, like creating a folder, adds `SectionAccessPolicy` on top. A new backoffice endpoint goes on a controller with `SectionAccessPolicy`, never `AuthorizationPolicies.BackOfficeAccess`.
+
 ### Descriptors (Umbraco Backoffice)
 Located in `SproutForms.Umbraco.Core/Descriptors/`:
 - **Fields**: `TextFieldDescriptor`, `EmailFieldDescriptor`, `TextAreaFieldDescriptor`, `SelectFieldDescriptor`, `RadioFieldDescriptor`, `DateFieldDescriptor`, `FileFieldDescriptor`, `HiddenFieldDescriptor`, `RepeaterFieldDescriptor`
@@ -53,7 +59,7 @@ Located in `SproutForms.Umbraco.Core/Descriptors/`:
 - **Outcomes**: `RedirectUrlOutcomeDescriptor`, `ShowMessageOutcomeDescriptor`, `RedirectUmbracoPageOutcomeDescriptor`
 
 ### Services
-- `IFormSubmissionService` / `FormSubmissionService` - Handles form submissions
+- `IFormSubmissionService` / `FormSubmissionService` - Handles form submissions. Only what the visitor could see is stored: the values of fields hidden by their rules or on a skipped page aren't validated, so they're dropped once the submission is accepted, along with their uploads. A `hidden` field without `AllowOverrideFromClient` always holds its `DefaultValue`, whatever was posted, and conditions and calculations see that value
 - `FormClientModelBuilder` - Builds a published form's `FormClientModel` (`SproutForms.Core/Models/ClientModels/`): what a front-end may see of it. Its pages hold rows of columns, each with its field, the same shape as the Razor view model. The headless API returns it as-is, and `FormRenderingService` builds the Razor view model from it, so both show the same form. Field types filter their configuration with `IFormFieldType.GetClientConfiguration`, form types their settings and field extensions with `GetClientSettings` / `GetClientFieldExtension` (nothing by default)
 - `FormRenderingService` - The Razor view model: the client model with the whole field configuration and the values and errors of a post without JavaScript
 - `FormSubmitOutcomeRunner` - Runs a form's submit outcome for a saved submission, for both submission controllers

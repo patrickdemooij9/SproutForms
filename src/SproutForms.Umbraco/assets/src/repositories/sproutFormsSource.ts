@@ -103,6 +103,11 @@ export class SproutFormsSource {
     return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsForm({ query: { id: formId } }));
   }
 
+  // The tree's view of a form, which users without the SproutForms section may read for the form picker
+  async getFormItem(formId: string) {
+    return await tryExecute(this.#host, BackofficeSproutForms.getUmbracoSproutFormsItem({ query: { id: formId } }));
+  }
+
   async saveForm(form: FormBackofficeModel){
     return await tryExecute(this.#host, BackofficeSproutForms.postUmbracoSproutFormsForm({
       body: form

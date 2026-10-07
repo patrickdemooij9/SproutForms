@@ -12,6 +12,7 @@ using SproutForms.Core.Models.Flows;
 using SproutForms.Core.Models.FormTypes;
 using Umbraco.Cms.Core.Cache;
 using SproutForms.Umbraco.Core.Caching;
+using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Core.Services;
 
 namespace SproutForms.Umbraco.Core.Repositories
@@ -26,6 +27,7 @@ namespace SproutForms.Umbraco.Core.Repositories
         private readonly WorkflowTemplateService? _templateService;
 
         private readonly Caching.IRepositoryCachePolicy<FormVersion, Guid> _cachePolicy;
+        private readonly DistributedCache _distributedCache;
 
         public FormVersionRepository(IScopeProvider scopeProvider,
             IEnumerable<IFormFieldType> fieldTypes,
@@ -33,9 +35,11 @@ namespace SproutForms.Umbraco.Core.Repositories
             IEnumerable<IFormWorkflowType> workflowTypes,
             IEnumerable<IFormDefinitionType> formTypes,
             IAppPolicyCache cache,
+            DistributedCache distributedCache,
             WorkflowTemplateService? templateService = null)
         {
             _scopeProvider = scopeProvider;
+            _distributedCache = distributedCache;
             _fieldTypes = fieldTypes;
             _outcomeTypes = outcomeTypes;
             _workflowTypes = workflowTypes;
@@ -48,6 +52,7 @@ namespace SproutForms.Umbraco.Core.Repositories
         public void Add(FormVersion version)
         {
             _cachePolicy.Create(version, DoAdd);
+            _distributedCache.RefreshSproutForms();
         }
 
         private void DoAdd(FormVersion version)
@@ -87,6 +92,7 @@ namespace SproutForms.Umbraco.Core.Repositories
             {
                 _cachePolicy.Delete(version, DoDelete);
             }
+            _distributedCache.RefreshSproutForms();
         }
 
         private void DoDelete(FormVersion version)
@@ -113,7 +119,6 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         private FormVersion[] DoGetByFormId(Guid formId)
         {
-            Console.WriteLine("Cache fail!");
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             var entities = scope.Database.Fetch<FormVersionEntity>(scope.SqlContext.Sql()
                 .SelectAll()
@@ -158,7 +163,6 @@ namespace SproutForms.Umbraco.Core.Repositories
 
         private FormVersion? DoGetById(Guid id)
         {
-            Console.WriteLine("Cache fail!");
             using var scope = _scopeProvider.CreateScope(autoComplete: true);
             var entity = scope.Database.FirstOrDefault<FormVersionEntity>(scope.SqlContext.Sql()
                 .SelectAll()

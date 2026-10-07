@@ -68,6 +68,47 @@ namespace SproutForms.Core.Tests
             Assert.That(values["people"].GetRawText(), Is.EqualTo("""[{"hasAllergies":"true","firstName":"2"}]"""));
         }
 
+        [Test]
+        public void Entries_past_the_maximum_are_ignored()
+        {
+            var values = Parse(new
+            {
+                people = Enumerable.Range(0, SubmittedValues.MaxEntries + 500).Select(index => new { firstName = $"Person {index}" })
+            });
+
+            Assert.That(values["people"].GetArrayLength(), Is.EqualTo(SubmittedValues.MaxEntries));
+        }
+
+        [Test]
+        public void The_maximum_counts_the_entries_of_nested_groups_too()
+        {
+            var children = new Fields.Configs.RepeaterFieldConfig
+            {
+                Fields = [new Models.FormField { Alias = "childName", Label = "Name", FieldTypeAlias = "text", Configuration = new Fields.Configs.TextFieldConfig() }]
+            };
+            var families = new Fields.Configs.RepeaterFieldConfig
+            {
+                Fields = [new Models.FormField { Alias = "children", Label = "Children", FieldTypeAlias = "repeater", Configuration = children }]
+            };
+            var fields = new List<Models.FormField>
+            {
+                new() { Alias = "families", Label = "Families", FieldTypeAlias = "repeater", Configuration = families }
+            };
+
+            // 20 families of 100 children: 2,020 entries in all
+            var values = SubmittedValues.Parse(fields, TestForms.Values(new
+            {
+                families = Enumerable.Range(0, 20).Select(_ => new
+                {
+                    children = Enumerable.Range(0, 100).Select(index => new { childName = $"Child {index}" })
+                })
+            })).ToDictionary();
+
+            var parsed = values["families"].EnumerateArray().ToList();
+            var total = parsed.Count + parsed.Sum(family => family.GetProperty("children").GetArrayLength());
+            Assert.That(total, Is.EqualTo(SubmittedValues.MaxEntries));
+        }
+
         private static Dictionary<string, System.Text.Json.JsonElement> Parse(object values)
             => SubmittedValues.Parse(TestForms.People().Definition.Fields, TestForms.Values(values)).ToDictionary();
     }

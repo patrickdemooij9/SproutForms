@@ -59,6 +59,7 @@ namespace SproutForms.Core.Services
         {
             var errors = new Dictionary<string, List<string>>();
             var values = SubmittedValues.Parse(formVersion.Definition.Fields, request.Values);
+            ApplyLockedHiddenValues(formVersion.Definition.Fields, values);
             var storedFiles = new List<StoredFileReference>();
 
             try
@@ -67,19 +68,26 @@ namespace SproutForms.Core.Services
 
                 // Worked out on the server whatever the browser showed, and before validating, because conditions can use them
                 var variables = _calculator.Calculate(formVersion.Definition, values.ToDictionary());
-                ValidateFields(formVersion, formVersion.Definition.Fields, values, variables, errors);
+                var hiddenFields = ValidateFields(formVersion, formVersion.Definition.Fields, values, variables, errors);
 
-                // What is stored, and what the form's type, workflows and outcome see
-                var storedValues = values.ToDictionary();
+                // A rejected form is shown again with everything the visitor filled in, including fields they can't see right now
+                var submittedValues = values.ToDictionary();
                 if (errors.Count != 0)
                 {
                     await DeleteStoredFilesAsync(storedFiles);
                     return new FormSubmissionResult
                     {
                         Errors = errors,
-                        Values = storedValues
+                        Values = submittedValues
                     };
                 }
+
+                // What is stored, and what the form's type, workflows and outcome see: nothing of the fields the visitor didn't see,
+                // which weren't validated either
+                foreach (var (owner, alias) in hiddenFields)
+                    owner.Remove(alias);
+                var storedValues = values.ToDictionary();
+                await DeleteUnusedFilesAsync(storedFiles, values);
 
                 var typeResult = await ProcessWithFormTypeAsync(formVersion, storedValues, variables);
                 if (typeResult.Errors.Count != 0)
@@ -88,7 +96,7 @@ namespace SproutForms.Core.Services
                     return new FormSubmissionResult
                     {
                         Errors = typeResult.Errors,
-                        Values = storedValues
+                        Values = submittedValues
                     };
                 }
 
@@ -164,12 +172,36 @@ namespace SproutForms.Core.Services
 
             var errors = new Dictionary<string, List<string>>();
             var submittedValues = SubmittedValues.Parse(formVersion.Definition.Fields, values);
+            ApplyLockedHiddenValues(formVersion.Definition.Fields, submittedValues);
             var variables = _calculator.Calculate(formVersion.Definition, submittedValues.ToDictionary());
             ValidateFields(formVersion, fields, submittedValues, variables, errors, includeFiles: false);
             return errors;
         }
 
-        private void ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, SubmittedValues values, IReadOnlyDictionary<string, JsonElement> variables, Dictionary<string, List<string>> errors, bool includeFiles = true)
+        // The value of a hidden field the visitor may not change is the form's, whatever was posted, and conditions see that one too
+        private static void ApplyLockedHiddenValues(IReadOnlyList<FormField> fields, SubmittedValues values)
+        {
+            foreach (var field in fields)
+            {
+                if (field.Configuration is IFormFieldGroupConfiguration group)
+                {
+                    foreach (var entry in values.GetEntries(field.Alias))
+                        ApplyLockedHiddenValues(group.Fields, entry);
+                }
+                else if (field.Configuration is HiddenFieldConfig { AllowOverrideFromClient: false } config)
+                {
+                    if (config.DefaultValue is null)
+                        values.Remove(field.Alias);
+                    else
+                        values.SetValue(field.Alias, JsonSerializer.SerializeToElement(config.DefaultValue));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Validates the fields the visitor can see, and returns those they can't: on a skipped page, or hidden by their rules
+        /// </summary>
+        private List<(SubmittedValues Owner, string Alias)> ValidateFields(FormVersion formVersion, IEnumerable<FormField> fields, SubmittedValues values, IReadOnlyDictionary<string, JsonElement> variables, Dictionary<string, List<string>> errors, bool includeFiles = true)
         {
             var conditionValues = values.ToDictionary();
 
@@ -181,8 +213,9 @@ namespace SproutForms.Core.Services
                 .Select(column => column.FieldAlias)
                 .ToHashSet();
 
-            var scope = new ValidationScope(formVersion, variables, errors, includeFiles);
+            var scope = new ValidationScope(formVersion, variables, errors, includeFiles, [.. skippedFieldAliases.Select(alias => (values, alias))]);
             ValidateScope(scope, fields.Where(field => !skippedFieldAliases.Contains(field.Alias)), values, conditionValues, string.Empty);
+            return scope.HiddenFields;
         }
 
         /// <summary>
@@ -204,7 +237,10 @@ namespace SproutForms.Core.Services
                     continue;
 
                 if (!_conditionEvaluator.IsVisible(field, conditionValues, scope.Variables))
+                {
+                    scope.HiddenFields.Add((values, field.Alias));
                     continue;
+                }
 
                 var isRequired = field.Required ||
                     _conditionEvaluator.IsRequired(field, conditionValues, scope.Variables);
@@ -266,15 +302,17 @@ namespace SproutForms.Core.Services
         // An entry's errors use its index as it was posted, so the front-end shows them on the entry the visitor sees
         private List<SubmittedValues> ValidateEntries(ValidationScope scope, IFormFieldGroupConfiguration group, List<SubmittedValues> entries, Dictionary<string, JsonElement> conditionValues, string path)
         {
+            // A rejected upload leaves the entry without its value, but the visitor didn't leave the entry empty. Looked up once, rather than
+            // for every entry, so the work grows with the entries and the errors, not with both multiplied
+            var entriesWithErrors = EntriesWithErrors(scope.Errors, path);
+
             var kept = new List<SubmittedValues>();
             for (var index = 0; index < entries.Count; index++)
             {
                 var entry = entries[index];
                 var entryPath = FieldPath.ForEntry(path, index);
 
-                // A rejected upload leaves the entry without its value, but the visitor didn't leave the entry empty
-                var hasErrors = scope.Errors.Keys.Any(key => key.StartsWith(entryPath, StringComparison.Ordinal));
-                if (!hasErrors && IsBlankEntry(scope.FormVersion, group, entry))
+                if (!entriesWithErrors.Contains(index) && IsBlankEntry(scope.FormVersion, group, entry))
                     continue;
 
                 var entryConditionValues = new Dictionary<string, JsonElement>(conditionValues);
@@ -288,10 +326,30 @@ namespace SproutForms.Core.Services
             return kept;
         }
 
-        // A value that wouldn't do for a required field, such as an unticked checkbox, isn't something the visitor filled in
+        // The indexes of the entries of the field group at the path that have an error, such as 1 for "people[1].cv"
+        private static HashSet<int> EntriesWithErrors(Dictionary<string, List<string>> errors, string path)
+        {
+            var prefix = path + "[";
+            var indexes = new HashSet<int>();
+            foreach (var key in errors.Keys)
+            {
+                if (!key.StartsWith(prefix, StringComparison.Ordinal))
+                    continue;
+
+                var end = key.IndexOf(']', prefix.Length);
+                if (end > prefix.Length && int.TryParse(key.AsSpan(prefix.Length, end - prefix.Length), out var index))
+                    indexes.Add(index);
+            }
+            return indexes;
+        }
+
+        // A value that wouldn't do for a required field, such as an unticked checkbox, isn't something the visitor filled in, and neither is
+        // the value of a hidden field they may not change
         private bool IsBlankEntry(FormVersion formVersion, IFormFieldGroupConfiguration group, SubmittedValues entry)
             => group.Fields.All(field =>
             {
+                if (field.Configuration is HiddenFieldConfig { AllowOverrideFromClient: false })
+                    return true;
                 if (field.Configuration is IFormFieldGroupConfiguration childGroup)
                     return entry.GetEntries(field.Alias).All(child => IsBlankEntry(formVersion, childGroup, child));
                 if (!entry.TryGetValue(field.Alias, out var value) || IsEmpty(value))
@@ -385,7 +443,23 @@ namespace SproutForms.Core.Services
             return fields.FirstOrDefault(it => it.Alias == path.FieldAlias);
         }
 
-        private sealed record ValidationScope(FormVersion FormVersion, IReadOnlyDictionary<string, JsonElement> Variables, Dictionary<string, List<string>> Errors, bool IncludeFiles);
+        // HiddenFields collects the fields the visitor couldn't see, with the values (the form's, or an entry's) that hold them
+        private sealed record ValidationScope(FormVersion FormVersion, IReadOnlyDictionary<string, JsonElement> Variables, Dictionary<string, List<string>> Errors, bool IncludeFiles, List<(SubmittedValues Owner, string Alias)> HiddenFields);
+
+        // An upload is no longer used when its field turned out to be hidden, or when another file was posted for the same field after it
+        private async Task DeleteUnusedFilesAsync(List<StoredFileReference> storedFiles, SubmittedValues values)
+        {
+            var used = values.AllValues()
+                .Where(value => value.ValueKind == JsonValueKind.String)
+                .Select(value => value.GetString())
+                .ToHashSet();
+            var unused = storedFiles.Where(reference => !used.Contains(JsonSerializer.Serialize(reference))).ToList();
+            if (unused.Count == 0)
+                return;
+
+            await DeleteStoredFilesAsync(unused);
+            storedFiles.RemoveAll(unused.Contains);
+        }
 
         private async Task DeleteStoredFilesAsync(List<StoredFileReference> storedFiles)
         {

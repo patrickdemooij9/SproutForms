@@ -27,7 +27,10 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
     if (this.Element) {
       this.Element.field = value!;
     }
-    this.observePropertyView();
+    // The parent passes a new object on every render; only another editor needs looking up, and a new element
+    if (value && value.propertyEditor !== this.#editorAlias) {
+      this.observePropertyView();
+    }
   }
   public get field() {
     return this._field;
@@ -49,42 +52,47 @@ export class FieldConfigPropertyElement extends UmbElementMixin(LitElement) {
   @state()
   public Element?: IFormFieldConfigElement;
 
+  // The property editor the element is for, the initializer looking up its manifest, and the manifest the element was made from
+  #editorAlias?: string;
+  #editorInitializer?: { destroy(): void };
+  #elementManifestAlias?: string;
+
   private observePropertyView() {
     if (!this._field) {
       return;
     }
 
-    new UmbExtensionsManifestInitializer(
+    const editorAlias = this._field.propertyEditor;
+    this.#editorAlias = editorAlias;
+    this.#editorInitializer?.destroy();
+    this.#elementManifestAlias = undefined;
+    this.Element = undefined;
+
+    this.#editorInitializer = new UmbExtensionsManifestInitializer(
       this,
       umbExtensionsRegistry,
       "formFieldConfig",
-      null,
+      (manifest) =>
+        (manifest as unknown as FormFieldConfigManifest).propertyTypeAlias === editorAlias,
       (documents) => {
-        documents.forEach((document) => {
-          const manifest =
-            document.manifest as unknown as FormFieldConfigManifest;
-
-          if (
-            !manifest ||
-            manifest.propertyTypeAlias !== this._field!.propertyEditor
-          ) {
-            return;
-          }
-          this._gotEditorUI(manifest);
-        });
+        const manifest = documents[0]?.manifest as unknown as FormFieldConfigManifest | undefined;
+        // The registry reports again when any extension is added; the element already made for this manifest stays
+        if (manifest && manifest.alias !== this.#elementManifestAlias) {
+          this._gotEditorUI(manifest, editorAlias);
+        }
       },
     );
   }
 
   private async _gotEditorUI(
-    manifest?: FormFieldConfigManifest | null,
+    manifest: FormFieldConfigManifest,
+    editorAlias: string,
   ): Promise<void> {
-    if (!manifest) {
-      return;
-    }
+    this.#elementManifestAlias = manifest.alias;
 
     const el = await createExtensionElement(manifest);
-    if (el) {
+    // The field may have moved on to another editor while this one was loading
+    if (el && editorAlias === this.#editorAlias) {
       this.Element = el;
       this.Element.field = this._field!;
       this.Element.formField = this._formField;

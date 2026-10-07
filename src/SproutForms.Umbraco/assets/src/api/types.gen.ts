@@ -789,6 +789,31 @@ export type PostUmbracoSproutFormsGenerateAliasResponses = {
 
 export type PostUmbracoSproutFormsGenerateAliasResponse = PostUmbracoSproutFormsGenerateAliasResponses[keyof PostUmbracoSproutFormsGenerateAliasResponses];
 
+export type GetUmbracoSproutFormsItemData = {
+    body?: never;
+    path?: never;
+    query?: {
+        id?: string;
+    };
+    url: '/umbraco/sproutForms/item';
+};
+
+export type GetUmbracoSproutFormsItemErrors = {
+    /**
+     * Not Found
+     */
+    404: unknown;
+};
+
+export type GetUmbracoSproutFormsItemResponses = {
+    /**
+     * OK
+     */
+    200: FormTreeItemModel;
+};
+
+export type GetUmbracoSproutFormsItemResponse = GetUmbracoSproutFormsItemResponses[keyof GetUmbracoSproutFormsItemResponses];
+
 export type GetUmbracoSproutFormsOutcomeTypesData = {
     body?: never;
     path?: never;

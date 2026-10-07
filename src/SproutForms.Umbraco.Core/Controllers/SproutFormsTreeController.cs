@@ -6,12 +6,12 @@ using SproutForms.Core.Models;
 using SproutForms.Core.Repositories;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using SproutForms.Umbraco.Core.Repositories;
+using SproutForms.Umbraco.Core.Security;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using Umbraco.Cms.Api.Common.Attributes;
 using Umbraco.Cms.Api.Common.ViewModels.Pagination;
-using Umbraco.Cms.Web.Common.Authorization;
 using Umbraco.Cms.Web.Common.Routing;
 
 namespace SproutForms.Umbraco.Core.Controllers
@@ -25,7 +25,7 @@ namespace SproutForms.Umbraco.Core.Controllers
     [ApiExplorerSettings(GroupName = "Backoffice SproutForms")]
     [ApiController]
     [BackOfficeRoute("sproutForms")]
-    [Authorize(Policy = AuthorizationPolicies.BackOfficeAccess)]
+    [Authorize(Policy = SproutFormsAuthorization.TreeAccessPolicy)]
     [MapToApi("sproutForms")]
     public class SproutFormsTreeController : Controller
     {
@@ -130,6 +130,29 @@ namespace SproutForms.Umbraco.Core.Controllers
             return Task.FromResult<ActionResult<PagedViewModel<FormTreeItemModel>>>(Ok(result));
         }
 
+        /// <summary>
+        /// A form as the tree shows it, so the form picker can show the name of the picked form
+        /// </summary>
+        [HttpGet("item")]
+        [ProducesResponseType(typeof(FormTreeItemModel), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public ActionResult<FormTreeItemModel> GetItem(Guid id)
+        {
+            var form = _formRepository.GetById(id);
+            if (form is null)
+            {
+                return NotFound();
+            }
+
+            return Ok(new FormTreeItemModel
+            {
+                Id = form.Id.ToString(),
+                Name = form.Name,
+                ItemType = TreeItemType.Form,
+                Source = (int)form.Source
+            });
+        }
+
         [HttpGet("ancestors")]
         [ProducesResponseType(typeof(IEnumerable<FormTreeItemModel>), StatusCodes.Status200OK)]
         public ActionResult<IEnumerable<FormTreeItemModel>> GetAncestors(Guid descendantId)
@@ -165,6 +188,7 @@ namespace SproutForms.Umbraco.Core.Controllers
         }
 
         [HttpPost("folder")]
+        [Authorize(Policy = SproutFormsAuthorization.SectionAccessPolicy)]
         [ProducesResponseType(typeof(FormTreeItemModel), StatusCodes.Status200OK)]
         public ActionResult<FormTreeItemModel> CreateFolder([FromBody] CreateFolderRequest request)
         {

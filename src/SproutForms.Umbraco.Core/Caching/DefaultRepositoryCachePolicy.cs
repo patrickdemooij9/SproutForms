@@ -254,8 +254,13 @@ public class DefaultRepositoryCachePolicy<TEntity, TId> : IRepositoryCachePolicy
         var cachedIds = _cache.GetCacheItem<TId[]>(secondaryIndexKey);
         if (cachedIds != null)
         {
-            // Resolve IDs back to entities from the main cache
-            return cachedIds.Select(GetCached).WhereNotNull().ToArray();
+            // Resolve IDs back to entities from the main cache. The index and the entities expire on their own, so an entity can be gone
+            // while its index is still there; returning the rest would silently leave it out, so that counts as a miss
+            var cachedEntities = cachedIds.Select(GetCached).ToArray();
+            if (cachedEntities.All(entity => entity != null))
+            {
+                return cachedEntities!;
+            }
         }
 
         // Secondary index miss - fetch from repository

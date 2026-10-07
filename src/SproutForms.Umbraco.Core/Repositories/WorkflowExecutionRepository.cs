@@ -121,6 +121,36 @@ namespace SproutForms.Umbraco.Core.Repositories
             await scope.Database.SaveAsync(ToEntity(execution));
         }
 
+        public async Task<bool> TrySaveExecution(WorkflowExecution execution, WorkflowExecutionStatus expectedStatus, int expectedAttemptCount)
+        {
+            using var scope = _scopeProvider.CreateScope(autoComplete: true);
+            var updated = await scope.Database.ExecuteAsync(@"
+    UPDATE SproutForms_WorkflowExecutions
+    SET
+        Status = @0,
+        AttemptCount = @1,
+        LastError = @2,
+        NextAttemptUtc = @3,
+        StartedUtc = @4,
+        CompletedUtc = @5
+    WHERE
+        Id = @6
+        AND Status = @7
+        AND AttemptCount = @8",
+            [
+                (int)execution.Status,
+                execution.AttemptCount,
+                execution.LastError,
+                execution.NextAttemptUtc,
+                execution.StartedUtc,
+                execution.CompletedUtc,
+                execution.Id,
+                (int)expectedStatus,
+                expectedAttemptCount
+            ]);
+            return updated == 1;
+        }
+
         public async Task<WorkflowExecution[]> GetBySubmissionId(Guid submissionId)
         {
             using var scope = _scopeProvider.CreateScope(autoComplete: true);

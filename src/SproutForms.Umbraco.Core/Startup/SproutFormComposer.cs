@@ -22,6 +22,7 @@ using SproutForms.Umbraco.Core.Extensions;
 using SproutForms.Umbraco.Core.Headless;
 using SproutForms.Umbraco.Core.Implementations;
 using SproutForms.Umbraco.Core.Repositories;
+using SproutForms.Umbraco.Core.Security;
 using SproutForms.Umbraco.Core.Services;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using Umbraco.Cms.Core.Composing;
@@ -126,6 +127,7 @@ namespace SproutForms.Umbraco.Core.Startup
             builder.Services.AddSingleton<IFormSubmissionGuard, HoneypotSubmissionGuard>();
 
             builder.Services.AddCodeFirstForms((it) => { });
+            builder.AddSproutFormsAuthorization();
             builder.AddSproutFormsHeadless();
 
             //builder.EnableSproutFormsRecaptchaV3();
