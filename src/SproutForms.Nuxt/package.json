@@ -1,0 +1,44 @@
+{
+  "name": "@sproutforms/nuxt",
+  "version": "1.0.0-beta002",
+  "description": "Nuxt module for SproutForms headless forms: server-side rendered forms, with the API key kept on the server.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.mts",
+      "import": "./dist/module.mjs"
+    }
+  },
+  "main": "./dist/module.mjs",
+  "typesVersions": {
+    "*": {
+      ".": [
+        "./dist/types.d.mts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "nuxt-module-build prepare && nuxt-module-build build",
+    "typecheck": "nuxt-module-build prepare && vue-tsc --noEmit",
+    "dev": "nuxt dev playground",
+    "preview": "nuxt build playground && node playground/.output/server/index.mjs"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.5.2",
+    "@sproutforms/client": "1.0.0-beta002",
+    "@sproutforms/vue": "1.0.0-beta002",
+    "defu": "^6.1.7",
+    "h3": "^1.15.11"
+  },
+  "devDependencies": {
+    "@nuxt/module-builder": "^1.0.3",
+    "@nuxt/schema": "4.5.2",
+    "nuxt": "4.5.2",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^3.3.12"
+  }
+}

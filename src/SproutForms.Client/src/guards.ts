@@ -1,4 +1,5 @@
 import type { FormClientModel } from './api/types.gen';
+import { Registry, type Lookup } from './registry';
 import type { FormValues } from './types';
 
 /**
@@ -9,13 +10,16 @@ export interface SubmissionGuardHandler {
     getValues(settings: Record<string, unknown>, values: FormValues): Promise<Record<string, string>>;
 }
 
-const guards = new Map<string, SubmissionGuardHandler>();
+/**
+ * The submission guard handlers every form uses unless its own registry replaces them.
+ */
+export const globalSubmissionGuards = new Registry<SubmissionGuardHandler>();
 
 /**
  * Adds or replaces the handler for a submission guard alias, for a guard you registered on the server.
  */
 export function registerSubmissionGuard(alias: string, handler: SubmissionGuardHandler): void {
-    guards.set(alias, handler);
+    globalSubmissionGuards.register(alias, handler);
 }
 
 function settingsOf(definition: FormClientModel): Record<string, unknown> {
@@ -25,12 +29,12 @@ function settingsOf(definition: FormClientModel): Record<string, unknown> {
 /**
  * Loads what the form's guard needs up front, such as the reCAPTCHA script. Call it when the form is shown.
  */
-export async function loadSubmissionGuard(definition: FormClientModel): Promise<void> {
+export async function loadSubmissionGuard(definition: FormClientModel, guards: Lookup<SubmissionGuardHandler> = globalSubmissionGuards): Promise<void> {
     const guard = definition.submissionGuard && guards.get(definition.submissionGuard.alias);
     await guard?.load?.(settingsOf(definition));
 }
 
-export async function getSubmissionGuardValues(definition: FormClientModel, values: FormValues): Promise<Record<string, string>> {
+export async function getSubmissionGuardValues(definition: FormClientModel, values: FormValues, guards: Lookup<SubmissionGuardHandler> = globalSubmissionGuards): Promise<Record<string, string>> {
     const guard = definition.submissionGuard && guards.get(definition.submissionGuard.alias);
     return guard ? guard.getValues(settingsOf(definition), values) : {};
 }

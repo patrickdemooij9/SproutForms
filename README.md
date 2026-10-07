@@ -345,6 +345,28 @@ It also has:
 
 forms.js uses the same condition and validation code, so a Razor form and a headless form behave the same way.
 
+The client also has a form engine, `createFormEngine(form, { client })`, that holds a form's values, errors and submit for a renderer of your own; see [its README](src/SproutForms.Client/README.md#the-form-engine).
+
+## Vue and Nuxt
+
+[`@sproutforms/vue`](src/SproutForms.Vue) renders a headless form with the same markup and stylesheets as the Razor forms, without any code of your own, and [`@sproutforms/nuxt`](src/SproutForms.Nuxt) renders it on the server:
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+    modules: ['@sproutforms/nuxt'],
+    sproutForms: { baseUrl: 'https://cms.example.com' }
+});
+```
+
+```vue
+<SproutForm alias="contact" />
+```
+
+Like the Razor views, you can replace any part of the form: a field type everywhere, one field of one form, or the form's building blocks (form, rows, field wrapper, actions, errors, success message) in a named theme. A custom field type only needs a Vue component registered under its alias. See the [Vue](src/SproutForms.Vue/README.md) and [Nuxt](src/SproutForms.Nuxt/README.md) READMEs.
+
+> The Vue and Nuxt packages are new. They render `text`, `email`, `textarea`, `select`, `checkbox` and `hidden` fields on single-page forms so far.
+
 ## Trying it out
 
 [`src/SproutForms.Client/example`](src/SproutForms.Client/example) is a playground for the headless API. It renders any form of the demo site with plain TypeScript, the way a front-end would (`src/form-renderer.ts`), and shows next to it:
