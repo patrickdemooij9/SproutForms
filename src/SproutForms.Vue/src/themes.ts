@@ -2,7 +2,7 @@ import type { Component } from 'vue';
 
 /**
  * The components a form is built from, the same parts the Razor views have. Replace one in a theme to change that part of
- * every form that uses the theme; it gets the form from useSproutForm().
+ * every form that uses the theme; it gets the form from useSproutFormContext().
  */
 export interface FormComponents {
     // The form element with its pages and actions, or the success message once submitted (Form.cshtml)

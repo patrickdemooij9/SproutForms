@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useSproutForm } from '../../context';
+import { useSproutFormContext } from '../../context';
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 </script>
 
 <template>

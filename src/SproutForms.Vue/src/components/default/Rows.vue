@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { isFieldVisible, type FormClientRow } from '@sproutforms/client';
-import { useSproutForm } from '../../context';
+import { useSproutFormContext } from '../../context';
 
 defineProps<{
     rows: FormClientRow[];
 }>();
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 const Field = form.resolveComponent('Field');
 </script>
 

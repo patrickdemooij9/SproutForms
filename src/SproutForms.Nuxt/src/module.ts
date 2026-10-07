@@ -53,8 +53,8 @@ export default defineNuxtModule<ModuleOptions>({
         addPlugin(resolver.resolve('./runtime/plugin'));
         addComponent({ name: 'SproutForm', export: 'SproutForm', filePath: '@sproutforms/vue' });
         addImports([
-            { name: 'useSproutForm', from: '@sproutforms/vue' },
-            { name: 'useSproutForms', from: '@sproutforms/vue' },
+            { name: 'useSproutFormContext', from: '@sproutforms/vue' },
+            { name: 'useSproutFormsPlugin', from: '@sproutforms/vue' },
             { name: 'defineTheme', from: '@sproutforms/vue' },
             { name: 'fieldControlProps', from: '@sproutforms/vue' }
         ]);

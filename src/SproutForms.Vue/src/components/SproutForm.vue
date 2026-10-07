@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { FormClientModel, FormValues, HeadlessOutcome } from '@sproutforms/client';
 import { computed, watch, type Component } from 'vue';
-import { useSproutForms } from '../plugin';
+import { useSproutFormsPlugin } from '../plugin';
 import SproutFormView from './SproutFormView.vue';
 
 const props = defineProps<{
@@ -22,7 +22,7 @@ const emit = defineEmits<{
     error: [error: unknown];
 }>();
 
-const sproutForms = useSproutForms();
+const sproutForms = useSproutFormsPlugin();
 
 // Only loaded when no definition is passed in; a component can't call the loader conditionally later
 const request = props.definition ? undefined : sproutForms.loadDefinition(() => {

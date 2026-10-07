@@ -36,8 +36,8 @@ export const sproutFormKey: InjectionKey<SproutFormContext> = Symbol('sproutform
 /**
  * The form this component is in. Use it in your own theme components.
  */
-export function useSproutForm(): SproutFormContext {
+export function useSproutFormContext(): SproutFormContext {
     const form = inject(sproutFormKey, undefined);
-    if (!form) throw new Error('useSproutForm() only works in a component inside <SproutForm>.');
+    if (!form) throw new Error('useSproutFormContext() only works in a component inside <SproutForm>.');
     return form;
 }

@@ -210,7 +210,7 @@ export type SproutForms = ReturnType<typeof createSproutForms>;
 /**
  * The plugin installed in the app.
  */
-export function useSproutForms(): SproutForms {
+export function useSproutFormsPlugin(): SproutForms {
     const sproutForms = inject(sproutFormsKey, undefined);
     if (!sproutForms) throw new Error('SproutForms is not installed: call app.use(createSproutForms(...)).');
     return sproutForms;

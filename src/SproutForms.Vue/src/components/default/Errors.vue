@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { getFormErrors } from '@sproutforms/client';
 import { computed } from 'vue';
-import { useSproutForm } from '../../context';
+import { useSproutFormContext } from '../../context';
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 
 const errors = computed(() => {
     const errors = getFormErrors(form.definition, form.state.value.errors);

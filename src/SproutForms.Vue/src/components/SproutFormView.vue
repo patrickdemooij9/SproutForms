@@ -2,7 +2,7 @@
 import { createFormEngine, handleOutcome, type FormClientField, type FormClientModel, type FormValues, type HeadlessOutcome } from '@sproutforms/client';
 import { nextTick, onMounted, onScopeDispose, provide, ref, shallowRef, useId, type Component } from 'vue';
 import { sproutFormKey, type FormSuccess, type SproutFormContext } from '../context';
-import { useSproutForms } from '../plugin';
+import { useSproutFormsPlugin } from '../plugin';
 import { defaultThemeName, type FormComponentName } from '../themes';
 
 const props = defineProps<{
@@ -21,7 +21,7 @@ const emit = defineEmits<{
     error: [error: unknown];
 }>();
 
-const sproutForms = useSproutForms();
+const sproutForms = useSproutFormsPlugin();
 const theme = props.theme ?? defaultThemeName;
 const idPrefix = useId();
 

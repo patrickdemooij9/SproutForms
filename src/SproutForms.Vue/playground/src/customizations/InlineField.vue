@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { isFieldRequired, isFieldVisible, type FormClientField } from '@sproutforms/client';
-import { useSproutForm } from '@sproutforms/vue';
+import { useSproutFormContext } from '@sproutforms/vue';
 import { computed } from 'vue';
 
 // A field wrapper with the label next to the control and the error under it, as a theme can replace any part of the form
 const props = defineProps<{ field: FormClientField }>();
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 const control = form.resolveField(props.field);
 const id = form.getFieldId(props.field.alias);
 

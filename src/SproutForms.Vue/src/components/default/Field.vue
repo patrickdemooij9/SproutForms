@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { isFieldRequired, isFieldVisible, type FormClientField } from '@sproutforms/client';
 import { computed } from 'vue';
-import { useSproutForm } from '../../context';
+import { useSproutFormContext } from '../../context';
 
 const props = defineProps<{
     field: FormClientField;
 }>();
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 const control = form.resolveField(props.field);
 if (!control) {
     console.warn(`SproutForms: no component for field type "${props.field.type}" (field "${props.field.alias}"). Register one with registerField.`);

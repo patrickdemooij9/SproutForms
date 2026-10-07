@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { isPageVisible } from '@sproutforms/client';
 import { computed } from 'vue';
-import { useSproutForm } from '../../context';
+import { useSproutFormContext } from '../../context';
 import { defaultThemeName } from '../../themes';
 
-const form = useSproutForm();
+const form = useSproutFormContext();
 const Rows = form.resolveComponent('Rows');
 const Errors = form.resolveComponent('Errors');
 const Actions = form.resolveComponent('Actions');

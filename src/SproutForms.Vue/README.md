@@ -114,7 +114,7 @@ createSproutForms({
 | `Errors` | Errors that aren't about one field, such as a failed submit | |
 | `Success` | What shows instead of the form after a `message` outcome | `message` (HTML from the CMS) or `text` |
 
-Inside one, `useSproutForm()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, status), `getFieldId`, `resolveField`, `resolveComponent` and `submit`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
+Inside one, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, status), `getFieldId`, `resolveField`, `resolveComponent` and `submit`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
 
 ## Validators, guards and outcomes
 
