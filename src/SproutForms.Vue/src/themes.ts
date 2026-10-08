@@ -5,13 +5,18 @@ import type { Component } from 'vue';
  * every form that uses the theme; it gets the form from useSproutFormContext().
  */
 export interface FormComponents {
-    // The form element with its pages and actions, or the success message once submitted (Form.cshtml)
+    // The form element with its progress, pages and actions, or the success message once submitted (Form.cshtml)
     Form: Component;
+    // The steps of a form with more than one page, when the form shows its progress
+    Progress: Component;
     // The rows and columns of a page or entry; gets `rows` (Rows.cshtml)
     Rows: Component;
     // A field's wrapper: label, errors and the field type's control; gets `field` (Field.cshtml)
     Field: Component;
-    // The submit button
+    // One entry of a field group such as a repeater; gets `field` (the group), `path` (the group's), `index` and `removable`, and
+    // emits `remove` (RepeaterEntry.cshtml). It calls provideEntryScope before rendering the entry's rows
+    RepeaterEntry: Component;
+    // The previous, next and submit buttons
     Actions: Component;
     // The errors that aren't about a field, such as a failed submit
     Errors: Component;

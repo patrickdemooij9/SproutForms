@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { isFieldVisible, type FormClientRow } from '@sproutforms/client';
 import { useSproutFormContext } from '../../context';
+import { useFieldScope } from '../../scope';
 
 defineProps<{
+    // A page's rows, or those of a field group's entry
     rows: FormClientRow[];
 }>();
 
 const form = useSproutFormContext();
+const scope = useFieldScope();
 const Field = form.resolveComponent('Field');
 </script>
 
@@ -18,7 +21,7 @@ const Field = form.resolveComponent('Field');
             :key="column.field.alias"
             :class="['form-col', `col-${column.width}`]"
             data-sf-col
-            :hidden="!isFieldVisible(column.field, form.state.value.values, form.state.value.variables) || undefined"
+            :hidden="!isFieldVisible(column.field, scope.values.value, form.state.value.variables) || undefined"
         >
             <component :is="Field" :field="column.field" />
         </div>

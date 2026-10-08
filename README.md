@@ -365,7 +365,7 @@ export default defineNuxtConfig({
 
 Like the Razor views, you can replace any part of the form: a field type everywhere, one field of one form, or the form's building blocks (form, rows, field wrapper, actions, errors, success message) in a named theme. A custom field type only needs a Vue component registered under its alias. See the [Vue](src/SproutForms.Vue/README.md) and [Nuxt](src/SproutForms.Nuxt/README.md) READMEs.
 
-> The Vue and Nuxt packages are new. They render `text`, `email`, `textarea`, `select`, `checkbox` and `hidden` fields on single-page forms so far.
+> The Vue and Nuxt packages are new. They render every built-in field type, repeaters and forms with more than one page; submission guards that need markup, such as the honeypot field, follow.
 
 ## Trying it out
 

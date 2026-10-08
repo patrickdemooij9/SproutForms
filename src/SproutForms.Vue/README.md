@@ -4,7 +4,7 @@ Renders [SproutForms](https://github.com/patrickdemooij9/SproutForms) headless f
 
 It is built on [`@sproutforms/client`](../SproutForms.Client), whose form engine holds the values, conditions, validation and submit. The Vue components only render the engine's state. For Nuxt, use [`@sproutforms/nuxt`](../SproutForms.Nuxt), which sets all of this up and renders on the server.
 
-> This is a first version. It renders `text`, `email`, `textarea`, `select`, `checkbox` and `hidden` fields on single-page forms. Radio, date, file, repeaters, multiple pages, calculations in the UI and submission guards follow.
+> This is a first version. It renders every built-in field type (`text`, `email`, `textarea`, `select`, `radio`, `checkbox`, `date`, `file`, `hidden` and `repeater`) and forms with more than one page. Submission guards that need markup, such as the honeypot field, follow.
 
 ## Getting started
 
@@ -32,9 +32,9 @@ app.use(createSproutForms({
 | `fields` | Controls for this form's fields by alias, over their field type's control. |
 | `initialValues` | Values by field alias to start with. |
 
-It emits `submitted` with the outcome (or `null`), and `error` when the definition can't be loaded or a submit fails other than on validation.
+It emits `submitted` with the outcome (or `null`), `pagechange` with the new and the previous page index, and `error` when the definition can't be loaded or a submit or page check fails other than on validation.
 
-Errors show once the visitor submits, and a field's error goes when its value changes. After a submit, a `message` outcome shows in place of the form; `redirect` and `redirectUmbracoPage` go to their URL, in vue-router when it is installed and the URL is on this site.
+Errors show once the visitor goes to the next page or submits, and a field's error goes when its value changes. A form with more than one page shows one page at a time, with its progress when the form has `showProgress`. Going to the next page validates the page in the browser, then with the server's rules; pages whose conditions don't hold are skipped. A submit validates the whole form and goes back to the first page with an error. After a submit, a `message` outcome shows in place of the form; `redirect` and `redirectUmbracoPage` go to their URL, in vue-router when it is installed and the URL is on this site.
 
 ## Styling
 
@@ -107,10 +107,12 @@ createSproutForms({
 
 | Component | Is | Gets |
 |---|---|---|
-| `Form` | The form element with its pages, errors and actions, or the success message once submitted | |
-| `Rows` | A page's rows and columns | `rows` |
+| `Form` | The form element with its progress, pages, errors and actions, or the success message once submitted | |
+| `Progress` | The steps of a form with more than one page | |
+| `Rows` | The rows and columns of a page or a repeater entry | `rows` |
 | `Field` | A field's wrapper: label, control and errors | `field` |
-| `Actions` | The submit button | |
+| `RepeaterEntry` | One entry of a repeater: its title, rows and remove button. Calls `provideEntryScope` | `field`, `path`, `index`, `removable`; emits `remove` |
+| `Actions` | The previous, next and submit buttons | |
 | `Errors` | Errors that aren't about one field, such as a failed submit | |
 | `Success` | What shows instead of the form after a `message` outcome | `message` (HTML from the CMS) or `text` |
 
@@ -138,9 +140,11 @@ const { id, errorId, visible, required, errors, invalid, control, controlProps }
 
 `control` is the field's control as this form resolves it: its alias override, or its type's control in the theme. `controlProps` holds `fieldControlProps` and the update handler. `useField` also returns `path`, `value`, `setValue` and `disabled`. Keep `data-sf-field-type` on the wrapper when you use `layout.css`: it hides a hidden field's column.
 
+In a repeater entry, `useField` gives the field's path in the entry, such as `people[0].email`, and its conditions see the entry's values over the form's. A custom `RepeaterEntry` sets that up with `provideEntryScope(() => props.path, () => props.index)` before it renders the entry's rows; `useFieldScope()` gives the scope a component is in.
+
 #### The rest of the form
 
-Inside any theme component, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, status), `getFieldId`, `resolveField`, `resolveComponent` and `submit`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
+Inside any theme component, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, page index, status), `getFieldId`, `resolveField`, `resolveComponent`, `submit`, `next` and `previous`. The engine adds `addEntry(path)`, `removeEntry(path, index)` and `getVisiblePageIndexes()`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
 
 ## Validators, guards and outcomes
 

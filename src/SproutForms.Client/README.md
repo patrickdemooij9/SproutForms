@@ -24,8 +24,14 @@ const engine = createFormEngine(form, { client });
 engine.subscribe(state => render(state));   // state: values, variables, errors, status, outcome, submitError
 
 engine.setValue('email', 'ann@example.com'); // works the variables out again and drops the field's error
-const result = await engine.submit();        // validates, then submits; errors end up in state.errors
+engine.setValue('people[0].email', 'bob@example.com'); // a field in a repeater's entry, by its path
+engine.addEntry('people');                    // and removeEntry('people', 0)
+
+await engine.next();                          // validates the page in the browser and with the server, then goes on
+const result = await engine.submit();        // validates the whole form, then submits; errors end up in state.errors
 ```
+
+On a form with more than one page, `state.pageIndex` is the page the visitor is on, `getVisiblePageIndexes()` the pages they go through and `isLastPage()` whether to show the submit button. A submit with errors goes back to the first page that has one.
 
 Create one engine per form on the page, and on a server one per request.
 

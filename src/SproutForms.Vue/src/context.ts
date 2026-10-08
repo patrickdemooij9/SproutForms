@@ -27,8 +27,11 @@ export interface SproutFormContext {
     // The control for a field: the form's override for its alias, or its type's in the theme
     resolveField(field: FormClientField): Component | undefined;
     resolveComponent(name: FormComponentName): Component;
-    // Validates the form, submits it when it is valid and handles the outcome
+    // On the last page: validates the form, submits it when it is valid and handles the outcome. On an earlier page: next()
     submit(): Promise<void>;
+    // Validates the current page, in the browser and with the server, and goes to the next page when it is valid
+    next(): Promise<void>;
+    previous(): void;
 }
 
 export const sproutFormKey: InjectionKey<SproutFormContext> = Symbol('sproutform');

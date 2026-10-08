@@ -3,6 +3,7 @@ export * from './client';
 export * from './conditions';
 export * from './calculations';
 export * from './pages';
+export * from './paths';
 export * from './validation';
 export * from './guards';
 export * from './outcomes';

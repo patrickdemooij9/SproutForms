@@ -18,8 +18,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{
     submitted: [outcome: HeadlessOutcome | null];
-    // The definition couldn't be loaded, or the submit failed other than on validation
+    // The definition couldn't be loaded, or the submit or a page check failed other than on validation
     error: [error: unknown];
+    pagechange: [index: number, previousIndex: number];
 }>();
 
 const sproutForms = useSproutFormsPlugin();
@@ -48,5 +49,6 @@ if (request) {
         :initial-values="initialValues"
         @submitted="emit('submitted', $event)"
         @error="emit('error', $event)"
+        @pagechange="(index, previousIndex) => emit('pagechange', index, previousIndex)"
     />
 </template>
