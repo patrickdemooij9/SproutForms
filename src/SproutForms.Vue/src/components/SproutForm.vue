@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FormClientModel, FormValues, HeadlessOutcome } from '@sproutforms/client';
+import type { FormClientModel, FormValues, FormVariables, HeadlessOutcome } from '@sproutforms/client';
 import { computed, watch, type Component } from 'vue';
 import { useSproutFormsPlugin } from '../plugin';
 import SproutFormView from './SproutFormView.vue';
@@ -17,7 +17,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    submitted: [outcome: HeadlessOutcome | null];
+    submitted: [outcome: HeadlessOutcome | null, variables: FormVariables];
     // The definition couldn't be loaded, or the submit or a page check failed other than on validation
     error: [error: unknown];
     pagechange: [index: number, previousIndex: number];
@@ -47,7 +47,7 @@ if (request) {
         :theme="theme"
         :fields="fields"
         :initial-values="initialValues"
-        @submitted="emit('submitted', $event)"
+        @submitted="(outcome, variables) => emit('submitted', outcome, variables)"
         @error="emit('error', $event)"
         @pagechange="(index, previousIndex) => emit('pagechange', index, previousIndex)"
     />

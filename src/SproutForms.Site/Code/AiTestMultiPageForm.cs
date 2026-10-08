@@ -64,7 +64,7 @@ namespace SproutForms.Site.Code
                     config
                         .To("orders@sproutforms.local")
                         .From("noreply@sproutforms.local")
-                        .Subject("Multi-page form submitted"))
+                        .Subject("Multi-page order from {name}"))
                 )
                 .Build();
         }

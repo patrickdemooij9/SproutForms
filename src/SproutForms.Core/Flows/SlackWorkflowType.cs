@@ -44,14 +44,11 @@ namespace SproutForms.Core.Flows
                 var response = await client.PostAsync(config.WebhookUrl, content, ct);
 
                 if (!response.IsSuccessStatusCode)
-                {
-                    var errorBody = await response.Content.ReadAsStringAsync(ct);
-                    return new WorkflowExecutionResult(false, $"Slack API error: {response.StatusCode} - {errorBody}");
-                }
+                    return await WorkflowFailures.FromResponseAsync(response, "Slack API error", ct);
             }
             catch (Exception ex)
             {
-                return new WorkflowExecutionResult(false, ex.Message);
+                return WorkflowFailures.FromHttpException(ex);
             }
 
             return new WorkflowExecutionResult(true);

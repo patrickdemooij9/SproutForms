@@ -1,12 +1,22 @@
-# @sproutforms/vue
+# Vue: `@sproutforms/vue`
 
-Renders [SproutForms](https://github.com/patrickdemooij9/SproutForms) headless forms in Vue 3.5+. A form renders with the same markup and stylesheets as the Razor forms without any code of your own, and you can replace any part of it: one field type, one field, or the form's building blocks per theme.
+`@sproutforms/vue` renders SproutForms headless forms in Vue 3.5+. A form renders with the same markup and stylesheets as the Razor forms without any code of your own, and you can replace any part of it: one field type, one field, or the form's building blocks per theme.
 
-It is built on [`@sproutforms/client`](../SproutForms.Client), whose form engine holds the values, conditions, validation and submit. The Vue components only render the engine's state. For Nuxt, use [`@sproutforms/nuxt`](../SproutForms.Nuxt), which sets all of this up and renders on the server.
+It is built on [`@sproutforms/client`](README.md#the-javascript-client), whose form engine holds the values, conditions, validation and submit. The Vue components only render the engine's state. For Nuxt, use [`@sproutforms/nuxt`](nuxt.md), which sets all of this up and renders on the server.
 
 > This is a first version. It renders every built-in field type (`text`, `email`, `textarea`, `select`, `radio`, `checkbox`, `date`, `file`, `hidden` and `repeater`) and forms with more than one page, and the honeypot field of the default submission guard.
 
-## Getting started
+## Installation
+
+Turn the headless API on in the Umbraco site first, and add your site's origin to `AllowedOrigins`; see [Install headless](README.md#turning-it-on).
+
+```
+npm install @sproutforms/vue
+```
+
+> `@sproutforms/vue` and `@sproutforms/client` aren't published to npm yet. Until they are, build them from the repository (see [Contributing](../../contributing.md)).
+
+Install the plugin and the stylesheets:
 
 ```ts
 import { createSproutForms } from '@sproutforms/vue';
@@ -17,6 +27,10 @@ app.use(createSproutForms({
     client: { baseUrl: 'https://cms.example.com' }
 }));
 ```
+
+`client` takes the options of [`createSproutFormsClient`](README.md#the-javascript-client), or a client you created yourself.
+
+## Rendering a form
 
 ```vue
 <SproutForm alias="contact" @submitted="outcome => track(outcome)" />
@@ -36,9 +50,25 @@ It emits `submitted` with the outcome (or `null`) and the variables the server w
 
 Errors show once the visitor goes to the next page or submits, and a field's error goes when its value changes. A form with more than one page shows one page at a time, with its progress when the form has `showProgress`. Going to the next page validates the page in the browser, then with the server's rules; pages whose conditions don't hold are skipped. A submit validates the whole form and goes back to the first page with an error. After a submit, a `message` outcome shows in place of the form; `redirect` and `redirectUmbracoPage` go to their URL, in vue-router when it is installed and the URL is on this site.
 
+## Plugin options
+
+`createSproutForms` takes:
+
+| Option | |
+|---|---|
+| `client` | A client, or the options to create one with. A form that gets its definition passed in only needs one to submit. |
+| `themes` | Themes by name. The `default` theme replaces built-in components for every form. |
+| `validators` | Validators by rule type, over the global ones. |
+| `guards` | Submission guard handlers by guard alias, over the global ones. |
+| `outcomeHandlers` | Outcome handlers by outcome type, over the global ones and the built-in `message`, `redirect` and `redirectUmbracoPage` handlers. |
+| `navigate` | How a redirect goes to a URL; by default in vue-router when it is installed and the URL is on this site, otherwise by loading it. |
+| `loadDefinition` | How `<SproutForm alias>` loads its definition; Nuxt replaces it with `useAsyncData`. |
+
+The plugin also has `registerField`, `registerComponent` and `registerTheme`, to add to it after it is created, and `useSproutFormsPlugin()` gives it to a component.
+
 ## Styling
 
-`layout.css` is the grid, `theme.css` the default look, the same files the Razor forms use. Change the theme with the `--sf-*` custom properties, as in [Styling](../../docs/styling.md#changing-the-default-theme), or leave `theme.css` out and style the classes yourself. The markup has the same classes and state attributes as the Razor views: `form-root`, `form-row`, `form-col col-6`, `form-group`, `form-control`, `form-error`, `form-success`, `[hidden]`, `aria-invalid` and so on.
+`layout.css` is the grid, `theme.css` the default look, the same files the Razor forms use. Change the theme with the `--sf-*` custom properties, as in [Styling](../../styling.md#changing-the-default-theme), or leave `theme.css` out and style the classes yourself. The markup has the same classes and state attributes as the Razor views: `form-root`, `form-row`, `form-col col-6`, `form-group`, `form-control`, `form-error`, `form-success`, `[hidden]`, `aria-invalid` and so on.
 
 ## Replacing parts of the form
 
@@ -75,9 +105,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>();
 
 The field wrapper renders the label, the required marker and the errors around it. A field type that renders its own label, such as the checkbox (`field.rendersOwnLabel`), gets none.
 
-### A custom field type
-
-A field type you registered on the server needs nothing more than a control under its alias: `registerField('starRating', StarRating)`. Its `configuration` is whatever its `GetClientConfiguration` returns. Its validation rules are checked by the server; register a validator for a rule type to check it in the browser too (see below).
+A field type you registered on the server needs a control under its alias, see [Custom field types for headless](../../extending-headless/field-types.md).
 
 ### One field of one form
 
@@ -90,6 +118,8 @@ A field type you registered on the server needs nothing more than a control unde
 A theme replaces any of the form's building blocks, and what it leaves out comes from the default theme:
 
 ```ts
+import { createSproutForms, defineTheme } from '@sproutforms/vue';
+
 createSproutForms({
     client,
     themes: {
@@ -145,7 +175,7 @@ In a repeater entry, `useField` gives the field's path in the entry, such as `pe
 
 #### The rest of the form
 
-Inside any theme component, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, page index, status), `getFieldId`, `resolveField`, `resolveComponent`, `submit`, `next` and `previous`. The engine adds `addEntry(path)`, `removeEntry(path, index)` and `getVisiblePageIndexes()`. The built-in components in [`src/components/default`](src/components/default) are a good start for your own.
+Inside any theme component, `useSproutFormContext()` gives you the form: its `definition`, the `engine`, its reactive `state` (values, variables, errors, page index, status), `getFieldId`, `resolveField`, `resolveComponent`, `submit`, `next` and `previous`. The engine adds `addEntry(path)`, `removeEntry(path, index)` and `getVisiblePageIndexes()`. The built-in components in [`src/SproutForms.Vue/src/components/default`](../../../src/SproutForms.Vue/src/components/default) are a good start for your own.
 
 ## Validators, guards and outcomes
 
@@ -161,13 +191,12 @@ createSproutForms({
 });
 ```
 
+See [Extending for headless front-ends](../../extending-headless/README.md) for each of them.
+
 ## Server-side rendering
 
 Create the plugin once per app, so once per request on a server: what you register on it stays in that app. Nothing in the engine or the components touches the DOM while rendering. Without Nuxt, `<SproutForm alias>` loads its definition during server rendering but doesn't hand it to the browser, which loads it again. Pass `definition` with your own state transfer, or pass `loadDefinition` to `createSproutForms`, as the Nuxt module does with `useAsyncData`.
 
-## Development
+## Playground
 
-From the repository root, `npm install` once, then:
-
-- `npm run dev:vue` starts the playground on `http://localhost:5174`, against the demo site's `AiTest` profile (start it with `pwsh -File scripts/ai-test/run-site.ps1`). It renders the `aiTestHeadlessBasics` form by default (`?form=` for another one), with an alias override and an `inline` theme to switch to.
-- `npm run build -w @sproutforms/vue` builds `dist`, with the stylesheets copied from `SproutForms.Core/wwwroot/forms-src`. Build `@sproutforms/client` first.
+`npm run dev:vue` in the repository root starts the Vue playground; see [Contributing](../../contributing.md#vue-and-nuxt).

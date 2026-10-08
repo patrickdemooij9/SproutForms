@@ -13,6 +13,7 @@ namespace SproutForms.Core.Builders
         private readonly List<FormPage> _pages = [];
         private FormPage? _implicitPage;
         private string? _submitLabel;
+        private bool _showProgress = true;
         private readonly List<FormWorkflow> _workflows = [];
         private FormSubmitOutcome? _outcome;
         private FormDefinitionTypeReference? _type;
@@ -73,6 +74,15 @@ namespace SproutForms.Core.Builders
         public FormBuilder SubmitLabel(string label)
         {
             _submitLabel = label;
+            return this;
+        }
+
+        /// <summary>
+        /// Whether a form with more than one page shows its progress steps above the page. They show by default.
+        /// </summary>
+        public FormBuilder ShowProgress(bool show = true)
+        {
+            _showProgress = show;
             return this;
         }
 
@@ -163,6 +173,7 @@ namespace SproutForms.Core.Builders
                 Pages = _pages,
                 Workflows = _workflows,
                 SubmitLabel = _submitLabel,
+                ShowProgress = _showProgress,
                 Variables = _variables,
                 Calculations = _calculations,
                 ConditionalOutcomes = _conditionalOutcomes

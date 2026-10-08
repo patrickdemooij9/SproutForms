@@ -8,6 +8,7 @@ const form = useSproutFormContext();
 const Progress = form.resolveComponent('Progress');
 const Rows = form.resolveComponent('Rows');
 const Errors = form.resolveComponent('Errors');
+const SubmissionGuard = form.resolveComponent('SubmissionGuard');
 const Actions = form.resolveComponent('Actions');
 const Success = form.resolveComponent('Success');
 
@@ -37,6 +38,7 @@ watch(() => form.state.value.pageIndex, async index => {
             :aria-busy="form.state.value.status === 'submitting' || form.state.value.status === 'validating' || undefined"
             @submit.prevent="form.submit()"
         >
+            <component :is="SubmissionGuard" />
             <component :is="Progress" v-if="isPaged && form.definition.showProgress" />
             <template v-if="isPaged">
                 <fieldset

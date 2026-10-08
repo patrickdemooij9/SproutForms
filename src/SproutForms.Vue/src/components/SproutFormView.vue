@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { createFormEngine, handleOutcome, type FormClientField, type FormClientModel, type FormValues, type HeadlessOutcome } from '@sproutforms/client';
+import { createFormEngine, handleOutcome, type FormClientField, type FormClientModel, type FormValues, type FormVariables, type HeadlessOutcome } from '@sproutforms/client';
 import { nextTick, onMounted, onScopeDispose, provide, ref, shallowRef, useId, watch, type Component } from 'vue';
 import { sproutFormKey, type FormSuccess, type SproutFormContext } from '../context';
 import { useSproutFormsPlugin } from '../plugin';
@@ -15,8 +15,9 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-    // The form is submitted; outcome is null when the server had none to give
-    submitted: [outcome: HeadlessOutcome | null];
+    // The form is submitted; outcome is null when the server had none to give. variables are those the server worked out for the
+    // variables the definition holds
+    submitted: [outcome: HeadlessOutcome | null, variables: FormVariables];
     // The submit, or checking a page with the server, failed other than on validation, such as a network error
     error: [error: unknown];
     // The visitor went to another page; indexes are those of the definition's pages
@@ -84,7 +85,7 @@ async function submit(): Promise<void> {
         return;
     }
 
-    emit('submitted', result.outcome);
+    emit('submitted', result.outcome, result.variables ?? {});
     const handled = await handleOutcome(result.outcome, {
         definition: props.definition,
         showMessage: message => { success.value = message ? { message } : { text: props.definition.texts.submitSucceeded }; },

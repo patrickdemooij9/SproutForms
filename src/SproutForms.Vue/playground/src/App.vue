@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HeadlessOutcome } from '@sproutforms/client';
+import type { FormVariables, HeadlessOutcome } from '@sproutforms/client';
 import { SproutForm } from '@sproutforms/vue';
 import { ref } from 'vue';
 import CountedTextarea from './customizations/CountedTextarea.vue';
@@ -10,8 +10,8 @@ const theme = ref(params.get('theme') ?? 'default');
 const overrideMessage = ref(params.get('override') !== 'false');
 const log = ref<string[]>([]);
 
-function onSubmitted(outcome: HeadlessOutcome | null) {
-    log.value.unshift(`submitted: ${JSON.stringify(outcome)}`);
+function onSubmitted(outcome: HeadlessOutcome | null, variables: FormVariables) {
+    log.value.unshift(`submitted: ${JSON.stringify(outcome)}, variables: ${JSON.stringify(variables)}`);
 }
 
 function onError(error: unknown) {
