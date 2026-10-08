@@ -8,12 +8,9 @@
     var addLabel = string.IsNullOrWhiteSpace(config.AddLabel) ? FormTexts.AddItem : config.AddLabel;
 }
 
-@* forms.js adds and removes entries; each entry's inputs are named after its index, such as people[0].firstName *@
-<fieldset class="form-repeater"
-          data-sf-repeater="@Model.Alias"
-          data-sf-repeater-min="@config.MinItems"
-          data-sf-repeater-max="@config.MaxItems"
-          data-sf-item-title="@config.GetItemTitleTemplate()">
+@* forms.js adds and removes entries, within the minimum and maximum of the form's definition; each entry's inputs are named after
+   its index, such as people[0].firstName *@
+<fieldset class="form-repeater" data-sf-repeater="@Model.Alias">
     <legend class="form-repeater-title">
         @Model.Label
         @if (Model.Required)

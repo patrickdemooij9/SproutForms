@@ -8,10 +8,9 @@
     var describedBy = hasError
         ? $"{Model.Alias}-error"
         : null;
-    var rulesJson = Model.Rules.Count > 0 ? Json.Serialize(Model.Rules) : null;
 }
 
-<div class="form-group @(hasError ? "has-error" : "")" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model)) @if (rulesJson != null) { <text> data-field-rules='@rulesJson'</text> }>
+<div class="form-group @(hasError ? "has-error" : "")" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model))>
     @if (!Model.RendersOwnLabel)
     {
         <label for="@Model.Alias">

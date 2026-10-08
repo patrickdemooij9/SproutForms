@@ -20,7 +20,7 @@ const result = await client.submit(form, { values });
 ```ts
 import { createFormEngine } from '@sproutforms/client';
 
-const engine = createFormEngine(form, { client });
+const engine = createFormEngine(form, { transport: client });
 engine.subscribe(state => render(state));   // state: values, variables, errors, status, outcome, submitError
 
 engine.setValue('email', 'ann@example.com'); // works the variables out again and drops the field's error
@@ -33,7 +33,7 @@ const result = await engine.submit();        // validates the whole form, then s
 
 On a form with more than one page, `state.pageIndex` is the page the visitor is on, `getVisiblePageIndexes()` the pages they go through and `isLastPage()` whether to show the submit button. A submit with errors goes back to the first page that has one.
 
-Create one engine per form on the page, and on a server one per request.
+Create one engine per form on the page, and on a server one per request. The transport is how it reaches the server: a client from `createSproutFormsClient`, or any `FormTransport` (`validatePage` and `submit`), such as the one the Razor forms' `forms.js` posts to their own endpoint with.
 
 ## Registries
 

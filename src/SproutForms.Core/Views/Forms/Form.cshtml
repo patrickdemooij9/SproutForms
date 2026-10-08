@@ -18,7 +18,9 @@
     }
     else
     {
-        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" data-submission-guards='@Json.Serialize(Model.SubmissionGuards)' @if (isPaged) { <text> data-sf-paged="true"</text> } @if (Model.Variables.Count > 0) { <text> data-sf-calculations='@Json.Serialize(new { variables = Model.Variables, calculations = Model.Calculations })'</text> }>
+        <form method="post" action="/api/forms/@Model.Id" novalidate data-form-ajax="true" @if (isPaged) { <text> data-sf-paged="true"</text> }>
+            @* The form as the browser may see it: forms.js runs the form engine on it, for its conditions, validation, pages and submit *@
+            <script type="application/json" data-sf-definition>@Json.Serialize(Model.Definition)</script>
             @Html.AntiForgeryToken()
             <input type="hidden" name="@FormSubmissionRequest.PageUrlKey" value="" data-sf-page-url="true" />
             @foreach (var guard in Model.SubmissionGuards.Where(it => it.PartialViewPath is not null))
@@ -39,7 +41,7 @@
                 @if (isPaged)
                 {
                     @* Without JavaScript every page shows, one after the other, and the form posts as a whole *@
-                    <fieldset class="form-page" tabindex="-1" data-sf-page="@formPage.Index" data-sf-next-label="@formPage.NextLabel" data-sf-previous-label="@formPage.PreviousLabel" @if (formPage.Visibility != null) { <text> data-sf-page-conditions='@Json.Serialize(formPage.Visibility)'</text> }>
+                    <fieldset class="form-page" tabindex="-1" data-sf-page="@formPage.Index">
                         @if (!string.IsNullOrWhiteSpace(formPage.Title))
                         {
                             <legend class="form-page-title">@formPage.Title</legend>

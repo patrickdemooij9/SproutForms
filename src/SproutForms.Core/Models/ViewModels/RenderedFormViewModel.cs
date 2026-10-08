@@ -1,4 +1,4 @@
-﻿using SproutForms.Core.Models.Calculations;
+using SproutForms.Core.Models.Calculations;
 using SproutForms.Core.Models.ClientModels;
 using SproutForms.Core.Models.ViewModels;
 using System;
@@ -17,9 +17,8 @@ namespace SproutForms.Umbraco.Core.Models.ViewModels
         public bool ShowProgress { get; init; }
         public IReadOnlyList<FormSubmissionGuardViewModel> SubmissionGuards { get; init; } = [];
 
-        // The variables forms.js works out as the visitor answers, for the conditions that use them, with their calculations
-        public IReadOnlyList<FormClientVariable> Variables { get; init; } = [];
-        public IReadOnlyList<CalculationRule> Calculations { get; init; } = [];
+        // What the browser may see of the form: forms.js runs its form engine on it, the same one headless front-ends use
+        public required FormClientModel Definition { get; init; }
     }
 
 }

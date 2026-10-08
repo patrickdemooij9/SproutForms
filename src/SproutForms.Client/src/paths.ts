@@ -1,3 +1,4 @@
+import { getEntryScope } from './conditions';
 import type { FormValues } from './types';
 
 interface PathSegment {
@@ -45,4 +46,29 @@ export function setValueAtPath(values: FormValues, path: string, value: unknown)
     const restPath = path.slice(path.indexOf('.') + 1);
     entries[segment.index] = setValueAtPath(asEntry(entries[segment.index]), restPath, value);
     return { ...values, [segment.alias]: entries };
+}
+
+/**
+ * The entries a path goes through, as group paths and indexes: [["people", 0]] for "people[0].email".
+ */
+export function getEntryPaths(path: string): [groupPath: string, index: number][] {
+    const result: [string, number][] = [];
+    const pattern = /\[(\d+)\]/g;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(path)) !== null) {
+        result.push([path.slice(0, match.index), Number(match[1])]);
+    }
+    return result;
+}
+
+/**
+ * The values the conditions of the field at a path see: in a field group's entry, the entry's own values over the form's (see
+ * getEntryScope); otherwise the form's.
+ */
+export function getPathScope(values: FormValues, path: string): FormValues {
+    let scope = values;
+    for (const [groupPath, index] of getEntryPaths(path)) {
+        scope = getEntryScope(asEntry(getValueAtPath(values, `${groupPath}[${index}]`)), scope);
+    }
+    return scope;
 }

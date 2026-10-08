@@ -146,12 +146,13 @@ The views you can put in a theme are `Form`, `Rows`, `Field` and `Fields/{field 
 
 To change a view for every form, whatever the theme, put it at the same path as in the package instead, such as `Views/Forms/Fields/text.cshtml`.
 
-forms.js only relies on `data-sf-*` attributes, never on class names, so you can use any classes you like (Bootstrap, Tailwind, ...). Keep these attributes when you replace a view:
+forms.js runs the same form engine as the headless front-ends (see [Vue and Nuxt](#vue-and-nuxt)) on the form's definition, which `Form.cshtml` writes into the page. It finds the markup by `data-sf-*` attributes, never by class names, so you can use any classes you like (Bootstrap, Tailwind, ...). Keep these when you replace a view:
 
-- The `<form>`: `data-form-ajax`, `data-submission-guards`, `data-sf-paged`, `data-sf-calculations`, and the hidden `data-sf-page-url` input.
-- A field's wrapper: the attributes `AttributesHelper.Build` renders (`data-sf-field-id`, `data-sf-validate`, ...) and `data-field-rules`. Inputs are found by their `name`.
+- The `<form>`: `data-form-ajax`, `data-sf-paged`, the `<script data-sf-definition>` with the definition, and the hidden `data-sf-page-url` input.
+- A field's wrapper: the attributes `AttributesHelper.Build` renders, `data-sf-field-id` (the field's path) and `data-sf-field-type`. Inputs are found by their `name`, which is the field's path too.
 - A column: `data-sf-col`, so a hidden field hides its column too.
-- Pages: `data-sf-page` and its labels and conditions, `data-sf-previous` and `data-sf-next` on the buttons, `data-sf-progress` on the progress list and `data-sf-progress-step` on its items.
+- Pages: `data-sf-page` with the page's index, `data-sf-previous` and `data-sf-next` on the buttons, `data-sf-progress` on the progress list and `data-sf-progress-step` on its items.
+- Repeaters: `data-sf-repeater` with the field's path, `data-sf-repeater-entries`, `data-sf-repeater-entry`, `data-sf-entry-title`, the `<template data-sf-repeater-template>` and the `data-sf-repeater-add` and `data-sf-repeater-remove` buttons.
 
 forms.js marks state with attributes you can style:
 
@@ -164,6 +165,23 @@ forms.js marks state with attributes you can style:
 | `data-sf-error` | An error message (it also has the `form-error` class) |
 | `data-sf-global-errors` | The errors that don't belong to a field, at the top of the form (also `form-global-errors`) |
 | `data-sf-success` | The confirmation message (also `form-success`) |
+
+### Your own JavaScript
+
+`window.SproutForms` takes the same handlers as the headless client, so one validator or guard works for Razor and headless forms alike. Register them after `forms.js` is loaded:
+
+```js
+// A rule type a custom field type returns from GetValidationRules; rules without a validator are only checked by the server
+window.SproutForms.registerValidator("postcode", value => /^\d{4} ?[A-Z]{2}$/i.test(value));
+
+// The browser side of a submission guard you registered on the server: the values it checks, sent with the submission
+window.SproutForms.registerSubmissionGuard("myCaptcha", { getValues: async settings => ({ "my-captcha": await solve(settings) }) });
+
+// Shows an outcome; the context has the form, showMessage(html) and navigate(url)
+window.SproutForms.registerOutcomeHandler("quizResult", (outcome, { showMessage }) => showMessage(`<p>You scored ${Number(outcome.data.score)}</p>`));
+```
+
+`window.SproutForms.getEngine(form)` gives a form's engine, to read its state or drive it from your own script. The form raises `sproutforms:pagechange` (`detail: { index, previousIndex }`) and `sproutforms:submitted` (`detail: { outcome }`).
 
 ## Contents
 
@@ -343,9 +361,9 @@ It also has:
 - `registerValidator` for the validation rules of a custom field type. Rules without a validator are only checked by the server.
 - `registerSubmissionGuard` for a custom guard. The honeypot and reCAPTCHA v3 are built in; call `loadSubmissionGuard(form)` when the form shows.
 
-forms.js uses the same condition and validation code, so a Razor form and a headless form behave the same way.
+forms.js runs the same engine, so a Razor form and a headless form behave the same way.
 
-The client also has a form engine, `createFormEngine(form, { client })`, that holds a form's values, errors and submit for a renderer of your own; see [its README](src/SproutForms.Client/README.md#the-form-engine).
+The client also has a form engine, `createFormEngine(form, { transport: client })`, that holds a form's values, errors and submit for a renderer of your own; see [its README](src/SproutForms.Client/README.md#the-form-engine).
 
 ## Vue and Nuxt
 
@@ -509,10 +527,10 @@ Give it a descriptor (`BaseOutcomeDescriptor<QuizResultOutcomeConfig>`) so edito
 Register a handler for the outcome's alias after `forms.js` is loaded:
 
 ```js
-window.SproutForms.outcomeHandlers.register("quizResult", (form, data) => {
+window.SproutForms.registerOutcomeHandler("quizResult", (outcome, { form }) => {
     const result = document.createElement("div");
     result.className = "form-success";
-    result.textContent = `You scored ${data.score}`;
+    result.textContent = `You scored ${outcome.data.score}`;
     form.replaceChildren(result);
 });
 ```

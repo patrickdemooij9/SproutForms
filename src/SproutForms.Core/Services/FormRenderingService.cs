@@ -71,8 +71,7 @@ namespace SproutForms.Core.Services
                 SubmitLabel = clientModel.SubmitLabel,
                 ShowProgress = clientModel.ShowProgress,
                 SubmissionGuards = submissionGuards,
-                Variables = clientModel.Variables,
-                Calculations = clientModel.Calculations,
+                Definition = clientModel,
                 HasErrors = _errors.Count > 0
             };
         }

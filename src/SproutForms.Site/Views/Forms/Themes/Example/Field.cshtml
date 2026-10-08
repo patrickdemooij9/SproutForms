@@ -3,13 +3,12 @@
 @model FormFieldViewModel
 
 @* An example theme: it only has the views it changes, the others come from the package.
-   The classes are free, but keep the data-sf-* attributes: forms.js relies on them. *@
+   The classes are free, but keep the data-sf-* attributes: forms.js finds the field and its error by them. *@
 @{
     var hasError = Model.Errors.Any();
-    var rulesJson = Model.Rules.Count > 0 ? Json.Serialize(Model.Rules) : null;
 }
 
-<div class="example-field" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model)) @if (rulesJson != null) { <text> data-field-rules='@rulesJson'</text> }>
+<div class="example-field" @AttributesHelper.RenderAttributes(AttributesHelper.Build(Model))>
     @if (!Model.RendersOwnLabel)
     {
         <label class="example-label" for="@Model.Alias">@Model.Label@(Model.Required ? " (required)" : "")</label>

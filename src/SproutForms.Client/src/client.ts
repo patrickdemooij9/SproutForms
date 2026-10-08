@@ -37,6 +37,16 @@ export type SubmitResult =
     | { ok: false; errors: FormErrors };
 
 /**
+ * How the form engine reaches the server: the headless API (createSproutFormsClient), or anything else that checks a page and
+ * takes a submission, such as the Razor forms' own endpoint.
+ */
+export interface FormTransport {
+    // The errors of the rules only the server knows for one page; none means the page is valid
+    validatePage(definition: FormClientModel, pageIndex: number, values: FormValues, init?: { signal?: AbortSignal }): Promise<FormErrors>;
+    submit(definition: FormClientModel, submit: SubmitOptions): Promise<SubmitResult>;
+}
+
+/**
  * A request the API didn't answer as expected: a form that doesn't exist (404), a missing API key (401) or a server error.
  */
 export class SproutFormsApiError extends Error {
@@ -89,6 +99,7 @@ function toETag(versionId: string): string {
 }
 
 export function createSproutFormsClient(options: SproutFormsClientOptions) {
+    // Also a FormTransport, so the engine can use it as is
     const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
     const baseUrl = options.baseUrl.replace(/\/+$/, '') + (options.apiPath ?? defaultApiPath).replace(/\/+$/, '');
 
