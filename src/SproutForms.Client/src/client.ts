@@ -1,15 +1,19 @@
 import type { FormClientModel, HeadlessOutcome, HeadlessSubmitResponse, ValidationProblemDetails } from './api/types.gen';
-import { getSubmissionGuardValues } from './guards';
+import { getSubmissionGuardValues, type SubmissionGuardHandler } from './guards';
+import type { Lookup } from './registry';
 import type { FormErrors, FormValues } from './types';
 
-const apiPath = '/umbraco/sproutforms/delivery/api/v1';
+// Where the Umbraco host serves the headless API
+export const defaultApiPath = '/umbraco/sproutforms/delivery/api/v1';
 
 // The value that holds the page the form was on, next to the fields, as a Razor form posts it
 const pageUrlKey = 'sf_PageUrl';
 
 export interface SproutFormsClientOptions {
-    // The Umbraco site, such as https://cms.example.com
+    // The Umbraco site, such as https://cms.example.com. Empty for the site the page is on, such as a proxy on your own server
     baseUrl: string;
+    // Where the API is under baseUrl; /umbraco/sproutforms/delivery/api/v1 by default
+    apiPath?: string;
     // Only when SproutForms:Headless:ApiKey is set, and only from a server: a key in browser code is public
     apiKey?: string;
     fetch?: typeof fetch;
@@ -23,6 +27,8 @@ export interface SubmitOptions {
     pageUrl?: string;
     // Added to what the form's submission guard handler returns. It is sent with the values, like the page URL
     guard?: Record<string, string>;
+    // Where the submission guard handlers come from; the global ones by default
+    guards?: Lookup<SubmissionGuardHandler>;
     signal?: AbortSignal;
 }
 
@@ -84,7 +90,7 @@ function toETag(versionId: string): string {
 
 export function createSproutFormsClient(options: SproutFormsClientOptions) {
     const fetchImpl = options.fetch ?? globalThis.fetch.bind(globalThis);
-    const baseUrl = options.baseUrl.replace(/\/+$/, '') + apiPath;
+    const baseUrl = options.baseUrl.replace(/\/+$/, '') + (options.apiPath ?? defaultApiPath).replace(/\/+$/, '');
 
     function headers(extra: Record<string, string> = {}): Record<string, string> {
         return {
@@ -152,7 +158,7 @@ export function createSproutFormsClient(options: SproutFormsClientOptions) {
          */
         async submit(definition: FormClientModel, submit: SubmitOptions): Promise<SubmitResult> {
             const split = splitFiles(submit.values);
-            const guard = { ...await getSubmissionGuardValues(definition, submit.values), ...submit.guard };
+            const guard = { ...await getSubmissionGuardValues(definition, submit.values, submit.guards), ...submit.guard };
             const pageUrl = submit.pageUrl ?? (globalThis as { location?: Location }).location?.href;
             const values = { ...split.values, ...guard, ...(pageUrl ? { [pageUrlKey]: pageUrl } : {}) };
             const url = `${baseUrl}/entries/${definition.id}`;

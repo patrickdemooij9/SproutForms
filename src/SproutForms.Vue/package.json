@@ -1,0 +1,41 @@
+{
+  "name": "@sproutforms/vue",
+  "version": "1.0.0-beta002",
+  "description": "Renders SproutForms headless forms in Vue, with components you can replace per field type, per field or per theme.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./layout.css": "./dist/layout.css",
+    "./theme.css": "./dist/theme.css"
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "vite build && vue-tsc -p tsconfig.build.json",
+    "typecheck": "vue-tsc -p tsconfig.json --noEmit",
+    "dev": "vite --config playground/vite.config.ts"
+  },
+  "dependencies": {
+    "@sproutforms/client": "1.0.0-beta002"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.9",
+    "typescript": "^5.8.3",
+    "vite": "^8.3.3",
+    "vue": "^3.5.43",
+    "vue-tsc": "^3.3.12"
+  }
+}

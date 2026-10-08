@@ -2,6 +2,7 @@ import type { FormClientField, FormClientModel, FormClientTexts, ValidationRule 
 import { calculateVariables } from './calculations';
 import { getEntryScope, isFieldRequired, isFieldVisible, isPageVisible, toConditionText } from './conditions';
 import { getEntries, getEntryPrefix, getGroupFields, getPageFields, isFieldGroup } from './pages';
+import { Registry, type Lookup } from './registry';
 import type { FormErrors, FormValues, FormVariables } from './types';
 
 export interface ValidatorContext {
@@ -51,13 +52,19 @@ export const builtInValidators: Readonly<Record<string, Validator>> = {
     maxItems: (value, rule) => rule.value === null || rule.value === undefined || toItemCount(value) <= Number(rule.value)
 };
 
-const validators = new Map<string, Validator>(Object.entries(builtInValidators));
+/**
+ * The validators every form uses unless its own registry replaces them: the built-in ones and those added with registerValidator.
+ */
+export const globalValidators = new Registry<Validator>();
+for (const [type, validator] of Object.entries(builtInValidators)) {
+    globalValidators.register(type, validator);
+}
 
 /**
  * Adds or replaces the validator for a rule type, such as one a custom field type returns from GetValidationRules.
  */
 export function registerValidator(type: string, validator: Validator): void {
-    validators.set(type, validator);
+    globalValidators.register(type, validator);
 }
 
 /**
@@ -94,7 +101,7 @@ export function countFilledEntries(field: FormClientField, value: unknown): numb
  * group's own rules are checked, not its entries: validateForm does those. Pass the form's variables (see calculateVariables)
  * when its conditions use them.
  */
-export async function validateField(field: FormClientField, values: FormValues, texts: FormClientTexts, variables?: FormVariables): Promise<string | undefined> {
+export async function validateField(field: FormClientField, values: FormValues, texts: FormClientTexts, variables?: FormVariables, validators: Lookup<Validator> = globalValidators): Promise<string | undefined> {
     const value = toFieldText(field, values[field.alias]);
     const requiredRule = field.validationRules.find(rule => rule.type === 'required');
 
@@ -120,6 +127,8 @@ export async function validateField(field: FormClientField, values: FormValues, 
 export interface ValidateFormOptions {
     // Only the fields of this page, as when the visitor goes to the next page
     pageIndex?: number;
+    // Where the validators come from; the global ones by default
+    validators?: Lookup<Validator>;
 }
 
 /**
@@ -133,7 +142,7 @@ export async function validateForm(definition: FormClientModel, values: FormValu
     const pages = definition.pages.filter(page => options.pageIndex === undefined ? isPageVisible(page, values, variables) : page.index === options.pageIndex);
 
     for (const page of pages) {
-        await validateFields(getPageFields(page), values, values, variables, '', definition.texts, errors);
+        await validateFields(getPageFields(page), values, values, variables, '', definition.texts, options.validators ?? globalValidators, errors);
     }
     return errors;
 }
@@ -141,7 +150,7 @@ export async function validateForm(definition: FormClientModel, values: FormValu
 /**
  * Validates the fields of the form, or of one entry of a field group: its own values, and the scope its conditions see.
  */
-async function validateFields(fields: FormClientField[], values: FormValues, scope: FormValues, variables: FormVariables, pathPrefix: string, texts: FormClientTexts, errors: FormErrors): Promise<void> {
+async function validateFields(fields: FormClientField[], values: FormValues, scope: FormValues, variables: FormVariables, pathPrefix: string, texts: FormClientTexts, validators: Lookup<Validator>, errors: FormErrors): Promise<void> {
     for (const field of fields) {
         if (!isFieldVisible(field, scope, variables)) continue;
 
@@ -151,11 +160,11 @@ async function validateFields(fields: FormClientField[], values: FormValues, sco
             for (let index = 0; index < entries.length; index++) {
                 const entry = entries[index];
                 if (isBlankEntry(field, entry)) continue;
-                await validateFields(getGroupFields(field), entry, getEntryScope(entry, scope), variables, getEntryPrefix(path, index), texts, errors);
+                await validateFields(getGroupFields(field), entry, getEntryScope(entry, scope), variables, getEntryPrefix(path, index), texts, validators, errors);
             }
         }
 
-        const error = await validateField(field, scope, texts, variables);
+        const error = await validateField(field, scope, texts, variables, validators);
         if (error) errors[path] = [error];
     }
 }

@@ -30,8 +30,9 @@ try {
         }
     }
 
-    if (-not (Test-Path (Join-Path $example 'node_modules'))) {
-        npm --prefix $example install
+    # The client and its example are part of the npm workspace in the repository root
+    if (-not (Test-Path (Join-Path $root 'node_modules'))) {
+        npm --prefix $root install
     }
     if (-not $NoBrowser) { Start-Process 'http://localhost:5173' }
     npm --prefix $example run dev

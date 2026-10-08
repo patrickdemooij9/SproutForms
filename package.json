@@ -1,0 +1,18 @@
+{
+  "name": "sproutforms-frontend",
+  "private": true,
+  "description": "The npm workspace of SproutForms' front-end packages: the engine (@sproutforms/client) and the renderers built on it.",
+  "workspaces": [
+    "src/SproutForms.Client",
+    "src/SproutForms.Client/example",
+    "src/SproutForms.Vue",
+    "src/SproutForms.Nuxt"
+  ],
+  "scripts": {
+    "build": "npm run build -w @sproutforms/client && npm run build -w @sproutforms/vue && npm run build -w @sproutforms/nuxt",
+    "typecheck": "npm run typecheck -w @sproutforms/client && npm run typecheck -w @sproutforms/vue && npm run typecheck -w @sproutforms/nuxt",
+    "dev:vue": "npm run dev -w @sproutforms/vue",
+    "dev:nuxt": "npm run dev -w @sproutforms/nuxt",
+    "preview:nuxt": "npm run preview -w @sproutforms/nuxt"
+  }
+}

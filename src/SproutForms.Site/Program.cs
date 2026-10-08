@@ -25,6 +25,7 @@ if (builder.Environment.IsEnvironment("AiTest"))
         it.Add<AiTestUnknownOutcomeForm>();
         it.Add<AiTestMultiPageForm>();
         it.Add<AiTestRepeaterForm>();
+        it.Add<AiTestHeadlessBasicsForm>();
     });
 }
 

@@ -13,7 +13,9 @@ SproutForms is an Umbraco CMS plugin that enables creating and managing forms in
 | `SproutForms.Umbraco` | Umbraco plugin package | SproutForms.Umbraco.Core |
 | `SproutForms.Site` | Demo/test site | - |
 | `SproutForms.Standalone.Site` | ASP.NET Core MVC site without Umbraco, using `SproutForms.Core` alone | SproutForms.Core |
-| `SproutForms.Client` | `@sproutforms/client`, the npm package for the headless API, with an example app in `example/` | - |
+| `SproutForms.Client` | `@sproutforms/client`, the npm package for the headless API and its form engine, with an example app in `example/` | - |
+| `SproutForms.Vue` | `@sproutforms/vue`, renders headless forms in Vue on the client's form engine, with a playground in `playground/` | `@sproutforms/client` |
+| `SproutForms.Nuxt` | `@sproutforms/nuxt`, the Nuxt module around `@sproutforms/vue`: SSR and an API proxy, with a playground in `playground/` | `@sproutforms/vue` |
 
 ### Target Framework
 - .NET 10.0
@@ -29,6 +31,8 @@ Build the frontend with the following command inside of the src/SproutForms.Umbr
 ```bash
 npm run build
 ```
+
+The headless packages (`SproutForms.Client`, its example, `SproutForms.Vue` and `SproutForms.Nuxt`) are an npm workspace with its root in the repository root: `npm install` there, then `npm run build` builds the client, Vue and Nuxt packages in order and `npm run typecheck` checks them. `src/SproutForms.Umbraco/assets` is not part of it.
 
 ## Key Architecture
 
@@ -103,6 +107,14 @@ Put a new piece in Core unless it needs Umbraco, and register it in `AddSproutFo
 
 `src/SproutForms.Client` holds the conditions and validation rules in TypeScript. `forms.ts` imports them, so `npm run minify:forms` bundles them into `forms.js`; keep them in step with `ConditionEvaluator` and the field types' `Validate`. After changing the API's models, regenerate `src/api/types.gen.ts` with `npm run generate` in `src/SproutForms.Client` while the `AiTest` site runs.
 
+## Front-end packages
+
+`@sproutforms/client` is the engine every renderer shares. `createFormEngine` (`src/engine.ts`) holds one form's state (values, variables, errors, page index, status, outcome), replaces it on every change and tells its subscribers. Values are set by path (`paths.ts`, such as `people[0].email`), repeater entries are added and removed through it, and `next()` checks a page in the browser and with `validatePage` before moving on; it never touches the DOM, so it runs during SSR. Validators, submission guards and outcome handlers live in `Registry`s: the module-level `register*` functions fill the global ones, and a renderer creates children of those per app (per request on a server) and passes them to the engine, `validateForm`, `client.submit` and `handleOutcome`.
+
+`@sproutforms/vue` renders the engine's state. `createSproutForms` is the per-app plugin: client, registries, `navigate`, `loadDefinition` and the themes. `<SproutForm>` loads a definition and renders `<SproutFormView>`, which creates the engine, provides the form context (`useSproutFormContext()`) and renders the theme's `Form`. `useField(field)` derives one field's state, its resolved control and the props to bind on it from that context and the field scope (`scope.ts`): the built-in `RepeaterEntry` calls `provideEntryScope`, so fields in an entry get their path and see the entry's values over the form's; the built-in `Field` is only layout on top of it, and custom wrappers should be too. Components resolve per form: a field's control from the form's `fields` prop by alias, then the form's theme, then the `default` theme, then `builtInFields`; the building blocks (`Form`, `Rows`, `Field`, `Actions`, `Errors`, `Success`) from the theme, the `default` theme, then `builtInComponents`. The built-in components render the Razor views' classes and state attributes, and the package build copies `forms-layout.css` and `forms-default-theme.css` from `SproutForms.Core`, so keep the markup of `Views/Forms` and `src/components` in step.
+
+`@sproutforms/nuxt` creates the plugin per request with a server client (with the API key) or a browser client (through the proxy in `src/runtime/server/proxy.ts`, which only forwards the delivery API's endpoints), and loads definitions with `useAsyncData` so they come with the payload.
+
 ## Adding New Field Types
 
 1. Create descriptor in `SproutForms.Umbraco.Core/Descriptors/Fields/`
@@ -110,6 +122,7 @@ Put a new piece in Core unless it needs Umbraco, and register it in `AddSproutFo
 3. Create view in `SproutForms.Core/Views/Forms/Fields/`
 4. Override `GetClientConfiguration` when the config holds settings the browser mustn't see, and add its config to `BuiltInFieldConfigurations` in `src/SproutForms.Client/src/types.ts`
 5. Register the field type in `AddSproutForms` (`SproutForms.Core/SproutFormsServiceCollectionExtensions.cs`) and the descriptor in `SproutFormComposer.cs`
+6. Add its Vue control to `src/SproutForms.Vue/src/components/fields/` and `builtInFields`, with the same markup as its Razor view
 
 ## Field Groups (repeaters)
 
