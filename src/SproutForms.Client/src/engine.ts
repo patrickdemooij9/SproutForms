@@ -1,13 +1,13 @@
 import type { FormClientField, FormClientModel, HeadlessOutcome } from './api/types.gen';
 import { calculateVariables } from './calculations';
-import type { SproutFormsClient, SubmitResult } from './client';
-import { isFieldRequired, isFieldVisible } from './conditions';
+import type { FormTransport, SubmitResult } from './client';
+import { getEntryScope, isFieldRequired, isFieldVisible } from './conditions';
 import { globalSubmissionGuards, loadSubmissionGuard, type SubmissionGuardHandler } from './guards';
 import { getFieldByPath, getFields, getGroupFields, getNextPageIndex, getPageFields, getPreviousPageIndex, getVisiblePageIndexes, isFieldGroup, isLastPage } from './pages';
-import { getValueAtPath, setValueAtPath } from './paths';
+import { getEntryPaths, getValueAtPath, setValueAtPath } from './paths';
 import type { Lookup } from './registry';
 import type { FormErrors, FormValues, FormVariables } from './types';
-import { globalValidators, validateForm, type Validator } from './validation';
+import { globalValidators, isBlankEntry, validateField, validateForm, type Validator } from './validation';
 
 /**
  * Where a form is: being filled in, checking a page with the server before going to the next one, submitting, or submitted.
@@ -35,10 +35,14 @@ export interface FormState {
 }
 
 export interface FormEngineOptions {
-    // Needed to submit, and to check a page with the server before going to the next one
-    client?: SproutFormsClient;
+    // How it reaches the server: needed to submit, and to check a page with the server before going to the next one. A headless
+    // client (createSproutFormsClient) is one
+    transport?: FormTransport;
     // Keyed by field alias, over the defaults of the form's hidden fields and the first entries of its field groups
     initialValues?: FormValues;
+    // Errors to start with, such as those of a post the server rendered the form again for; the form starts on the first page
+    // that has one
+    initialErrors?: FormErrors;
     // Where the validators and submission guard handlers come from; the global ones by default
     validators?: Lookup<Validator>;
     guards?: Lookup<SubmissionGuardHandler>;
@@ -91,6 +95,12 @@ function getRootAlias(path: string): string {
     return path.split(/[.[]/)[0];
 }
 
+// The page with the first error that is about a field, so the visitor sees it
+function getPageWithError(definition: FormClientModel, errors: FormErrors): number | undefined {
+    const aliases = new Set(Object.keys(errors).map(getRootAlias));
+    return definition.pages.find(page => getPageFields(page).some(field => aliases.has(field.alias)))?.index;
+}
+
 /**
  * Holds the state of one form and everything that changes it: the values, the variables worked out from them, the page the
  * visitor is on, the entries of field groups, validation and the submit. It doesn't touch the DOM, so a renderer for any
@@ -103,11 +113,12 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
 
     function createState(): FormState {
         const values = { ...getStartValuesOf(getFields(definition)), ...options.initialValues };
+        const errors = options.initialErrors ?? {};
         return {
             values,
             variables: calculateVariables(definition, values),
-            errors: {},
-            pageIndex: getVisiblePageIndexes(definition, values)[0] ?? 0,
+            errors,
+            pageIndex: getPageWithError(definition, errors) ?? getVisiblePageIndexes(definition, values)[0] ?? 0,
             status: 'idle',
             outcome: null,
             submitError: undefined
@@ -131,10 +142,9 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
             key !== path && !(includingEntries && key.startsWith(`${path}[`))));
     }
 
-    // The page with the first error that is about a field, so the visitor sees it
-    function getPageWithError(errors: FormErrors): number | undefined {
-        const aliases = new Set(Object.keys(errors).map(getRootAlias));
-        return definition.pages.find(page => getPageFields(page).some(field => aliases.has(field.alias)))?.index;
+    function clearError(path: string): undefined {
+        if (path in state.errors) setState({ errors: withoutErrors(path) });
+        return undefined;
     }
 
     function hasErrors(errors: FormErrors): boolean {
@@ -229,7 +239,7 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
         },
 
         /**
-         * Validates the current page in the browser, then with the server's rules when there is a client, and goes to the next
+         * Validates the current page in the browser, then with the server's rules when there is a transport, and goes to the next
          * page the visitor goes through when it is valid. Returns whether it went.
          */
         async next(): Promise<boolean> {
@@ -242,10 +252,10 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
                 return false;
             }
 
-            if (options.client) {
+            if (options.transport) {
                 setState({ status: 'validating', errors: {}, submitError: undefined });
                 try {
-                    const serverErrors = await options.client.validatePage(definition, pageIndex, state.values);
+                    const serverErrors = await options.transport.validatePage(definition, pageIndex, state.values);
                     if (hasErrors(serverErrors)) {
                         setState({ status: 'idle', errors: serverErrors });
                         return false;
@@ -283,6 +293,38 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
         },
 
         /**
+         * Validates one field by its path and shows or clears its error, such as when the visitor leaves it. A field the visitor
+         * can't see, or one in an entry they left empty, isn't validated, as on submit. Returns its error.
+         */
+        async validateField(path: string): Promise<string | undefined> {
+            const field = getFieldByPath(definition, path);
+            if (!field) return undefined;
+
+            // A field in an entry sees the entry's values over the form's, and the entries it is in must be filled in
+            let scope = state.values;
+            for (const [groupPath, index] of getEntryPaths(path)) {
+                const group = getFieldByPath(definition, groupPath);
+                const entry = getValueAtPath(state.values, `${groupPath}[${index}]`) as FormValues | undefined ?? {};
+                if (!group || isBlankEntry(group, entry)) return clearError(path);
+                scope = getEntryScope(entry, scope);
+            }
+
+            const pageVisible = getVisiblePageIndexes(definition, state.values, state.pageIndex)
+                .some(index => getPageFields(definition.pages.find(page => page.index === index)!).some(it => it.alias === getRootAlias(path)));
+            if (!pageVisible || !isFieldVisible(field, scope, state.variables)) return clearError(path);
+
+            const error = await validateField(field, scope, definition.texts, state.variables, validators);
+            if (error) {
+                setState({ errors: { ...state.errors, [path]: [error] } });
+            } else {
+                clearError(path);
+            }
+            return error;
+        },
+
+        clearError,
+
+        /**
          * Loads what the form's submission guard needs up front, such as the reCAPTCHA script. Only call it in a browser.
          */
         loadSubmissionGuard(): Promise<void> {
@@ -294,22 +336,22 @@ export function createFormEngine(definition: FormClientModel, options: FormEngin
          * the state's errors, on the first page that has one; any other failure in submitError, and is thrown.
          */
         async submit(): Promise<SubmitResult> {
-            if (!options.client) throw new Error('The form engine needs a client to submit.');
+            if (!options.transport) throw new Error('The form engine needs a transport to submit.');
             if (state.status !== 'idle') return { ok: false, errors: state.errors };
 
             const errors = await validateForm(definition, state.values, { validators });
             if (hasErrors(errors)) {
-                setState({ errors, pageIndex: getPageWithError(errors) ?? state.pageIndex });
+                setState({ errors, pageIndex: getPageWithError(definition, errors) ?? state.pageIndex });
                 return { ok: false, errors };
             }
 
             setState({ status: 'submitting', errors: {}, submitError: undefined });
             try {
-                const result = await options.client.submit(definition, { values: state.values, pageUrl: options.pageUrl, guards });
+                const result = await options.transport.submit(definition, { values: state.values, pageUrl: options.pageUrl, guards });
                 if (result.ok) {
                     setState({ status: 'submitted', outcome: result.outcome });
                 } else {
-                    setState({ status: 'idle', errors: result.errors, pageIndex: getPageWithError(result.errors) ?? state.pageIndex });
+                    setState({ status: 'idle', errors: result.errors, pageIndex: getPageWithError(definition, result.errors) ?? state.pageIndex });
                 }
                 return result;
             } catch (error) {

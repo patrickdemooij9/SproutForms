@@ -2,7 +2,6 @@
 using Microsoft.AspNetCore.Mvc.Rendering;
 using SproutForms.Umbraco.Core.Models.ViewModels;
 using System.Text.Encodings.Web;
-using System.Text.RegularExpressions;
 
 namespace SproutForms.Core.Rendering
 {
@@ -23,42 +22,15 @@ namespace SproutForms.Core.Rendering
             return builder;
         }
 
+        /// <summary>
+        /// The attributes of a field's wrapper: forms.js finds the field by its path, and the stylesheets look at its type. Its rules
+        /// come with the form's definition.
+        /// </summary>
         public static IDictionary<string, string> Build(FormFieldViewModel model)
-        {
-            var attributes = new Dictionary<string, string>
+            => new Dictionary<string, string>
             {
                 ["data-sf-field-id"] = model.Alias,
                 ["data-sf-field-type"] = model.Type,
             };
-
-            if (model.ValidationRules.Count() > 0) //TODO: Fix multiple enumerations
-            {
-                attributes["data-sf-validate"] = string.Join(",", model.ValidationRules.Select(it => it.Type));
-
-                foreach (var validationRule in model.ValidationRules)
-                {
-                    var typeKebab = validationRule.Type.PascalToKebabCase();
-
-                    attributes[$"data-sf-{typeKebab}"] = validationRule.Value?.ToString();
-                    attributes[$"data-sf-{typeKebab}-message"] = validationRule.Message;
-                }
-            }
-
-            return attributes;
-        }
-
-        public static string PascalToKebabCase(this string value)
-        {
-            if (string.IsNullOrEmpty(value))
-                return value;
-
-            return Regex.Replace(
-                value,
-                "(?<!^)([A-Z][a-z]|(?<=[a-z])[A-Z0-9])",
-                "-$1",
-                RegexOptions.Compiled)
-                .Trim()
-                .ToLower();
-        }
     }
 }

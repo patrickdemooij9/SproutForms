@@ -28,7 +28,7 @@ const theme = props.theme ?? defaultThemeName;
 const idPrefix = useId();
 
 const engine = createFormEngine(props.definition, {
-    client: sproutForms.client,
+    transport: sproutForms.client,
     initialValues: props.initialValues,
     validators: sproutForms.validators,
     guards: sproutForms.guards

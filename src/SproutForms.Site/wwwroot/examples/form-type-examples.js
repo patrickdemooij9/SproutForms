@@ -1,10 +1,10 @@
 // Front-end handlers for the example form types in /Examples. Load this after forms.js:
 //   <render-form-dependencies></render-form-dependencies>
 //   <script src="/examples/form-type-examples.js"></script>
-// A handler gets the form element and the data its outcome type returned, and replaces the form with the result.
-// Everything is written with textContent, because the data can contain text editors typed in.
+// A handler gets the outcome (its type and the data its outcome type returned) and a context with the form element, and replaces
+// the form with the result. Everything is written with textContent, because the data can contain text editors typed in.
 (function () {
-    const outcomes = window.SproutForms.outcomeHandlers;
+    const register = window.SproutForms.registerOutcomeHandler;
 
     function element(tag, className, text) {
         const el = document.createElement(tag);
@@ -21,7 +21,7 @@
     }
 
     // QuizResultOutcomeType: the score and the pass or fail message
-    outcomes.register("quizResult", (form, data) => {
+    register("quizResult", ({ data }, { form }) => {
         showResult(form, [
             element("strong", "example-quiz-score", `${data.score} / ${data.maxScore}`),
             element("p", null, data.resultMessage)
@@ -29,7 +29,7 @@
     });
 
     // PollResultsOutcomeType: a bar per option, with the visitor's own vote marked
-    outcomes.register("pollResults", (form, data) => {
+    register("pollResults", ({ data }, { form }) => {
         const children = data.questions.map((question) => {
             const block = element("div", "example-poll-question");
             block.append(element("p", "example-poll-label", question.question));
@@ -51,9 +51,9 @@
     });
 
     // ProductRecommendationOutcomeType: go to the product, or show the "no match" message
-    outcomes.register("productRecommendation", (form, data) => {
+    register("productRecommendation", ({ data }, { form, navigate }) => {
         if (data.url) {
-            window.location.href = data.url;
+            navigate(data.url);
             return;
         }
         showResult(form, [element("p", null, data.message)]);

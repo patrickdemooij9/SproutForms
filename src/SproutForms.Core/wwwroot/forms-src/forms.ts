@@ -1,413 +1,536 @@
-import { computeVariables, usesVariables } from "../../../SproutForms.Client/src/calculations";
-import { evaluateCondition, isRequiredByRules, isShownByRules } from "../../../SproutForms.Client/src/conditions";
-import { builtInValidators } from "../../../SproutForms.Client/src/validation";
-import type { CalculationRule, ConditionDefinition, FieldRule, FormClientVariable, FormVariables } from "../../../SproutForms.Client/src/types";
+// The browser side of the Razor forms: the form engine of @sproutforms/client, the same one headless front-ends use, driving the
+// markup the Razor views rendered. The engine holds the values, conditions, calculations, validation, pages and submit; this file
+// feeds it what the visitor enters and shows its state with data-sf-* attributes.
+import {
+    createFormEngine,
+    getEntryTitle,
+    getFieldByPath,
+    getFormErrors,
+    getPathScope,
+    getSubmissionGuardValues,
+    getVisiblePageIndexes,
+    globalOutcomeHandlers,
+    handleOutcome,
+    isFieldRequired,
+    isFieldVisible,
+    Registry,
+    registerSubmissionGuard,
+    registerValidator,
+    setValueAtPath,
+    type FormClientModel,
+    type FormEngine,
+    type FormErrors,
+    type FormState,
+    type FormTransport,
+    type FormValues,
+    type OutcomeContext,
+    type OutcomeHandler,
+    type RepeaterFieldConfiguration,
+    type SubmitResult
+} from "../../../SproutForms.Client/src/index";
 
-interface SubmissionGuard {
-    load?: (form: HTMLFormElement, settings: Record<string, unknown>) => Promise<void>;
-    beforeSubmit?: (form: HTMLFormElement, settings: Record<string, unknown>, payload: FormData) => Promise<void>;
+/**
+ * What an outcome handler of a Razor form can do on top of the engine's context.
+ */
+export interface RazorOutcomeContext extends OutcomeContext {
+    form: HTMLFormElement;
+    // Replaces the form with a success message, as HTML
+    showMessage(html: string): void;
+    navigate(url: string): void;
 }
 
-interface SubmissionGuardRegistry {
-    [alias: string]: SubmissionGuard;
-}
-
-interface FieldCondition {
-    rules: Array<{
-        fieldAlias: string;
-        variableAlias?: string | null;
-        comparison: string;
-        value: unknown;
-        valueSource?: string;
-    }>;
-    operator?: "All" | "Any";
-}
-
-// The variables the conditions of a form use, and the calculations that work them out, from data-sf-calculations
-interface CalculationState {
-    variables: FormClientVariable[];
-    calculations: CalculationRule[];
-    dependsOnVisibility: boolean;
-}
-
-// A field's rules from data-field-rules, kept on its wrapper
-type FieldRulesElement = HTMLElement & { rules?: FieldRule[] };
-
-interface Validator {
-    (value: string | undefined, options: Record<string, string | undefined>, context?: Element): Promise<boolean>;
-}
-
-interface ValidatorRegistry {
-    [alias: string]: Validator;
-}
-
-interface OutcomeHandler {
-    (form: HTMLFormElement, outcomeData: Record<string, unknown>): void | Promise<void>;
-}
-
-interface OutcomeHandlerRegistry {
-    [alias: string]: OutcomeHandler;
-}
-
-interface ValidationResult {
-    valid: boolean;
-    rule?: string;
-    message?: string;
-}
-
-interface GuardSettings {
-    siteKey?: string;
-    action?: string;
-}
-
-interface GuardDefinition {
-    alias: string;
-    settings: Record<string, unknown>;
-}
-
-interface PageState {
-    pages: HTMLElement[];
-    conditions: Array<FieldCondition | undefined>;
-    current: number;
-}
+export type RazorOutcomeHandler = OutcomeHandler<RazorOutcomeContext>;
 
 interface PageChangeDetail {
     index: number;
     previousIndex: number;
 }
 
-interface FormSubmitResult {
-    outcomeType?: string;
-    outcomeData?: Record<string, unknown>;
-    errors?: Record<string, string[]>;
-    values?: Record<string, unknown>;
+// The response of the Razor endpoint, /api/forms/{id}
+interface RazorSubmitResponse {
+    success: boolean;
+    errors?: FormErrors;
+    outcomeType?: string | null;
+    outcomeData?: Record<string, unknown> | null;
 }
 
 declare global {
     interface Window {
         SproutForms: {
-            submissionGuard: {
-                registry: SubmissionGuardRegistry;
-                register(alias: string, guard: SubmissionGuard): void;
-            };
-            conditions: {
-                registry: FieldCondition[] | null;
-                init(form: Element): void;
-                evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>, variables?: FormVariables): boolean;
-            };
-            validation: {
-                registry: ValidatorRegistry;
-                register(alias: string, validator: Validator): void;
-                validateField(fieldContainer: Element): Promise<ValidationResult>;
-            };
-            outcomeHandlers: {
-                registry: OutcomeHandlerRegistry;
-                register(alias: string, handler: OutcomeHandler): void;
-            };
-        };
-        grecaptcha?: {
-            execute(siteKey: string, options: { action: string }): Promise<string>;
+            // The validator for a rule type, such as one a custom field type returns from GetValidationRules
+            registerValidator: typeof registerValidator;
+            // The browser side of a submission guard you registered on the server
+            registerSubmissionGuard: typeof registerSubmissionGuard;
+            // Shows the outcome of a submit, by outcome type
+            registerOutcomeHandler(type: string, handler: RazorOutcomeHandler): void;
+            // The engine of a form on the page, to read its state or drive it from your own script
+            getEngine(form: HTMLFormElement): FormEngine | undefined;
         };
     }
 }
 
-window.SproutForms = {
-    submissionGuard: {
-        registry: {},
-        register(alias: string, guard: SubmissionGuard) {
-            this.registry[alias] = guard;
-        }
+const builtInOutcomeHandlers: Record<string, RazorOutcomeHandler> = {
+    // Editors write the message in the CMS; never put submitted values in it
+    message: (outcome, context) => {
+        if (typeof outcome.data.message === "string" && outcome.data.message) context.showMessage(outcome.data.message);
+        else context.showMessage(escapeHtml(context.definition.texts.submitSucceeded));
     },
-    conditions: {
-        registry: null as FieldCondition[] | null,
-        init(form: Element) {
-            const raw = form.getAttribute("data-field-conditions");
-            if (!raw) {
-                this.registry = [];
-                return;
-            }
-            try {
-                this.registry = JSON.parse(raw);
-            } catch {
-                this.registry = [];
-            }
-        },
-        // Shared with @sproutforms/client, so Razor and headless forms decide the same way as the server
-        evaluate(fieldConditions: FieldCondition | undefined, formValues: Record<string, unknown>, variables?: FormVariables): boolean {
-            return evaluateCondition(fieldConditions as ConditionDefinition | undefined, formValues, variables);
-        }
+    redirect: (outcome, context) => {
+        if (typeof outcome.data.url === "string" && outcome.data.url) context.navigate(outcome.data.url);
     },
-    validation: {
-        registry: {} as ValidatorRegistry,
-
-        register(alias: string, validator: Validator) {
-            this.registry[alias] = validator;
-        },
-
-        async validateField(fieldContainer: Element): Promise<ValidationResult> {
-            const rules = (fieldContainer.getAttribute("data-sf-validate") || "").split(",");
-            // A condition can make a field required that isn't required on its own
-            if (getOwnElements(fieldContainer, "[data-conditional-required]").length > 0 && !rules.includes("required")) {
-                rules.unshift("required");
-            }
-            const value = getFieldValue(fieldContainer);
-            const containerEl = fieldContainer as HTMLElement;
-
-            for (const rule of rules) {
-                const validator = this.registry[rule.trim()];
-                if (!validator) continue;
-
-                const isValid = await validator(value, containerEl.dataset as Record<string, string | undefined>);
-
-                if (!isValid) {
-                    const capitalizedType = rule.charAt(0).toUpperCase() + rule.slice(1);
-                    return {
-                        valid: false,
-                        rule,
-                        message: containerEl.dataset[`sf${capitalizedType}Message`]
-                            ?? (rule === "required" ? "Field is required." : undefined)
-                    };
-                }
-            }
-
-            return { valid: true };
-        }
-    },
-    outcomeHandlers: {
-        registry: {} as OutcomeHandlerRegistry,
-
-        register(alias: string, handler: OutcomeHandler) {
-            this.registry[alias] = handler;
-        }
+    redirectUmbracoPage: (outcome, context) => {
+        if (typeof outcome.data.url === "string" && outcome.data.url) context.navigate(outcome.data.url);
     }
 };
 
-document.addEventListener("submit", async function (e) {
-    const form = e.target as HTMLFormElement;
-
-    if (!form.matches("[data-form-ajax]")) return;
-
-    e.preventDefault();
-
-    // Enter in a field submits the form, which on any page but the last means going to the next page
-    const pageState = pageStates.get(form);
-    if (pageState && !isOnLastPage(pageState)) {
-        await goToNextPage(form);
-        return;
-    }
-
-    const validation = await validateAllFields(form);
-    if (!validation) {
-        showFirstPageWithError(form);
-        return;
-    }
-
-    const formData = new FormData(form);
-
-    const submissionGuards = getSubmissionGuards(form);
-    try {
-        for (const guardDef of submissionGuards) {
-            const guard = window.SproutForms?.submissionGuard?.registry?.[guardDef.alias];
-            if (!guard) continue;
-
-            if (guard.beforeSubmit) {
-                await guard.beforeSubmit(form, guardDef.settings, formData);
-            }
-        }
-    } catch (err) {
-        const error = err as Error;
-        applyGlobalError(form, error.message || "Something went wrong. Please try again.");
-        return;
-    }
-
-    const response = await fetch(form.action, {
-        method: "POST",
-        headers: {
-            "X-Requested-With": "XMLHttpRequest"
-        },
-        body: formData
-    });
-
-    const result = await response.json() as FormSubmitResult;
-
-    clearErrors(form);
-
-    if (!response.ok) {
-        applyErrors(form, result.errors || {});
-        showFirstPageWithError(form);
-        return;
-    }
-
-    if (result.outcomeType) {
-        const handler = window.SproutForms?.outcomeHandlers?.registry?.[result.outcomeType];
-        if (handler) {
-            await handler(form, result.outcomeData);
-            return;
-        }
-    }
-
-    // The submission was saved, but there's no outcome to show (none configured, or no handler registered for it).
-    // Confirm it anyway, so the visitor doesn't think it failed and submit again.
-    showFallbackSuccess(form);
+// Those registered on the page, then the global ones, then the built-in ones
+const outcomeHandlers = new Registry<RazorOutcomeHandler>({
+    get: type => globalOutcomeHandlers.get(type) ?? builtInOutcomeHandlers[type]
 });
 
-// The value the field submits: the checked radio, a checkbox only when it's checked, and the file name of an upload.
-// A repeater's value is the number of entries the visitor filled in, as the server counts them
-function getFieldValue(fieldContainer: Element): string | undefined {
-    const repeater = getOwnElements<HTMLElement>(fieldContainer, "[data-sf-repeater]")[0];
-    if (repeater) {
-        const count = getEntries(repeater).filter(entry => !isBlankEntry(entry)).length;
-        return count === 0 ? undefined : String(count);
-    }
+const engines = new WeakMap<HTMLFormElement, FormEngine>();
 
-    const inputs = getOwnElements<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(fieldContainer, "input, textarea, select");
-    const first = inputs[0];
-    if (!first) return undefined;
-
-    if (first instanceof HTMLInputElement && (first.type === "radio" || first.type === "checkbox")) {
-        const checked = inputs.find(input => input instanceof HTMLInputElement && input.type === first.type && input.checked);
-        return checked?.value;
-    }
-    if (first instanceof HTMLInputElement && first.type === "file") {
-        return first.files?.[0]?.name;
-    }
-    return first.value;
-}
-
-function showFallbackSuccess(form: HTMLFormElement) {
-    const success = document.createElement("div");
-    success.className = "form-success";
-    success.setAttribute("data-sf-success", "");
-    success.setAttribute("role", "status");
-    success.textContent = "Thank you, your submission has been received.";
-    form.replaceChildren(success);
-}
+window.SproutForms = {
+    registerValidator,
+    registerSubmissionGuard,
+    registerOutcomeHandler: (type, handler) => outcomeHandlers.register(type, handler),
+    getEngine: form => engines.get(form)
+};
 
 document.addEventListener("DOMContentLoaded", () => {
-    document.querySelectorAll("form[data-form-ajax]").forEach(initForm);
+    document.querySelectorAll<HTMLFormElement>("form[data-form-ajax]").forEach(initForm);
 });
 
-function initForm(form: Element) {
-    initFormGuards(form as HTMLFormElement);
-    initRepeaters(form as HTMLFormElement);
-    initConditionalFields(form as HTMLFormElement);
-    initPageUrl(form as HTMLFormElement);
-    initValidation(form as HTMLFormElement);
-    initPages(form as HTMLFormElement);
-}
+type ValueElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 
-// The elements of a field itself, not those of the fields inside it, such as the fields in a repeater's entries
-function getOwnElements<T extends Element = Element>(field: Element, selector: string): T[] {
-    return Array.from(field.querySelectorAll<T>(selector)).filter(element => element.closest("[data-sf-field-id]") === field);
-}
+const antiforgeryName = "__RequestVerificationToken";
 
-// Repeaters: the visitor adds and removes entries, whose inputs are named after their index, such as "people[0].firstName".
-// The server reports an entry's errors by the same index, so the entries are renumbered whenever one is removed
-const renumberedAttributes = ["name", "id", "for", "data-sf-field-id", "data-field-id", "aria-describedby", "data-sf-entry-prefix", "data-sf-repeater"];
-const indexPlaceholder = "__index__";
+function initForm(form: HTMLFormElement) {
+    const definitionElement = form.querySelector("script[data-sf-definition]");
+    if (!definitionElement?.textContent) return;
+    const definition = JSON.parse(definitionElement.textContent) as FormClientModel;
 
-function initRepeaters(form: HTMLFormElement) {
-    form.querySelectorAll<HTMLElement>("[data-sf-repeater]").forEach(updateRepeater);
+    const pageUrlInput = form.querySelector<HTMLInputElement>("[data-sf-page-url]");
+    const engine = createFormEngine(definition, {
+        transport: createRazorTransport(form, pageUrlInput?.name),
+        // What the server rendered: the values and errors of a post without JavaScript, or the defaults
+        initialValues: readValues(form, pageUrlInput?.name),
+        initialErrors: readRenderedErrors(form),
+        pageUrl: window.location.href
+    });
+    engines.set(form, engine);
+
+    const view = createView(form, engine);
+    engine.subscribe(state => view.render(state));
+    view.render(engine.getState());
+
+    form.addEventListener("input", event => updateValue(event.target));
+    form.addEventListener("change", event => updateValue(event.target));
+
+    // Leaving a field validates it, so its error shows before the visitor moves on
+    form.addEventListener("focusout", event => {
+        const field = getFieldOfInput(event.target);
+        if (field?.dataset.sfFieldId) void engine.validateField(field.dataset.sfFieldId);
+    });
 
     form.addEventListener("click", event => {
         const target = event.target as Element;
-        const addButton = target.closest("[data-sf-repeater-add]");
-        if (addButton) {
-            addEntry(form, addButton.closest<HTMLElement>("[data-sf-repeater]")!);
-            return;
-        }
-        const removeButton = target.closest("[data-sf-repeater-remove]");
-        if (removeButton) {
-            removeEntry(form, removeButton.closest<HTMLElement>("[data-sf-repeater-entry]")!);
+        if (target.closest("[data-sf-previous]")) {
+            engine.previous();
+        } else if (target.closest("[data-sf-next]")) {
+            void next();
+        } else if (target.closest("[data-sf-repeater-add]")) {
+            view.addEntry(target.closest<HTMLElement>("[data-sf-repeater]")!);
+        } else if (target.closest("[data-sf-repeater-remove]")) {
+            view.removeEntry(target.closest<HTMLElement>("[data-sf-repeater-entry]")!);
         }
     });
+
+    form.addEventListener("submit", event => {
+        event.preventDefault();
+        // Enter in a field submits the form, which on any page but the last means going to the next page
+        void (engine.isLastPage() ? submit() : next());
+    });
+
+    engine.loadSubmissionGuard().catch(error => console.error("SproutForms: the submission guard could not load", error));
+
+    function updateValue(target: EventTarget | null) {
+        if (!isValueElement(target) || !target.name || isIgnored(form, target, pageUrlInput?.name)) return;
+        if (target instanceof HTMLInputElement && target.type === "radio" && !target.checked) return;
+        engine.setValue(target.name, readValue(target));
+    }
+
+    async function next() {
+        try {
+            if (!await engine.next()) view.focusFirstError();
+        } catch (error) {
+            console.error("SproutForms: the page could not be checked", error);
+        }
+    }
+
+    async function submit() {
+        let result: SubmitResult;
+        try {
+            result = await engine.submit();
+        } catch (error) {
+            console.error("SproutForms: the form could not be submitted", error);
+            return;
+        }
+
+        if (!result.ok) {
+            view.focusFirstError();
+            return;
+        }
+
+        form.dispatchEvent(new CustomEvent("sproutforms:submitted", { bubbles: true, detail: { outcome: result.outcome } }));
+        const context: RazorOutcomeContext = {
+            definition,
+            form,
+            showMessage: html => view.showSuccess(html),
+            navigate: url => { window.location.href = url; }
+        };
+        // The submission was saved even when nothing handles its outcome, so confirm it, or the visitor might submit it again
+        if (!await handleOutcome(result.outcome, context, outcomeHandlers)) {
+            view.showSuccess(escapeHtml(definition.texts.submitSucceeded));
+        }
+    }
 }
+
+// Values
+
+function isValueElement(target: EventTarget | null): target is ValueElement {
+    return target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement;
+}
+
+// The antiforgery token and the page URL are the transport's; the hidden "false" after a checkbox is only for posts without JavaScript
+function isIgnored(form: HTMLFormElement, element: ValueElement, pageUrlName: string | undefined): boolean {
+    if (element.name === antiforgeryName || element.name === pageUrlName) return true;
+    return element instanceof HTMLInputElement && element.type === "hidden"
+        && form.querySelector(`input[type=checkbox][name="${CSS.escape(element.name)}"]`) !== null;
+}
+
+// A checkbox's value is whether it's ticked, an upload's the file the visitor chose
+function readValue(element: ValueElement): unknown {
+    if (element instanceof HTMLInputElement) {
+        if (element.type === "checkbox") return element.checked;
+        if (element.type === "file") return element.files?.[0];
+    }
+    return element.value;
+}
+
+// The values of every named input, by its name: the field's path, such as "people[0].email". Inputs that aren't fields, such as the
+// honeypot, end up in the values too, so the submission guard finds them
+function readValues(form: HTMLFormElement, pageUrlName: string | undefined): FormValues {
+    let values: FormValues = {};
+    for (const element of Array.from(form.elements)) {
+        if (!isValueElement(element) || !element.name || isIgnored(form, element, pageUrlName)) continue;
+        if (element instanceof HTMLInputElement && element.type === "radio" && !element.checked) continue;
+        values = setValueAtPath(values, element.name, readValue(element));
+    }
+    return values;
+}
+
+// The errors the server rendered after a post without JavaScript
+function readRenderedErrors(form: HTMLFormElement): FormErrors {
+    const errors: FormErrors = {};
+    form.querySelectorAll<HTMLElement>("[data-sf-field-id]").forEach(field => {
+        const messages = getOwnElements(field, "[data-sf-error]").flatMap(error => {
+            const lines = Array.from(error.children).map(child => child.textContent?.trim() ?? "");
+            return (lines.length > 0 ? lines : [error.textContent?.trim() ?? ""]).filter(Boolean);
+        });
+        if (messages.length > 0) errors[field.dataset.sfFieldId!] = messages;
+    });
+    return errors;
+}
+
+// Transport: the Razor endpoint, with the antiforgery token, as form fields named by path
+
+function createRazorTransport(form: HTMLFormElement, pageUrlName: string | undefined): FormTransport {
+    function toFormData(values: FormValues, withFiles: boolean): FormData {
+        const data = new FormData();
+        appendValues(data, values, "", withFiles);
+        const token = form.querySelector<HTMLInputElement>(`input[name="${antiforgeryName}"]`)?.value;
+        if (token) data.set(antiforgeryName, token);
+        return data;
+    }
+
+    async function post(url: string, data: FormData): Promise<{ response: Response; result: RazorSubmitResponse }> {
+        const response = await fetch(url, { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" }, body: data });
+        const result = await response.json().catch(() => ({ success: false })) as RazorSubmitResponse;
+        return { response, result };
+    }
+
+    return {
+        async validatePage(_definition, pageIndex, values) {
+            // Uploads are checked when the form is submitted
+            const { response, result } = await post(`${form.action}/pages/${pageIndex}/validate`, toFormData(values, false));
+            if (response.status === 400) return result.errors ?? {};
+            if (!response.ok) throw new Error(`SproutForms answered ${response.status}`);
+            return {};
+        },
+
+        async submit(definition, { values, pageUrl, guard, guards }) {
+            const data = toFormData(values, true);
+            const guardValues = { ...await getSubmissionGuardValues(definition, values, guards), ...guard };
+            for (const [name, value] of Object.entries(guardValues)) data.set(name, value);
+            if (pageUrlName && pageUrl) data.set(pageUrlName, pageUrl);
+
+            const { response, result } = await post(form.action, data);
+            if (response.status === 400) return { ok: false, errors: result.errors ?? {} };
+            if (!response.ok) throw new Error(`SproutForms answered ${response.status}`);
+            return { ok: true, outcome: result.outcomeType ? { type: result.outcomeType, data: result.outcomeData ?? {} } : null };
+        }
+    };
+}
+
+// A field group's entries as "people[0].email", booleans as the "true" and "false" a checkbox posts
+function appendValues(data: FormData, values: FormValues, prefix: string, withFiles: boolean) {
+    for (const [alias, value] of Object.entries(values)) {
+        const path = prefix + alias;
+        if (value instanceof Blob) {
+            if (withFiles) data.append(path, value, value instanceof File ? value.name : path);
+        } else if (Array.isArray(value)) {
+            value.forEach((entry, index) => appendValues(data, (entry ?? {}) as FormValues, `${path}[${index}].`, withFiles));
+        } else if (value !== null && value !== undefined) {
+            data.append(path, String(value));
+        }
+    }
+}
+
+// View: the engine's state as attributes on the rendered markup
+
+function createView(form: HTMLFormElement, engine: FormEngine) {
+    const definition = engine.definition;
+    const isPaged = form.hasAttribute("data-sf-paged");
+    const renderedErrors = new WeakMap<Element, string>();
+    let currentPage: number | undefined;
+
+    function render(state: FormState) {
+        form.toggleAttribute("aria-busy", state.status === "submitting" || state.status === "validating");
+        renderFields(state);
+        renderRepeaters();
+        renderGlobalErrors(state);
+        if (isPaged) renderPages(state);
+    }
+
+    function renderFields(state: FormState) {
+        form.querySelectorAll<HTMLElement>("[data-sf-field-id]").forEach(wrapper => {
+            const path = wrapper.dataset.sfFieldId!;
+            const field = getFieldByPath(definition, path);
+            if (!field) return;
+
+            const scope = getPathScope(state.values, path);
+            const visible = isFieldVisible(field, scope, state.variables);
+            setHidden(wrapper, !visible);
+            const column = wrapper.closest<HTMLElement>("[data-sf-col]");
+            if (column) setHidden(column, !visible);
+
+            const required = visible && isFieldRequired(field, scope, state.variables);
+            getOwnElements(wrapper, "input, select, textarea").forEach(input => {
+                if (required) input.setAttribute("aria-required", "true");
+                else input.removeAttribute("aria-required");
+            });
+
+            renderFieldErrors(wrapper, path, state.errors[path] ?? []);
+        });
+    }
+
+    // Only touched when the errors change, so a theme's own error markup stays until then
+    function renderFieldErrors(wrapper: HTMLElement, path: string, messages: string[]) {
+        const key = messages.join("\n");
+        if ((renderedErrors.get(wrapper) ?? readRenderedKey(wrapper)) === key) return;
+        renderedErrors.set(wrapper, key);
+
+        getOwnElements(wrapper, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", String(messages.length > 0)));
+        getOwnElements(wrapper, "[data-sf-error]").forEach(error => error.remove());
+        if (messages.length === 0) return;
+
+        const error = createErrorElement();
+        error.id = `${path}-error`;
+        error.setAttribute("role", "alert");
+        for (const message of messages) {
+            const line = document.createElement("div");
+            line.textContent = message;
+            error.appendChild(line);
+        }
+        wrapper.appendChild(error);
+    }
+
+    // The errors the server rendered, the first time
+    function readRenderedKey(wrapper: HTMLElement): string {
+        return getOwnElements(wrapper, "[data-sf-error]").flatMap(error => {
+            const lines = Array.from(error.children).map(child => child.textContent?.trim() ?? "");
+            return (lines.length > 0 ? lines : [error.textContent?.trim() ?? ""]).filter(Boolean);
+        }).join("\n");
+    }
+
+    function renderGlobalErrors(state: FormState) {
+        const messages = getFormErrors(definition, state.errors);
+        if (state.submitError) messages.unshift(definition.texts.submitFailed);
+
+        let container = form.querySelector<HTMLElement>("[data-sf-global-errors]");
+        if (messages.length === 0) {
+            container?.remove();
+            return;
+        }
+        if (!container) {
+            container = document.createElement("div");
+            container.className = "form-global-errors";
+            container.setAttribute("data-sf-global-errors", "");
+            container.setAttribute("role", "alert");
+            form.prepend(container);
+        }
+        container.replaceChildren(...messages.map(message => {
+            const error = createErrorElement();
+            error.textContent = message;
+            return error;
+        }));
+    }
+
+    // Numbers the entries in order, titles them, and shows the add and remove buttons the minimum and maximum allow
+    function renderRepeaters() {
+        form.querySelectorAll<HTMLElement>("[data-sf-repeater]").forEach(repeater => {
+            const field = getFieldByPath(definition, repeater.dataset.sfRepeater!);
+            if (!field) return;
+            const config = (field.configuration ?? {}) as Partial<RepeaterFieldConfiguration>;
+            const entries = getEntries(repeater);
+
+            entries.forEach((entry, index) => {
+                const title = entry.querySelector(":scope > [data-sf-entry-title]");
+                if (title) title.textContent = getEntryTitle(field, index) ?? "";
+                const removeButton = entry.querySelector<HTMLElement>(":scope > [data-sf-repeater-remove]");
+                if (removeButton) removeButton.hidden = config.minItems != null && entries.length <= config.minItems;
+            });
+
+            const addButton = repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]");
+            if (addButton) addButton.hidden = config.maxItems != null && entries.length >= config.maxItems;
+        });
+    }
+
+    function renderPages(state: FormState) {
+        const pages = Array.from(form.querySelectorAll<HTMLElement>("[data-sf-page]"));
+        const visible = getVisiblePageIndexes(definition, state.values, state.pageIndex);
+        const position = visible.indexOf(state.pageIndex);
+        const page = definition.pages.find(it => it.index === state.pageIndex);
+        const busy = state.status !== "idle";
+
+        pages.forEach(element => {
+            const index = Number(element.dataset.sfPage);
+            element.hidden = index !== state.pageIndex;
+            element.toggleAttribute("data-sf-skipped", !visible.includes(index));
+        });
+
+        const previousButton = form.querySelector<HTMLButtonElement>("[data-sf-previous]");
+        if (previousButton) {
+            previousButton.hidden = position <= 0;
+            previousButton.textContent = page?.previousLabel ?? "";
+            previousButton.disabled = busy;
+        }
+        const nextButton = form.querySelector<HTMLButtonElement>("[data-sf-next]");
+        if (nextButton) {
+            nextButton.hidden = position === visible.length - 1;
+            nextButton.textContent = page?.nextLabel ?? "";
+            nextButton.disabled = busy;
+        }
+        const submitButton = form.querySelector<HTMLButtonElement>("button[type=submit]");
+        if (submitButton) {
+            submitButton.hidden = position !== visible.length - 1;
+            submitButton.disabled = busy;
+        }
+
+        const progress = form.querySelector<HTMLElement>("[data-sf-progress]");
+        if (progress) {
+            progress.hidden = false;
+            progress.querySelectorAll<HTMLElement>("[data-sf-progress-step]").forEach(step => {
+                const stepPosition = visible.indexOf(Number(step.dataset.sfProgressStep));
+                step.hidden = stepPosition === -1;
+                step.toggleAttribute("data-sf-complete", stepPosition !== -1 && stepPosition < position);
+                if (stepPosition === position) step.setAttribute("aria-current", "step");
+                else step.removeAttribute("aria-current");
+            });
+        }
+
+        if (currentPage !== undefined && currentPage !== state.pageIndex) {
+            form.dispatchEvent(new CustomEvent<PageChangeDetail>("sproutforms:pagechange", {
+                bubbles: true,
+                detail: { index: state.pageIndex, previousIndex: currentPage }
+            }));
+            // A page with errors leaves the focus to its first error
+            if (Object.keys(state.errors).length === 0) pages.find(element => !element.hidden)?.focus();
+        }
+        currentPage = state.pageIndex;
+    }
+
+    function addEntry(repeater: HTMLElement) {
+        const template = repeater.querySelector<HTMLTemplateElement>(":scope > [data-sf-repeater-template]");
+        const container = repeater.querySelector(":scope > [data-sf-repeater-entries]");
+        if (!template || !container) return;
+
+        const fragment = template.content.cloneNode(true) as DocumentFragment;
+        const entry = fragment.querySelector<HTMLElement>("[data-sf-repeater-entry]");
+        if (!entry) return;
+
+        container.appendChild(fragment);
+        const path = repeater.dataset.sfRepeater!;
+        renumberEntries(repeater, path);
+        engine.addEntry(path);
+        focusFirstInput(entry);
+    }
+
+    function removeEntry(entry: HTMLElement) {
+        const repeater = entry.closest<HTMLElement>("[data-sf-repeater]");
+        if (!repeater) return;
+
+        const path = repeater.dataset.sfRepeater!;
+        const index = getEntries(repeater).indexOf(entry);
+        entry.remove();
+        renumberEntries(repeater, path);
+        engine.removeEntry(path, index);
+
+        // Focus stays in the repeater: on the entry that took this one's place, the one before it, or the add button
+        const remaining = getEntries(repeater);
+        const next = remaining[index] ?? remaining[index - 1];
+        if (next) focusFirstInput(next);
+        else repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]")?.focus();
+    }
+
+    function focusFirstError() {
+        const path = Object.keys(engine.getState().errors)[0];
+        const wrapper = path ? form.querySelector<HTMLElement>(`[data-sf-field-id="${CSS.escape(path)}"]`) : null;
+        if (wrapper) focusFirstInput(wrapper);
+        else form.querySelector<HTMLElement>("[data-sf-global-errors]")?.scrollIntoView({ block: "nearest" });
+    }
+
+    function showSuccess(html: string) {
+        const success = document.createElement("div");
+        success.className = "form-success";
+        success.setAttribute("data-sf-success", "");
+        success.setAttribute("role", "status");
+        success.innerHTML = html;
+        form.replaceChildren(success);
+    }
+
+    return { render, addEntry, removeEntry, focusFirstError, showSuccess };
+}
+
+// Repeaters: the inputs of an entry are named after its index, such as "people[0].firstName", and the server reports its errors
+// by the same index, so the entries are renumbered whenever one is added or removed
+const renumberedAttributes = ["name", "id", "for", "data-sf-field-id", "data-field-id", "aria-describedby", "data-sf-entry-prefix", "data-sf-repeater"];
+const indexPlaceholder = "__index__";
 
 function getEntries(repeater: HTMLElement): HTMLElement[] {
     const container = repeater.querySelector(":scope > [data-sf-repeater-entries]");
     return container ? Array.from(container.querySelectorAll<HTMLElement>(":scope > [data-sf-repeater-entry]")) : [];
 }
 
-// An entry whose fields are all empty isn't sent on by the server, so it isn't validated here either
-function isBlankEntry(entry: HTMLElement): boolean {
-    return Array.from(entry.querySelectorAll("[data-sf-field-id]"))
-        .filter(field => field.closest("[data-sf-repeater-entry]") === entry)
-        .every(field => !getFieldValue(field)?.trim());
+function renumberEntries(repeater: HTMLElement, path: string) {
+    getEntries(repeater).forEach((entry, index) => renumberEntry(entry, path, index));
 }
 
-function isInBlankEntry(element: Element): boolean {
-    for (let entry = element.closest<HTMLElement>("[data-sf-repeater-entry]"); entry; entry = entry.parentElement?.closest<HTMLElement>("[data-sf-repeater-entry]") ?? null) {
-        if (isBlankEntry(entry)) return true;
-    }
-    return false;
-}
-
-function addEntry(form: HTMLFormElement, repeater: HTMLElement) {
-    const template = repeater.querySelector<HTMLTemplateElement>(":scope > [data-sf-repeater-template]");
-    const container = repeater.querySelector(":scope > [data-sf-repeater-entries]");
-    if (!template || !container) return;
-
-    const fragment = template.content.cloneNode(true) as DocumentFragment;
-    const entry = fragment.querySelector<HTMLElement>("[data-sf-repeater-entry]");
-    if (!entry) return;
-
-    container.appendChild(fragment);
-    updateRepeater(repeater);
-    initFieldConditions(entry);
-    evaluateAllConditions(form);
-
-    const field = repeater.closest<HTMLElement>("[data-sf-field-id]");
-    if (field) clearFieldError(field);
-    focusFirstInput(entry);
-}
-
-function removeEntry(form: HTMLFormElement, entry: HTMLElement) {
-    const repeater = entry.closest<HTMLElement>("[data-sf-repeater]");
-    if (!repeater) return;
-
-    const index = getEntries(repeater).indexOf(entry);
-    entry.remove();
-    updateRepeater(repeater);
-    evaluateAllConditions(form);
-
-    // Focus stays in the repeater: on the entry that took this one's place, the one before it, or the add button
-    const remaining = getEntries(repeater);
-    const next = remaining[index] ?? remaining[index - 1];
-    if (next) {
-        focusFirstInput(next);
-    } else {
-        repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]")?.focus();
-    }
-}
-
-function focusFirstInput(root: HTMLElement) {
-    root.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
-}
-
-// Numbers the entries in order, titles them, and shows the add and remove buttons the minimum and maximum allow
-function updateRepeater(repeater: HTMLElement) {
-    const alias = repeater.dataset.sfRepeater ?? "";
-    const titleTemplate = repeater.dataset.sfItemTitle ?? "";
-    const min = parseInt(repeater.dataset.sfRepeaterMin ?? "", 10);
-    const max = parseInt(repeater.dataset.sfRepeaterMax ?? "", 10);
-    const entries = getEntries(repeater);
-
-    entries.forEach((entry, index) => {
-        renumberEntry(entry, alias, index);
-        const title = entry.querySelector(":scope > [data-sf-entry-title]");
-        if (title) title.textContent = titleTemplate.replace(/\{n\}/g, String(index + 1));
-        const removeButton = entry.querySelector<HTMLElement>(":scope > [data-sf-repeater-remove]");
-        if (removeButton) removeButton.hidden = !isNaN(min) && entries.length <= min;
-    });
-
-    const addButton = repeater.querySelector<HTMLElement>(":scope > [data-sf-repeater-add]");
-    if (addButton) addButton.hidden = !isNaN(max) && entries.length >= max;
-}
-
-function renumberEntry(entry: HTMLElement, alias: string, index: number) {
-    const escapedAlias = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`(^|\\s)${escapedAlias}\\[(?:\\d+|${indexPlaceholder})\\]`, "g");
-    const replacement = `$1${alias}[${index}]`;
+function renumberEntry(entry: HTMLElement, path: string, index: number) {
+    const escapedPath = path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pattern = new RegExp(`(^|\\s)${escapedPath}\\[(?:\\d+|${indexPlaceholder})\\]`, "g");
+    const replacement = `$1${path}[${index}]`;
 
     const rename = (element: Element) => {
         for (const attribute of renumberedAttributes) {
@@ -428,548 +551,25 @@ function renumberEntry(entry: HTMLElement, alias: string, index: number) {
     renameAll(entry);
 }
 
-const pageStates = new WeakMap<HTMLFormElement, PageState>();
+// Helpers
 
-function initPages(form: HTMLFormElement) {
-    if (!form.hasAttribute("data-sf-paged")) return;
-
-    const pages = Array.from(form.querySelectorAll<HTMLElement>("[data-sf-page]"));
-    const state: PageState = {
-        pages,
-        conditions: pages.map(page => parsePageConditions(page)),
-        current: 0
-    };
-    pageStates.set(form, state);
-    updatePageVisibility(form);
-
-    form.querySelector("[data-sf-previous]")?.addEventListener("click", () => goToPreviousPage(form));
-    form.querySelector("[data-sf-next]")?.addEventListener("click", () => goToNextPage(form));
-    form.querySelector("[data-sf-progress]")?.removeAttribute("hidden");
-
-    // After a post without JavaScript the errors are already rendered, so start on the first page that has one
-    const pageWithError = findFirstPageWithError(state);
-    showPage(form, pageWithError === -1 ? 0 : pageWithError, false);
-}
-
-function parsePageConditions(page: HTMLElement): FieldCondition | undefined {
-    const raw = page.getAttribute("data-sf-page-conditions");
-    if (!raw) return undefined;
-
-    try {
-        return JSON.parse(raw);
-    } catch (e) {
-        console.error("Failed to parse page conditions:", e);
-        return undefined;
-    }
-}
-
-// Marks the pages whose conditions don't hold as skipped, and updates the buttons and progress to match
-function updatePageVisibility(form: HTMLFormElement) {
-    const state = pageStates.get(form);
-    if (!state) return;
-
-    const formValues = getFormValues(form);
-    const variables = getFormVariables(form, formValues);
-    state.pages.forEach((page, index) => {
-        const isVisible = window.SproutForms.conditions.evaluate(state.conditions[index], formValues, variables);
-        page.toggleAttribute("data-sf-skipped", !isVisible);
-    });
-
-    updatePageNavigation(form, state);
-    updateProgress(form, state);
-}
-
-// The current page always counts as visible: its conditions only depend on earlier pages
-function getVisiblePageIndexes(state: PageState): number[] {
-    return state.pages
-        .map((_, index) => index)
-        .filter(index => index === state.current || !state.pages[index].hasAttribute("data-sf-skipped"));
-}
-
-function isOnLastPage(state: PageState): boolean {
-    const visible = getVisiblePageIndexes(state);
-    return visible.indexOf(state.current) === visible.length - 1;
-}
-
-function showPage(form: HTMLFormElement, index: number, moveFocus: boolean) {
-    const state = pageStates.get(form);
-    if (!state) return;
-
-    const previousIndex = state.current;
-    state.current = index;
-    state.pages.forEach((page, i) => page.hidden = i !== index);
-
-    updatePageNavigation(form, state);
-    updateProgress(form, state);
-
-    if (moveFocus) {
-        state.pages[index].focus();
-    }
-    if (previousIndex !== index) {
-        form.dispatchEvent(new CustomEvent<PageChangeDetail>("sproutforms:pagechange", {
-            bubbles: true,
-            detail: { index, previousIndex }
-        }));
-    }
-}
-
-function updatePageNavigation(form: HTMLFormElement, state: PageState) {
-    const visible = getVisiblePageIndexes(state);
-    const position = visible.indexOf(state.current);
-    const page = state.pages[state.current];
-    const isLast = position === visible.length - 1;
-
-    const previousButton = form.querySelector<HTMLButtonElement>("[data-sf-previous]");
-    if (previousButton) {
-        previousButton.hidden = position <= 0;
-        previousButton.textContent = page.dataset.sfPreviousLabel ?? "";
-    }
-
-    const nextButton = form.querySelector<HTMLButtonElement>("[data-sf-next]");
-    if (nextButton) {
-        nextButton.hidden = isLast;
-        nextButton.textContent = page.dataset.sfNextLabel ?? "";
-    }
-
-    const submitButton = form.querySelector<HTMLButtonElement>("button[type=submit]");
-    if (submitButton) {
-        submitButton.hidden = !isLast;
-    }
-}
-
-function updateProgress(form: HTMLFormElement, state: PageState) {
-    const visible = getVisiblePageIndexes(state);
-    const currentPosition = visible.indexOf(state.current);
-
-    form.querySelectorAll<HTMLElement>("[data-sf-progress-step]").forEach(step => {
-        const index = parseInt(step.dataset.sfProgressStep ?? "", 10);
-        const position = visible.indexOf(index);
-        const isCurrent = index === state.current;
-
-        step.hidden = position === -1;
-        step.toggleAttribute("data-sf-complete", position !== -1 && position < currentPosition);
-        if (isCurrent) {
-            step.setAttribute("aria-current", "step");
-        } else {
-            step.removeAttribute("aria-current");
-        }
-    });
-}
-
-async function goToNextPage(form: HTMLFormElement) {
-    const state = pageStates.get(form);
-    if (!state) return;
-
-    const page = state.pages[state.current];
-    const isValid = await validateAllFields(page);
-    if (!isValid) return;
-
-    const nextButton = form.querySelector<HTMLButtonElement>("[data-sf-next]");
-    if (nextButton) nextButton.disabled = true;
-    try {
-        if (!await validatePageOnServer(form, state.current)) return;
-    } finally {
-        if (nextButton) nextButton.disabled = false;
-    }
-
-    const visible = getVisiblePageIndexes(state);
-    const next = visible[visible.indexOf(state.current) + 1];
-    if (next !== undefined) {
-        showPage(form, next, true);
-    }
-}
-
-// Checks the rules only the server knows. Uploads aren't sent; they're checked when the form is submitted.
-async function validatePageOnServer(form: HTMLFormElement, pageIndex: number): Promise<boolean> {
-    const formData = new FormData(form);
-    form.querySelectorAll<HTMLInputElement>("input[type=file]").forEach(input => formData.delete(input.name));
-
-    let response: Response;
-    try {
-        response = await fetch(`${form.action}/pages/${pageIndex}/validate`, {
-            method: "POST",
-            headers: {
-                "X-Requested-With": "XMLHttpRequest"
-            },
-            body: formData
-        });
-    } catch {
-        applyGlobalError(form, "Something went wrong. Please try again.");
-        return false;
-    }
-
-    const page = pageStates.get(form)?.pages[pageIndex];
-    if (page) clearErrors(page);
-
-    if (response.status === 400) {
-        const result = await response.json() as FormSubmitResult;
-        applyErrors(form, result.errors || {});
-        return false;
-    }
-    if (!response.ok) {
-        applyGlobalError(form, "Something went wrong. Please try again.");
-        return false;
-    }
-    return true;
-}
-
-function goToPreviousPage(form: HTMLFormElement) {
-    const state = pageStates.get(form);
-    if (!state) return;
-
-    const visible = getVisiblePageIndexes(state);
-    const previous = visible[visible.indexOf(state.current) - 1];
-    if (previous !== undefined) {
-        showPage(form, previous, true);
-    }
-}
-
-function findFirstPageWithError(state: PageState): number {
-    return state.pages.findIndex(page => page.querySelector("[data-sf-error]"));
-}
-
-function showFirstPageWithError(form: HTMLFormElement) {
-    const state = pageStates.get(form);
-    if (!state) return;
-
-    const index = findFirstPageWithError(state);
-    if (index !== -1 && index !== state.current) {
-        showPage(form, index, true);
-    }
-}
-
-function initPageUrl(form: HTMLFormElement) {
-    const pageUrlInput = form.querySelector('[data-sf-page-url="true"]') as HTMLInputElement | null;
-    if (pageUrlInput) {
-        pageUrlInput.value = window.location.href;
-    }
-}
-
-// Listens on the form, so the fields of a repeater entry added later are validated too
-function initValidation(form: HTMLFormElement) {
-    form.addEventListener("focusout", async event => {
-        const group = getFieldOfInput(event.target);
-        if (group?.hasAttribute("data-sf-validate")) {
-            await validateGroup(group);
-        }
-    });
-
-    form.addEventListener("input", event => {
-        const group = getFieldOfInput(event.target);
-        if (group?.hasAttribute("data-sf-validate")) {
-            clearFieldError(group);
-        }
-    });
+// The elements of a field itself, not those of the fields inside it, such as the fields in a repeater's entries
+function getOwnElements<T extends Element = Element>(field: Element, selector: string): T[] {
+    return Array.from(field.querySelectorAll<T>(selector)).filter(element => element.closest("[data-sf-field-id]") === field);
 }
 
 function getFieldOfInput(target: EventTarget | null): HTMLElement | null {
-    if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement)) return null;
-    return target.closest<HTMLElement>("[data-sf-field-id]");
+    return isValueElement(target) ? target.closest<HTMLElement>("[data-sf-field-id]") : null;
 }
 
-async function validateGroup(group: HTMLElement): Promise<boolean> {
-    const result = await window.SproutForms.validation.validateField(group);
-
-    if (!result.valid) {
-        showFieldError(group, result.message);
-        return false;
-    }
-
-    clearFieldError(group);
-    return true;
-}
-
-function showFieldError(group: HTMLElement, message?: string) {
-    getOwnElements(group, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
-    getOwnElements(group, "[data-sf-error]").forEach(error => error.remove());
-
-    const errorContainer = createErrorElement();
-    errorContainer.setAttribute("role", "alert");
-    errorContainer.textContent = message ?? "";
-
-    group.appendChild(errorContainer);
-}
-
-function clearFieldError(group: HTMLElement) {
-    getOwnElements(group, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "false"));
-    getOwnElements(group, "[data-sf-error]").forEach(error => error.remove());
-}
-
-// Validates the fields inside root: the whole form, or a single page
-async function validateAllFields(root: ParentNode): Promise<boolean> {
-    let isValid = true;
-    // Fields with conditions too, since a condition can make them required
-    const groups = root.querySelectorAll("[data-sf-validate], [data-condition-field]");
-
-    for (const group of groups) {
-        const groupEl = group as HTMLElement;
-        // Also the fields inside a hidden repeater
-        if (groupEl.closest("[data-sf-field-id][hidden], [data-sf-col][hidden]")) {
-            continue;
-        }
-        // A skipped page's fields aren't validated, on the server either
-        if (groupEl.closest("[data-sf-skipped]")) {
-            continue;
-        }
-        // Neither are the fields of a repeater entry the visitor left empty
-        if (isInBlankEntry(groupEl)) {
-            clearFieldError(groupEl);
-            continue;
-        }
-
-        const result = await validateGroup(groupEl);
-        if (!result) {
-            isValid = false;
-        }
-    }
-
-    return isValid;
-}
-
-// Listens on the form, so the fields of a repeater entry added later are evaluated too
-function initConditionalFields(form: HTMLFormElement) {
-    initFieldConditions(form);
-    initCalculations(form);
-
-    form.addEventListener("input", () => evaluateAllConditions(form));
-    form.addEventListener("change", () => evaluateAllConditions(form));
-
-    evaluateAllConditions(form);
-}
-
-function initFieldConditions(root: ParentNode) {
-    const formFields = root.querySelectorAll("[data-field-rules]");
-
-    formFields.forEach(wrapper => {
-        const fieldAlias = wrapper.getAttribute("data-sf-field-id");
-        const rulesRaw = wrapper.getAttribute("data-field-rules");
-
-        if (!rulesRaw || !fieldAlias) return;
-
-        try {
-            wrapper.setAttribute("data-condition-field", fieldAlias);
-            (wrapper as FieldRulesElement).rules = JSON.parse(rulesRaw);
-        } catch (e) {
-            console.error("Failed to parse field rules:", e);
-        }
-    });
-}
-
-function getFormValues(form: HTMLFormElement): Record<string, unknown> {
-    const values: Record<string, unknown> = {};
-    const formData = new FormData(form);
-    for (const [key, value] of formData.entries()) {
-        values[key] = value;
-    }
-
-    // The value the server receives: the checkbox's value when checked, otherwise the hidden "false" next to it
-    const checkboxes = form.querySelectorAll("input[type='checkbox']");
-    checkboxes.forEach(cb => {
-        const checkbox = cb as HTMLInputElement;
-        values[checkbox.name] = checkbox.checked ? checkbox.value : "false";
-    });
-
-    return values;
-}
-
-function getScopedValues(element: Element, formValues: Record<string, unknown>): Record<string, unknown> {
-    const entries: HTMLElement[] = [];
-    for (let entry = element.closest<HTMLElement>("[data-sf-repeater-entry]"); entry; entry = entry.parentElement?.closest<HTMLElement>("[data-sf-repeater-entry]") ?? null) {
-        entries.unshift(entry);
-    }
-    if (entries.length === 0) return formValues;
-
-    const values = { ...formValues };
-    for (const entry of entries) {
-        const prefix = entry.dataset.sfEntryPrefix ?? "";
-        for (const [name, value] of Object.entries(formValues)) {
-            if (name.startsWith(prefix)) values[name.slice(prefix.length)] = value;
-        }
-    }
-    return values;
-}
-
-const calculationStates = new WeakMap<HTMLFormElement, CalculationState>();
-
-function initCalculations(form: HTMLFormElement) {
-    const raw = form.getAttribute("data-sf-calculations");
-    if (!raw) return;
-
-    try {
-        const { variables, calculations } = JSON.parse(raw) as { variables: FormClientVariable[]; calculations: CalculationRule[] };
-        const conditions = [
-            ...Array.from(form.querySelectorAll("[data-sf-page]")).map(page => parsePageConditions(page as HTMLElement)),
-            ...Array.from(form.querySelectorAll<FieldRulesElement>("[data-condition-field]"))
-                .flatMap(wrapper => (wrapper.rules ?? []).map(rule => rule.condition))
-        ];
-        calculationStates.set(form, {
-            variables,
-            calculations,
-            dependsOnVisibility: conditions.some(condition => usesVariables(condition as ConditionDefinition | undefined))
-        });
-    } catch (e) {
-        console.error("Failed to parse calculations:", e);
-    }
-}
-
-// The fields of the form itself, not those in a repeater's entries: calculations only use those
-function isTopLevelField(element: Element): boolean {
-    return !element.closest("[data-sf-repeater-entry]");
-}
-
-// A field the visitor doesn't see, because of its own conditions or a skipped page, counts as empty in the calculations
-function getHiddenFieldAliases(form: HTMLFormElement, formValues: Record<string, unknown>, variables: FormVariables): string[] {
-    const hidden: string[] = [];
-    form.querySelectorAll<HTMLElement>("[data-sf-page]").forEach(page => {
-        if (window.SproutForms.conditions.evaluate(parsePageConditions(page), formValues, variables)) return;
-        page.querySelectorAll("[data-sf-field-id]").forEach(field => {
-            if (isTopLevelField(field)) hidden.push(field.getAttribute("data-sf-field-id")!);
-        });
-    });
-    form.querySelectorAll<FieldRulesElement>("[data-condition-field]").forEach(wrapper => {
-        if (isTopLevelField(wrapper) && !isShownByRules(wrapper.rules, formValues, variables)) {
-            hidden.push(wrapper.getAttribute("data-condition-field")!);
-        }
-    });
-    return hidden;
-}
-
-// The variables the form's conditions use, worked out the same way as on the server, which works them out again on submit
-function getFormVariables(form: HTMLFormElement, formValues: Record<string, unknown>): FormVariables {
-    const state = calculationStates.get(form);
-    if (!state) return {};
-
-    return computeVariables(state.variables, state.calculations, formValues,
-        variables => getHiddenFieldAliases(form, formValues, variables), state.dependsOnVisibility);
-}
-
-function evaluateAllConditions(form: HTMLFormElement) {
-    const formValues = getFormValues(form);
-    const variables = getFormVariables(form, formValues);
-    const fields = form.querySelectorAll("[data-condition-field]");
-
-    fields.forEach(wrapper => {
-        const wrapperEl = wrapper as FieldRulesElement;
-        const rules = wrapperEl.rules;
-        if (!rules) return;
-
-        // Inside a repeater entry, a condition sees the entry's own fields by their alias, over the form's
-        const values = getScopedValues(wrapperEl, formValues);
-        const isVisible = isShownByRules(rules, values, variables);
-
-        setHidden(wrapperEl, !isVisible);
-        const parentCol = wrapper.closest<HTMLElement>("[data-sf-col]");
-        if (parentCol) {
-            setHidden(parentCol, !isVisible);
-        }
-
-        getOwnElements(wrapper, "[data-conditional-required]").forEach(existingRequired => {
-            existingRequired.removeAttribute("data-conditional-required");
-            existingRequired.removeAttribute("required");
-        });
-
-        if (isVisible && isRequiredByRules(rules, values, variables)) {
-            // A repeater marks itself, since its inputs belong to its entries' fields
-            const input = getOwnElements(wrapper, "input, select, textarea, [data-sf-repeater]")[0];
-            if (input) {
-                input.setAttribute("data-conditional-required", "true");
-                input.setAttribute("required", "");
-            }
-        }
-    });
-
-    updatePageVisibility(form);
+function focusFirstInput(root: HTMLElement) {
+    root.querySelector<HTMLElement>("input:not([type=hidden]), select, textarea")?.focus();
 }
 
 // The inline style keeps it hidden when a theme's classes set a display that would win over the hidden attribute
 function setHidden(element: HTMLElement, hidden: boolean) {
     element.hidden = hidden;
     element.style.display = hidden ? "none" : "";
-}
-
-window.SproutForms.submissionGuard.register("recaptchaV3", {
-    async load(form: HTMLFormElement, settings: GuardSettings) {
-        if (window.grecaptcha) return;
-
-        await loadScript(
-            `https://www.google.com/recaptcha/api.js?render=${settings.siteKey}`
-        );
-    },
-
-    async beforeSubmit(form: HTMLFormElement, settings: GuardSettings, payload: FormData) {
-        const token = await window.grecaptcha!.execute(settings.siteKey!, {
-            action: settings.action || "submit"
-        });
-
-        payload.append("g-recaptcha-response", token);
-    }
-});
-
-// The built-in rules are shared with @sproutforms/client; forms.js reads a rule's value from the field's data attribute.
-// None of them look at the field or the other values, so they get an empty context
-const emptyValidatorContext = { field: { alias: "", label: "", type: "", required: false, rendersOwnLabel: false, validationRules: [] }, values: {} };
-for (const [type, validator] of Object.entries(builtInValidators)) {
-    window.SproutForms.validation.register(type, async (value, options) => {
-        if (!value) return type !== "required";
-        const capitalizedType = type.charAt(0).toUpperCase() + type.slice(1);
-        return validator(value, { type, value: options[`sf${capitalizedType}`] }, emptyValidatorContext);
-    });
-}
-
-// A repeater's value is the number of entries the visitor filled in; without any, it has no value
-window.SproutForms.validation.register("minItems", async (value, options) => Number(value ?? 0) >= Number(options.sfMinItems));
-window.SproutForms.validation.register("maxItems", async (value, options) => Number(value ?? 0) <= Number(options.sfMaxItems));
-
-window.SproutForms.validation.register("sameAs", async (value, options, context) => {
-    if (!context) return false;
-    const other = context.querySelector(`[name="${options.sfOther}"]`) as HTMLInputElement | null;
-    return other && value === other.value;
-});
-
-// Clears the errors inside root: the whole form, or a single page
-function clearErrors(root: ParentNode) {
-    root.querySelectorAll("[data-sf-error]").forEach(e => e.remove());
-    root.querySelectorAll("[aria-invalid]").forEach(el => {
-        el.setAttribute("aria-invalid", "false");
-    });
-}
-
-// The inputs still hold what the visitor entered, so only the errors are applied. Writing the
-// echoed values back would overwrite the value attribute of checkboxes and radios.
-function applyErrors(form: HTMLFormElement, errors: Record<string, string[]>) {
-    for (const fieldId in errors) {
-        const messages = errors[fieldId];
-        const wrapper = form.querySelector(`[data-sf-field-id="${fieldId}"]`)
-            ?? form.querySelector(`[name="${fieldId}"]`)?.closest("[data-sf-field-id]");
-
-        if (!wrapper) {
-            messages.forEach(msg => {
-                applyGlobalError(form, msg);
-            });
-            continue;
-        }
-
-        getOwnElements(wrapper, "input, select, textarea").forEach(input => input.setAttribute("aria-invalid", "true"));
-
-        const errorContainer = createErrorElement();
-
-        messages.forEach(msg => {
-            const div = document.createElement("div");
-            div.textContent = msg;
-            errorContainer.appendChild(div);
-        });
-
-        wrapper.appendChild(errorContainer);
-    }
-}
-
-function applyGlobalError(form: HTMLFormElement, message: string) {
-    const container = getOrCreateGlobalErrorContainer(form);
-
-    const div = createErrorElement();
-    div.textContent = message;
-
-    container.appendChild(div);
 }
 
 // forms.js finds errors by the data attribute, the class is only there for the default theme
@@ -980,82 +580,10 @@ function createErrorElement(): HTMLDivElement {
     return element;
 }
 
-function getOrCreateGlobalErrorContainer(form: HTMLFormElement): HTMLElement {
-    let container = form.querySelector<HTMLElement>("[data-sf-global-errors]");
-
-    if (!container) {
-        container = document.createElement("div");
-        container.className = "form-global-errors";
-        container.setAttribute("data-sf-global-errors", "");
-        container.setAttribute("role", "alert");
-        container.setAttribute("aria-live", "assertive");
-        form.prepend(container);
-    }
-
-    return container;
+function escapeHtml(text: string): string {
+    const element = document.createElement("div");
+    element.textContent = text;
+    return element.innerHTML;
 }
 
-async function initFormGuards(form: HTMLFormElement) {
-    const submissionGuards = getSubmissionGuards(form);
-
-    for (const guardDef of submissionGuards) {
-        const guard = window.SproutForms?.submissionGuard?.registry?.[guardDef.alias];
-        if (!guard || !guard.load) continue;
-
-        try {
-            await guard.load(form, guardDef.settings);
-        } catch (err) {
-            const error = err as Error;
-            console.error(`Enhancer '${guardDef.alias}' failed to load`, error);
-            applyGlobalError(
-                form,
-                "This form could not be initialized correctly. Please try again later."
-            );
-        }
-    }
-}
-
-function loadScript(src: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = src;
-        s.async = true;
-        s.onload = () => resolve();
-        s.onerror = () => reject(new Error(`Failed to load script: ${src}`));
-        document.head.appendChild(s);
-    });
-}
-
-function getSubmissionGuards(form: HTMLFormElement): GuardDefinition[] {
-    const raw = form.getAttribute("data-submission-guards");
-    if (!raw) return [];
-
-    try {
-        return JSON.parse(raw);
-    } catch {
-        return [];
-    }
-}
-
-window.SproutForms.outcomeHandlers.register("message", (form, outcomeData) => {
-    const message = outcomeData.message as string;
-    if (message) {
-        form.innerHTML = `<div class="form-success" data-sf-success role="status">${message}</div>`;
-    }
-});
-
-window.SproutForms.outcomeHandlers.register("redirect", (form, outcomeData) => {
-    const url = outcomeData.url as string;
-    if (url) {
-        window.location.href = url;
-    }
-});
-
-window.SproutForms.outcomeHandlers.register("redirectUmbracoPage", (form, outcomeData) => {
-    const url = outcomeData.url as string;
-    if (url) {
-        window.location.href = url;
-    }
-});
-
-export {}
+export {};
