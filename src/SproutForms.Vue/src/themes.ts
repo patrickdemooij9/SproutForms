@@ -20,6 +20,8 @@ export interface FormComponents {
     Actions: Component;
     // The errors that aren't about a field, such as a failed submit
     Errors: Component;
+    // The markup the form's submission guard needs, such as the honeypot's hidden input (Guards/Honeypot.cshtml)
+    SubmissionGuard: Component;
     // What shows instead of the form once it is submitted; gets `message` (HTML from the CMS) or `text`
     Success: Component;
 }

@@ -41,14 +41,11 @@ namespace SproutForms.Core.Flows
                 var response = await client.SendAsync(request, ct);
 
                 if (!response.IsSuccessStatusCode)
-                {
-                    var errorBody = await response.Content.ReadAsStringAsync(ct);
-                    return new WorkflowExecutionResult(false, $"HTTP error: {response.StatusCode} - {errorBody}");
-                }
+                    return await WorkflowFailures.FromResponseAsync(response, "HTTP error", ct);
             }
             catch (Exception ex)
             {
-                return new WorkflowExecutionResult(false, ex.Message);
+                return WorkflowFailures.FromHttpException(ex);
             }
 
             return new WorkflowExecutionResult(true);

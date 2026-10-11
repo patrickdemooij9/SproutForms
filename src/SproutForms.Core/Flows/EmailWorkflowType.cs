@@ -13,15 +13,17 @@ namespace SproutForms.Core.Flows
     {
         private readonly IEmailSender _emailSender;
         private readonly FormValueFormatter _formatter;
+        private readonly WorkflowMessageResolver _messageResolver;
 
         public string Alias => "email";
 
         public Type ConfigurationType => typeof(EmailWorkflowConfig);
 
-        public EmailWorkflowType(IEmailSender emailSender, FormValueFormatter formatter)
+        public EmailWorkflowType(IEmailSender emailSender, FormValueFormatter formatter, WorkflowMessageResolver messageResolver)
         {
             _emailSender = emailSender;
             _formatter = formatter;
+            _messageResolver = messageResolver;
         }
 
         public async Task<WorkflowExecutionResult> ExecuteAsync(WorkflowContext context, CancellationToken ct)
@@ -29,19 +31,22 @@ namespace SproutForms.Core.Flows
             var config = (EmailWorkflowConfig)context.Workflow.Configuration;
 
             var body = BuildBody(context.Submission, context.Version);
+            // A subject is one header line, and a field's value can hold line breaks
+            var subject = string.Join(' ', (_messageResolver.ResolveTokens(config.Subject, context.Submission, context.Version) ?? string.Empty)
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
 
             try
             {
                 await _emailSender.SendAsync(
                 config.From,
                 config.To,
-                VariableTokens.Resolve(config.Subject, context.Submission, context.Version.Definition),
+                subject,
                 body,
                 ct);
             }
             catch (Exception ex)
             {
-                return new WorkflowExecutionResult(false, ex.Message);
+                return WorkflowFailures.FromEmailException(ex);
             }
 
             return new WorkflowExecutionResult(true);

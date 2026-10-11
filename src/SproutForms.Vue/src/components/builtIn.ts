@@ -7,6 +7,7 @@ import Form from './default/Form.vue';
 import Progress from './default/Progress.vue';
 import RepeaterEntry from './default/RepeaterEntry.vue';
 import Rows from './default/Rows.vue';
+import SubmissionGuard from './default/SubmissionGuard.vue';
 import Success from './default/Success.vue';
 import CheckboxField from './fields/CheckboxField.vue';
 import DateField from './fields/DateField.vue';
@@ -22,7 +23,7 @@ import TextField from './fields/TextField.vue';
 /**
  * What every theme falls back to.
  */
-export const builtInComponents: FormComponents = { Form, Progress, Rows, Field, RepeaterEntry, Actions, Errors, Success };
+export const builtInComponents: FormComponents = { Form, Progress, Rows, Field, RepeaterEntry, Actions, Errors, SubmissionGuard, Success };
 
 export const builtInFields: Record<string, Component> = {
     text: TextField,

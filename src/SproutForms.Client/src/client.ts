@@ -1,7 +1,7 @@
 import type { FormClientModel, HeadlessOutcome, HeadlessSubmitResponse, ValidationProblemDetails } from './api/types.gen';
 import { getSubmissionGuardValues, type SubmissionGuardHandler } from './guards';
 import type { Lookup } from './registry';
-import type { FormErrors, FormValues } from './types';
+import type { FormErrors, FormValues, FormVariables } from './types';
 
 // Where the Umbraco host serves the headless API
 export const defaultApiPath = '/umbraco/sproutforms/delivery/api/v1';
@@ -33,7 +33,8 @@ export interface SubmitOptions {
 }
 
 export type SubmitResult =
-    | { ok: true; outcome: HeadlessOutcome | null }
+    // variables: what the server worked out for the variables the definition holds; left out by a transport that doesn't return them
+    | { ok: true; outcome: HeadlessOutcome | null; variables?: FormVariables }
     | { ok: false; errors: FormErrors };
 
 /**
@@ -191,7 +192,7 @@ export function createSproutFormsClient(options: SproutFormsClientOptions) {
             if (!response.ok) return fail(response);
 
             const result = await response.json() as HeadlessSubmitResponse;
-            return { ok: true, outcome: result.outcome ?? null };
+            return { ok: true, outcome: result.outcome ?? null, variables: (result.variables ?? {}) as FormVariables };
         }
     };
 }

@@ -20,7 +20,7 @@ namespace SproutForms.Umbraco.Core.Implementations
         {
             if (!_globalSettings.IsSmtpServerConfigured && !_globalSettings.IsPickupDirectoryLocationConfigured)
             {
-                throw new Exception("SMTP server or pickup directory location must be configured to send emails.");
+                throw new InvalidOperationException("SMTP server or pickup directory location must be configured to send emails.");
             }
 
             return _sender.SendAsync(new EmailMessage(from, to, subject, body, true), "forms-mail");

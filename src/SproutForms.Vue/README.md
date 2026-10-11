@@ -4,7 +4,7 @@ Renders [SproutForms](https://github.com/patrickdemooij9/SproutForms) headless f
 
 It is built on [`@sproutforms/client`](../SproutForms.Client), whose form engine holds the values, conditions, validation and submit. The Vue components only render the engine's state. For Nuxt, use [`@sproutforms/nuxt`](../SproutForms.Nuxt), which sets all of this up and renders on the server.
 
-> This is a first version. It renders every built-in field type (`text`, `email`, `textarea`, `select`, `radio`, `checkbox`, `date`, `file`, `hidden` and `repeater`) and forms with more than one page. Submission guards that need markup, such as the honeypot field, follow.
+> This is a first version. It renders every built-in field type (`text`, `email`, `textarea`, `select`, `radio`, `checkbox`, `date`, `file`, `hidden` and `repeater`) and forms with more than one page, and the honeypot field of the default submission guard.
 
 ## Getting started
 
@@ -32,13 +32,13 @@ app.use(createSproutForms({
 | `fields` | Controls for this form's fields by alias, over their field type's control. |
 | `initialValues` | Values by field alias to start with. |
 
-It emits `submitted` with the outcome (or `null`), `pagechange` with the new and the previous page index, and `error` when the definition can't be loaded or a submit or page check fails other than on validation.
+It emits `submitted` with the outcome (or `null`) and the variables the server worked out (those the definition holds), `pagechange` with the new and the previous page index, and `error` when the definition can't be loaded or a submit or page check fails other than on validation.
 
 Errors show once the visitor goes to the next page or submits, and a field's error goes when its value changes. A form with more than one page shows one page at a time, with its progress when the form has `showProgress`. Going to the next page validates the page in the browser, then with the server's rules; pages whose conditions don't hold are skipped. A submit validates the whole form and goes back to the first page with an error. After a submit, a `message` outcome shows in place of the form; `redirect` and `redirectUmbracoPage` go to their URL, in vue-router when it is installed and the URL is on this site.
 
 ## Styling
 
-`layout.css` is the grid, `theme.css` the default look, the same files the Razor forms use. Change the theme with the `--sf-*` custom properties, as in the [main README](../../README.md#changing-the-default-theme), or leave `theme.css` out and style the classes yourself. The markup has the same classes and state attributes as the Razor views: `form-root`, `form-row`, `form-col col-6`, `form-group`, `form-control`, `form-error`, `form-success`, `[hidden]`, `aria-invalid` and so on.
+`layout.css` is the grid, `theme.css` the default look, the same files the Razor forms use. Change the theme with the `--sf-*` custom properties, as in [Styling](../../docs/styling.md#changing-the-default-theme), or leave `theme.css` out and style the classes yourself. The markup has the same classes and state attributes as the Razor views: `form-root`, `form-row`, `form-col col-6`, `form-group`, `form-control`, `form-error`, `form-success`, `[hidden]`, `aria-invalid` and so on.
 
 ## Replacing parts of the form
 
@@ -114,6 +114,7 @@ createSproutForms({
 | `RepeaterEntry` | One entry of a repeater: its title, rows and remove button. Calls `provideEntryScope` | `field`, `path`, `index`, `removable`; emits `remove` |
 | `Actions` | The previous, next and submit buttons | |
 | `Errors` | Errors that aren't about one field, such as a failed submit | |
+| `SubmissionGuard` | The markup the form's submission guard needs: the honeypot's hidden input. Replace it for a guard of your own that needs markup | |
 | `Success` | What shows instead of the form after a `message` outcome | `message` (HTML from the CMS) or `text` |
 
 #### Your own field wrapper

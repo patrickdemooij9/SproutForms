@@ -2,7 +2,7 @@
 
 A framework-agnostic client for the [SproutForms](https://github.com/patrickdemooij9/SproutForms) headless API. It fetches a published form, evaluates its conditions and validation rules the way the server does, and submits it. It doesn't render anything: [`@sproutforms/vue`](../SproutForms.Vue) and [`@sproutforms/nuxt`](../SproutForms.Nuxt) render forms with it, and you can build a renderer for any other framework on its form engine.
 
-Turn the headless API on in the Umbraco site first. The [README's Headless section](https://github.com/patrickdemooij9/SproutForms#headless) covers the settings, the endpoints and the client.
+Turn the headless API on in the Umbraco site first. [Install headless](https://github.com/patrickdemooij9/SproutForms/blob/main/docs/getting-started/headless/README.md) in the documentation covers the settings, the endpoints and the client.
 
 ```ts
 import { createSproutFormsClient, validateForm } from '@sproutforms/client';
