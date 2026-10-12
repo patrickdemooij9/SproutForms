@@ -1,6 +1,6 @@
 {
   "name": "@sproutforms/client",
-  "version": "1.0.0-beta002",
+  "version": "1.0.0-beta003",
   "description": "Framework-agnostic client for the SproutForms headless API: fetch a form, validate it in the browser and submit it.",
   "license": "MIT",
   "type": "module",
@@ -15,6 +15,10 @@
   "files": [
     "dist"
   ],
+  "publishConfig": {
+    "access": "public",
+    "tag": "beta"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",

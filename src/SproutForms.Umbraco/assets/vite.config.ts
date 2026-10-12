@@ -8,7 +8,7 @@ export default defineConfig({
             fileName: "index"
         },
         outDir: "../wwwroot", 
-        emptyOutDir: false,
+        emptyOutDir: true,
         sourcemap: true,
         rollupOptions: {
             external: [/^@umbraco/],
